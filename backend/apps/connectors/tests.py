@@ -1,3 +1,1 @@
-from django.test import TestCase
-
-# Create your tests here.
+"""Connector unit tests can be expanded in later milestones."""

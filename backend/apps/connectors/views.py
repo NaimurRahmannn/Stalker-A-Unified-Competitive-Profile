@@ -1,3 +1,1 @@
-from django.shortcuts import render
-
-# Create your views here.
+"""Connector endpoints are not exposed directly in this milestone."""
