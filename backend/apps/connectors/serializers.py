@@ -1,13 +1,36 @@
 from rest_framework import serializers
 
-from apps.connectors.models import PlatformAccount
+from apps.connectors.models import CodeforcesStats, PlatformAccount
 
 
 class ConnectorHealthSerializer(serializers.Serializer):
     status = serializers.CharField()
 
 
+class CodeforcesStatsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CodeforcesStats
+        fields = (
+            "handle",
+            "rating",
+            "max_rating",
+            "rank",
+            "max_rank",
+            "solved_count",
+            "attempted_count",
+            "accepted_submission_count",
+            "contest_count",
+            "last_online_at",
+            "registered_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
 class PlatformAccountSerializer(serializers.ModelSerializer):
+    codeforces_stats = CodeforcesStatsSerializer(read_only=True)
+
     class Meta:
         model = PlatformAccount
         fields = (
@@ -19,6 +42,7 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "last_synced_at",
             "created_at",
             "updated_at",
+            "codeforces_stats",
         )
         read_only_fields = (
             "id",
@@ -26,6 +50,7 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "last_synced_at",
             "created_at",
             "updated_at",
+            "codeforces_stats",
         )
         extra_kwargs = {
             "profile_url": {"required": False, "allow_blank": True},

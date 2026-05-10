@@ -1,9 +1,18 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.connectors.models import PlatformAccount
+from apps.connectors.models import CodeforcesStats, PlatformAccount
+from apps.connectors.services.codeforces import (
+    CodeforcesInvalidHandleError,
+    CodeforcesUnavailableError,
+    calculate_solved_stats,
+)
 
 
 User = get_user_model()
@@ -157,3 +166,166 @@ class PlatformAccountAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("handle", response.data)
+
+    @patch("apps.connectors.views.build_codeforces_profile")
+    def test_authenticated_user_can_sync_their_own_codeforces_account(self, mocked_profile):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="Tourist",
+        )
+        last_online_at = timezone.now()
+        registered_at = timezone.now()
+        mocked_profile.return_value = {
+            "handle": "tourist",
+            "rating": 3900,
+            "max_rating": 3900,
+            "rank": "legendary grandmaster",
+            "max_rank": "legendary grandmaster",
+            "solved_count": 2000,
+            "attempted_count": 2500,
+            "accepted_submission_count": 3000,
+            "contest_count": 100,
+            "last_online_at": last_online_at,
+            "registered_at": registered_at,
+            "raw_user_info": {"handle": "tourist"},
+            "raw_rating_history": [{"contestId": 1}],
+        }
+        self.authenticate()
+
+        response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["handle"], "tourist")
+        self.assertTrue(response.data["is_verified"])
+        self.assertIsNotNone(response.data["last_synced_at"])
+        self.assertIn("codeforces_stats", response.data)
+        self.assertEqual(response.data["codeforces_stats"]["handle"], "tourist")
+        self.assertEqual(response.data["codeforces_stats"]["rating"], 3900)
+
+        account.refresh_from_db()
+        self.assertTrue(account.is_verified)
+        self.assertIsNotNone(account.last_synced_at)
+        self.assertEqual(account.handle, "tourist")
+        self.assertTrue(CodeforcesStats.objects.filter(platform_account=account).exists())
+
+    @patch("apps.connectors.views.build_codeforces_profile")
+    def test_sync_updates_existing_codeforces_stats(self, mocked_profile):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="tourist",
+        )
+        CodeforcesStats.objects.create(
+            platform_account=account,
+            handle="tourist",
+            rating=3800,
+            solved_count=10,
+        )
+        mocked_profile.return_value = {
+            "handle": "tourist",
+            "rating": 3900,
+            "max_rating": 3900,
+            "rank": "legendary grandmaster",
+            "max_rank": "legendary grandmaster",
+            "solved_count": 2000,
+            "attempted_count": 2500,
+            "accepted_submission_count": 3000,
+            "contest_count": 100,
+            "last_online_at": timezone.now(),
+            "registered_at": timezone.now(),
+            "raw_user_info": {"handle": "tourist"},
+            "raw_rating_history": [{"contestId": 1}],
+        }
+        self.authenticate()
+
+        response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(CodeforcesStats.objects.count(), 1)
+        stats = CodeforcesStats.objects.get(platform_account=account)
+        self.assertEqual(stats.rating, 3900)
+        self.assertEqual(stats.solved_count, 2000)
+
+    def test_sync_fails_if_platform_is_not_codeforces(self):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.LEETCODE,
+            handle="niamur",
+        )
+        self.authenticate()
+
+        response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "Sync is currently only available for Codeforces.")
+
+    def test_sync_fails_if_user_tries_to_sync_another_users_account(self):
+        account = PlatformAccount.objects.create(
+            user=self.other_user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="tourist",
+        )
+        self.authenticate()
+
+        response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("apps.connectors.views.build_codeforces_profile")
+    def test_sync_handles_invalid_codeforces_handle_with_400(self, mocked_profile):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="invalid_handle",
+        )
+        mocked_profile.side_effect = CodeforcesInvalidHandleError("Codeforces handle was not found.")
+        self.authenticate()
+
+        response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "Codeforces handle was not found.")
+
+    @patch("apps.connectors.views.build_codeforces_profile")
+    def test_sync_handles_codeforces_network_failure_with_503(self, mocked_profile):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="tourist",
+        )
+        mocked_profile.side_effect = CodeforcesUnavailableError("Codeforces API is currently unavailable.")
+        self.authenticate()
+
+        response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data["detail"], "Codeforces API is currently unavailable.")
+
+
+class CodeforcesStatsCalculationTests(SimpleTestCase):
+    def test_calculate_solved_stats_counts_unique_problems_and_accepted_submissions(self):
+        submissions = [
+            {
+                "problem": {"contestId": 1, "index": "A", "name": "Problem A"},
+                "verdict": "OK",
+            },
+            {
+                "problem": {"contestId": 1, "index": "A", "name": "Problem A"},
+                "verdict": "OK",
+            },
+            {
+                "problem": {"contestId": 1, "index": "B", "name": "Problem B"},
+                "verdict": "WRONG_ANSWER",
+            },
+            {
+                "problem": {"contestId": 1, "index": "C", "name": "Problem C"},
+                "verdict": "OK",
+            },
+        ]
+
+        stats = calculate_solved_stats(submissions)
+
+        self.assertEqual(stats["solved_count"], 2)
+        self.assertEqual(stats["attempted_count"], 3)
+        self.assertEqual(stats["accepted_submission_count"], 3)
