@@ -1,15 +1,30 @@
-from rest_framework import permissions
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.dashboard.serializers import DashboardMeSerializer
-from apps.dashboard.services import build_dashboard_payload
+from apps.connectors.models import PlatformAccount
+from apps.dashboard.serializers import (
+    DashboardPlatformSerializer,
+    DashboardUserSerializer,
+)
 
 
-class DashboardMeAPIView(APIView):
-	permission_classes = [permissions.IsAuthenticated]
+class DashboardMeView(APIView):
+    permission_classes = [IsAuthenticated]
 
-	def get(self, request):
-		payload = build_dashboard_payload(request.user)
-		serializer = DashboardMeSerializer(payload)
-		return Response(serializer.data)
+    def get(self, request):
+        platforms = (
+            PlatformAccount.objects.filter(user=request.user)
+            .select_related("codeforces_stats")
+            .order_by("platform")
+        )
+
+        return Response(
+            {
+                "user": DashboardUserSerializer(request.user).data,
+                "platforms": DashboardPlatformSerializer(platforms, many=True).data,
+            }
+        )
+
+
+DashboardMeAPIView = DashboardMeView
