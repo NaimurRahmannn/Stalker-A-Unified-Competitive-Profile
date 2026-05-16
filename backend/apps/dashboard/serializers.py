@@ -1,30 +1,71 @@
 from rest_framework import serializers
 
-from apps.accounts.models import ExternalAccount
-from apps.accounts.serializers import ProfileSnapshotSummarySerializer, UserSerializer
+from apps.accounts.models import User
+from apps.connectors.models import CodeforcesStats, PlatformAccount
 
 
-class DashboardAccountSerializer(serializers.ModelSerializer):
-    latest_snapshot = serializers.SerializerMethodField()
+class DashboardUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "email",
+            "full_name",
+            "avatar",
+            "bio",
+            "country",
+            "institution",
+            "github_url",
+            "linkedin_url",
+        )
+        read_only_fields = fields
+
+
+class DashboardCodeforcesStatsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CodeforcesStats
+        fields = (
+            "rating",
+            "max_rating",
+            "rank",
+            "max_rank",
+            "solved_count",
+            "attempted_count",
+            "accepted_submission_count",
+            "contest_count",
+            "last_online_at",
+            "registered_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+class DashboardPlatformSerializer(serializers.ModelSerializer):
+    stats = serializers.SerializerMethodField()
 
     class Meta:
-        model = ExternalAccount
+        model = PlatformAccount
         fields = (
-            "source",
-            "handle_or_slug",
-            "verification_status",
-            "sync_status",
+            "id",
+            "platform",
+            "handle",
+            "profile_url",
+            "is_verified",
             "last_synced_at",
-            "latest_snapshot",
+            "created_at",
+            "updated_at",
+            "stats",
         )
+        read_only_fields = fields
 
-    def get_latest_snapshot(self, obj: ExternalAccount) -> dict | None:
-        snapshot = obj.snapshots.first()
-        if snapshot is None:
+    def get_stats(self, obj: PlatformAccount) -> dict | None:
+        if obj.platform != PlatformAccount.Platform.CODEFORCES:
             return None
-        return ProfileSnapshotSummarySerializer(snapshot).data
 
+        try:
+            stats = obj.codeforces_stats
+        except CodeforcesStats.DoesNotExist:
+            return None
 
-class DashboardMeSerializer(serializers.Serializer):
-    user = UserSerializer()
-    accounts = DashboardAccountSerializer(many=True)
+        return DashboardCodeforcesStatsSerializer(stats).data
