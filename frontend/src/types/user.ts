@@ -1,3 +1,1 @@
-export type User = {
-  id: import("./api").ID;
-};
+export type { User } from "@/features/auth/types";
