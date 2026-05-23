@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
 import {
   ArrowRight,
@@ -87,6 +88,15 @@ type JourneyItem = {
     label: string;
   }>;
   sparkline: number[];
+};
+
+type PlatformStatus = "Verified" | "Unverified";
+
+type ConnectedPlatform = {
+  name: string;
+  handle: string;
+  status: PlatformStatus;
+  mark: "codeforces" | "leetcode" | "atcoder" | "codechef" | "github" | "kaggle";
 };
 
 const journeyAccentStyles: Record<
@@ -189,6 +199,54 @@ const journeyItems: JourneyItem[] = [
     sparkline: [16, 24, 21, 31, 28, 40, 29, 25, 33, 28, 35, 42, 39, 48, 32, 44, 36, 49],
   },
 ];
+
+const connectedPlatforms: ConnectedPlatform[] = [
+  {
+    name: "Codeforces",
+    handle: "@tourist_",
+    status: "Verified",
+    mark: "codeforces",
+  },
+  {
+    name: "LeetCode",
+    handle: "@naimur_rahman",
+    status: "Verified",
+    mark: "leetcode",
+  },
+  {
+    name: "AtCoder",
+    handle: "@naimur_rahman",
+    status: "Verified",
+    mark: "atcoder",
+  },
+  {
+    name: "CodeChef",
+    handle: "@naimur_rahman",
+    status: "Unverified",
+    mark: "codechef",
+  },
+  {
+    name: "GitHub",
+    handle: "@naimur_rahman",
+    status: "Verified",
+    mark: "github",
+  },
+  {
+    name: "Kaggle",
+    handle: "@naimur_rahman",
+    status: "Unverified",
+    mark: "kaggle",
+  },
+];
+
+const platformLogoSrc: Record<ConnectedPlatform["mark"], string> = {
+  atcoder: "/images/atcoder_logo.png",
+  codechef: "/images/codechef_logo.png",
+  codeforces: "/images/codeforces_logo.png",
+  github: "/images/github_logo.png",
+  kaggle: "/images/kaggle_logo.png",
+  leetcode: "/images/leetcode_logo.png",
+};
 
 type PlaceholderPanelProps = {
   title: string;
@@ -423,6 +481,107 @@ function TechnicalJourneySection() {
   );
 }
 
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.04)]">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 transition hover:text-blue-800"
+        >
+          View All
+          <ArrowRight className="size-3.5" />
+        </button>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function PlatformMark({ mark }: { mark: ConnectedPlatform["mark"] }) {
+  const logoSize = mark === "codeforces" || mark === "github" ? "size-8" : "size-9";
+
+  return (
+    <span className="grid size-11 place-items-center rounded-2xl bg-slate-50">
+      <Image
+        src={platformLogoSrc[mark]}
+        alt=""
+        width={40}
+        height={40}
+        className={`${logoSize} object-contain`}
+      />
+    </span>
+  );
+}
+
+function PlatformMiniCard({ platform }: { platform: ConnectedPlatform }) {
+  const badgeClass =
+    platform.status === "Verified"
+      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+      : "bg-orange-50 text-orange-700 ring-1 ring-orange-200";
+
+  return (
+    <article className="flex min-h-34 flex-col items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-[0_10px_26px_rgba(15,23,42,0.035)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(15,23,42,0.07)]">
+      <PlatformMark mark={platform.mark} />
+      <div className="min-w-0">
+        <p className="truncate text-xs font-semibold text-slate-950">
+          {platform.name}
+        </p>
+        <p className="mt-1 truncate text-[10px] font-medium text-slate-500">
+          {platform.handle}
+        </p>
+      </div>
+      <span
+        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${badgeClass}`}
+      >
+        {platform.status}
+      </span>
+    </article>
+  );
+}
+
+function AddPlatformCard() {
+  return (
+    <button
+      type="button"
+      className="flex min-h-34 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-3 text-center text-blue-700 transition hover:bg-blue-50"
+    >
+      <span className="grid size-10 place-items-center rounded-xl border border-blue-200 bg-white">
+        <span className="text-2xl font-light leading-none">+</span>
+      </span>
+      <span className="text-xs font-semibold">Add Platform</span>
+    </button>
+  );
+}
+
+function ConnectedPlatformsSection() {
+  return (
+    <SectionCard title="Connected Platforms">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        {connectedPlatforms.map((platform) => (
+          <PlatformMiniCard key={platform.name} platform={platform} />
+        ))}
+        <AddPlatformCard />
+      </div>
+    </SectionCard>
+  );
+}
+
+function ConnectedPlatformsRow() {
+  return (
+    <div className="mt-6">
+      <ConnectedPlatformsSection />
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -442,9 +601,11 @@ export default function DashboardPage() {
 
               <TechnicalJourneySection />
 
+              <ConnectedPlatformsRow />
+
               <PlaceholderPanel
                 title="Main Content"
-                description="Connected Platforms and Recent Activity will be built in the next part."
+                description="Recent Achievements will be built in the next part."
                 className="mt-6 min-h-72"
               />
             </section>
