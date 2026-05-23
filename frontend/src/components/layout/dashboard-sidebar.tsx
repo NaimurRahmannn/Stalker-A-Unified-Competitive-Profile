@@ -19,7 +19,22 @@ import type { LucideIcon } from "lucide-react";
 
 type Accent = "green" | "blue" | "purple" | "orange" | "slate";
 
+export type DashboardSidebarActiveItem =
+  | "overview"
+  | "competitive-programming"
+  | "ctf"
+  | "hackathon"
+  | "datathon"
+  | "platforms"
+  | "achievements"
+  | "activity"
+  | "goals"
+  | "contests"
+  | "public-profile"
+  | "settings";
+
 type SidebarItem = {
+  id: DashboardSidebarActiveItem;
   label: string;
   href: string;
   icon: LucideIcon;
@@ -53,13 +68,15 @@ const accentStyles: Record<Accent, { icon: string; iconBg: string }> = {
 
 const domainItems: SidebarItem[] = [
   {
+    id: "competitive-programming",
     label: "Competitive Programming",
-    href: "#",
+    href: "/competitive-programming",
     icon: Code2,
     accent: "green",
     chevron: true,
   },
   {
+    id: "ctf",
     label: "CTF / Cybersecurity",
     href: "#",
     icon: ShieldCheck,
@@ -67,6 +84,7 @@ const domainItems: SidebarItem[] = [
     chevron: true,
   },
   {
+    id: "hackathon",
     label: "Hackathon",
     href: "#",
     icon: Trophy,
@@ -74,6 +92,7 @@ const domainItems: SidebarItem[] = [
     chevron: true,
   },
   {
+    id: "datathon",
     label: "Datathon / Data Science",
     href: "#",
     icon: BarChart3,
@@ -83,13 +102,49 @@ const domainItems: SidebarItem[] = [
 ];
 
 const platformItems: SidebarItem[] = [
-  { label: "Platforms", href: "#", icon: Link2, accent: "slate" },
-  { label: "Achievements", href: "#", icon: Award, accent: "slate" },
-  { label: "Activity", href: "#", icon: Activity, accent: "slate" },
-  { label: "Goals", href: "#", icon: Target, accent: "slate" },
-  { label: "Contests", href: "#", icon: CalendarDays, accent: "slate" },
-  { label: "Public Profile", href: "#", icon: Globe2, accent: "slate" },
-  { label: "Settings", href: "#", icon: Settings, accent: "slate" },
+  {
+    id: "platforms",
+    label: "Platforms",
+    href: "#",
+    icon: Link2,
+    accent: "slate",
+  },
+  {
+    id: "achievements",
+    label: "Achievements",
+    href: "#",
+    icon: Award,
+    accent: "slate",
+  },
+  {
+    id: "activity",
+    label: "Activity",
+    href: "#",
+    icon: Activity,
+    accent: "slate",
+  },
+  { id: "goals", label: "Goals", href: "#", icon: Target, accent: "slate" },
+  {
+    id: "contests",
+    label: "Contests",
+    href: "#",
+    icon: CalendarDays,
+    accent: "slate",
+  },
+  {
+    id: "public-profile",
+    label: "Public Profile",
+    href: "#",
+    icon: Globe2,
+    accent: "slate",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    href: "#",
+    icon: Settings,
+    accent: "slate",
+  },
 ];
 
 function SidebarLink({ item }: { item: SidebarItem }) {
@@ -123,9 +178,11 @@ function SidebarLink({ item }: { item: SidebarItem }) {
 function SidebarSection({
   title,
   items,
+  activeItem,
 }: {
   title: string;
   items: SidebarItem[];
+  activeItem: DashboardSidebarActiveItem;
 }) {
   return (
     <div>
@@ -134,14 +191,21 @@ function SidebarSection({
       </p>
       <div className="mt-3 grid gap-2">
         {items.map((item) => (
-          <SidebarLink key={item.label} item={item} />
+          <SidebarLink
+            key={item.label}
+            item={{ ...item, active: item.id === activeItem }}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-export function DashboardSidebar() {
+export function DashboardSidebar({
+  activeItem = "overview",
+}: {
+  activeItem?: DashboardSidebarActiveItem;
+}) {
   return (
     <div className="flex h-full min-h-0 flex-col lg:min-h-[calc(100vh-3rem)]">
       <div className="px-1 pb-8 pt-2">
@@ -159,17 +223,26 @@ export function DashboardSidebar() {
         <div>
           <SidebarLink
             item={{
+              id: "overview",
               label: "Overview",
               href: "/dashboard",
               icon: LayoutGrid,
               accent: "green",
-              active: true,
+              active: activeItem === "overview",
             }}
           />
         </div>
 
-        <SidebarSection title="Domains" items={domainItems} />
-        <SidebarSection title="Platform" items={platformItems} />
+        <SidebarSection
+          title="Domains"
+          items={domainItems}
+          activeItem={activeItem}
+        />
+        <SidebarSection
+          title="Platform"
+          items={platformItems}
+          activeItem={activeItem}
+        />
       </nav>
 
       <div className="mt-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
