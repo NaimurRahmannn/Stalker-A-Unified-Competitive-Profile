@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BarChart3,
   Bell,
+  Box,
   Code2,
   RefreshCw,
   Search,
@@ -99,6 +100,16 @@ type ConnectedPlatform = {
   mark: "codeforces" | "leetcode" | "atcoder" | "codechef" | "github" | "kaggle";
 };
 
+type RecentAchievement = {
+  platform: string;
+  title: string;
+  time: string;
+  icon: LucideIcon;
+  accent: MetricAccent;
+  badge?: string;
+  description?: string;
+};
+
 const journeyAccentStyles: Record<
   MetricAccent,
   {
@@ -146,6 +157,41 @@ const journeyAccentStyles: Record<
     button: "border-orange-200 bg-orange-50/50 hover:bg-orange-50",
     buttonText: "text-orange-700",
     stroke: "#f97316",
+  },
+};
+
+const achievementAccentStyles: Record<
+  MetricAccent,
+  {
+    icon: string;
+    iconBg: string;
+    badge: string;
+    border: string;
+  }
+> = {
+  green: {
+    icon: "text-emerald-600",
+    iconBg: "bg-emerald-50",
+    badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    border: "hover:border-emerald-100",
+  },
+  blue: {
+    icon: "text-blue-600",
+    iconBg: "bg-blue-50",
+    badge: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
+    border: "hover:border-blue-100",
+  },
+  purple: {
+    icon: "text-violet-600",
+    iconBg: "bg-violet-50",
+    badge: "bg-violet-50 text-violet-700 ring-1 ring-violet-200",
+    border: "hover:border-violet-100",
+  },
+  orange: {
+    icon: "text-orange-600",
+    iconBg: "bg-orange-50",
+    badge: "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
+    border: "hover:border-orange-100",
   },
 };
 
@@ -247,6 +293,41 @@ const platformLogoSrc: Record<ConnectedPlatform["mark"], string> = {
   kaggle: "/images/kaggle_logo.png",
   leetcode: "/images/leetcode_logo.png",
 };
+
+const recentAchievements: RecentAchievement[] = [
+  {
+    platform: "Hack The Box",
+    title: "First Machine",
+    time: "2 days ago",
+    icon: Box,
+    accent: "green",
+    badge: "Completed",
+  },
+  {
+    platform: "Codeforces",
+    title: "New Rating Milestone",
+    time: "3 days ago",
+    icon: Code2,
+    accent: "blue",
+    badge: "1372",
+  },
+  {
+    platform: "Devpost",
+    title: "Project Submitted",
+    time: "5 days ago",
+    icon: Trophy,
+    accent: "purple",
+    description: "AI Study Buddy",
+  },
+  {
+    platform: "Kaggle",
+    title: "Competition Joined",
+    time: "1 week ago",
+    icon: BarChart3,
+    accent: "orange",
+    description: "Google Analytics Dashboard",
+  },
+];
 
 type PlaceholderPanelProps = {
   title: string;
@@ -582,6 +663,69 @@ function ConnectedPlatformsRow() {
   );
 }
 
+function AchievementCard({ achievement }: { achievement: RecentAchievement }) {
+  const Icon = achievement.icon;
+  const accent = achievementAccentStyles[achievement.accent];
+
+  return (
+    <article
+      className={`flex min-h-28 flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(15,23,42,0.06)] ${accent.border}`}
+    >
+      <div className="flex items-start gap-2.5">
+        <span
+          className={`grid size-9 shrink-0 place-items-center rounded-xl ${accent.iconBg} ${accent.icon}`}
+        >
+          <Icon className="size-4.5" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-slate-950">
+            {achievement.platform}
+          </p>
+          <p className="mt-0.5 truncate text-[11px] font-medium text-slate-600">
+            {achievement.title}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 min-h-5">
+        {achievement.badge ? (
+          <span
+            className={`inline-flex max-w-full rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${accent.badge}`}
+          >
+            <span className="truncate">{achievement.badge}</span>
+          </span>
+        ) : null}
+        {achievement.description ? (
+          <p className="line-clamp-1 text-[11px] font-medium leading-5 text-slate-600">
+            {achievement.description}
+          </p>
+        ) : null}
+      </div>
+
+      <p className="mt-auto pt-2 text-[10px] font-medium text-slate-500">
+        {achievement.time}
+      </p>
+    </article>
+  );
+}
+
+function RecentAchievementsSection() {
+  return (
+    <div className="mt-6">
+      <SectionCard title="Recent Achievements">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {recentAchievements.map((achievement) => (
+            <AchievementCard
+              key={`${achievement.platform}-${achievement.title}`}
+              achievement={achievement}
+            />
+          ))}
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -603,11 +747,7 @@ export default function DashboardPage() {
 
               <ConnectedPlatformsRow />
 
-              <PlaceholderPanel
-                title="Main Content"
-                description="Recent Achievements will be built in the next part."
-                className="mt-6 min-h-72"
-              />
+              <RecentAchievementsSection />
             </section>
 
             <aside className="min-w-0 border-t border-slate-200 pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
