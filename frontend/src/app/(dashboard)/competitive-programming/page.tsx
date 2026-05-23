@@ -1,4 +1,5 @@
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
+import { CompetitivePlatformPerformance } from "@/components/dashboard/competitive-platform-performance";
 import {
   BarChart3,
   Bell,
@@ -117,7 +118,7 @@ function CompetitiveProgrammingHeader() {
       </div>
 
       <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center min-[1180px]:w-auto">
-        <label className="relative block w-full sm:min-w-80 min-[1180px]:w-[330px]">
+        <label className="relative block w-full sm:min-w-80 min-[1180px]:w-82.5">
           <span className="sr-only">Search anything</span>
           <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
           <input
@@ -229,9 +230,16 @@ export default function CompetitiveProgrammingPage() {
               <MetricCardsSection />
 
               <div className="mt-6">
-                <PlaceholderCard title="Platform Performance">
-                  Platform performance cards will be built in the next part.
-                </PlaceholderCard>
+                <CompetitivePlatformPerformance />
+              </div>
+
+              <div className="mt-6">
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.04)]">
+                  <p className="text-sm font-medium leading-6 text-slate-600">
+                    Rating Progress and Recent Activity will be built in the
+                    next part.
+                  </p>
+                </section>
               </div>
             </section>
 
