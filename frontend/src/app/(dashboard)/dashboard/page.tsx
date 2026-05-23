@@ -1,3 +1,5 @@
+import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
+
 type PlaceholderPanelProps = {
   title: string;
   description: string;
@@ -24,13 +26,9 @@ function PlaceholderPanel({
 export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto grid min-h-screen w-full grid-cols-1 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_340px]">
+      <div className="mx-auto grid min-h-screen w-full grid-cols-1 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
         <aside className="border-b border-slate-200 bg-white p-5 sm:p-6 lg:border-b-0 lg:border-r">
-          <PlaceholderPanel
-            title="Sidebar"
-            description="Navigation shell placeholder."
-            className="min-h-40 lg:min-h-[calc(100vh-3rem)]"
-          />
+          <DashboardSidebar />
         </aside>
 
         <section className="min-w-0 p-5 sm:p-6 lg:p-8">
