@@ -59,7 +59,7 @@ export function DashboardTopHeader() {
           Sync All
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 lg:flex">
           <HeaderIconButton label="Notifications">
             <Bell className="size-5" />
             <span className="absolute right-1.5 top-1 grid size-4 place-items-center rounded-full bg-red-500 text-[10px] font-semibold leading-none text-white ring-2 ring-slate-50">

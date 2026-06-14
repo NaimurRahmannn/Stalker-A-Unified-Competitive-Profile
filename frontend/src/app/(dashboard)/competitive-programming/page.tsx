@@ -1,4 +1,5 @@
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
+import { DashboardMobileNav } from "@/components/layout/dashboard-mobile-nav";
 import { CompetitivePlatformPerformance } from "@/components/dashboard/competitive-platform-performance";
 import {
   BarChart3,
@@ -139,7 +140,7 @@ function CompetitiveProgrammingHeader() {
           Sync All
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 lg:flex">
           <HeaderIconButton label="Notifications">
             <Bell className="size-5" />
             <span className="absolute right-1.5 top-1 grid size-4 place-items-center rounded-full bg-red-500 text-[10px] font-semibold leading-none text-white ring-2 ring-slate-50">
@@ -216,11 +217,13 @@ export default function CompetitiveProgrammingPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto grid min-h-screen w-full grid-cols-1 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="border-b border-slate-200 bg-white p-5 sm:p-6 lg:border-b-0 lg:border-r">
+        <aside className="hidden bg-white p-5 sm:p-6 lg:block lg:border-r lg:border-slate-200">
           <DashboardSidebar activeItem="competitive-programming" />
         </aside>
 
         <div className="min-w-0 bg-slate-50">
+          <DashboardMobileNav activeItem="competitive-programming" />
+
           <section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
             <CompetitiveProgrammingHeader />
           </section>
@@ -243,7 +246,7 @@ export default function CompetitiveProgrammingPage() {
               </div>
             </section>
 
-            <aside className="min-w-0 border-t border-slate-200 pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+            <aside className="hidden min-w-0 border-t border-slate-200 pt-6 xl:block xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
               <PlaceholderCard title="Competitive Widgets">
                 Profile completion, next steps, and solving streak widgets will
                 live here.
