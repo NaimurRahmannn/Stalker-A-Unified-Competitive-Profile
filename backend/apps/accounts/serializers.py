@@ -1,8 +1,7 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from apps.accounts.models import ExternalAccount, User
-from apps.dashboard.models import ProfileSnapshot
+from apps.accounts.models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -76,47 +75,3 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
             "github_url",
             "linkedin_url",
         )
-
-
-class ProfileSnapshotSummarySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProfileSnapshot
-        fields = (
-            "display_name",
-            "headline_rank_title",
-            "rating",
-            "highest_rating",
-            "contests_count",
-            "solved_count",
-            "avatar_url",
-        )
-
-
-class ExternalAccountSerializer(serializers.ModelSerializer):
-    latest_snapshot = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ExternalAccount
-        fields = (
-            "id",
-            "source",
-            "handle_or_slug",
-            "profile_url",
-            "verification_status",
-            "sync_status",
-            "last_synced_at",
-            "last_error",
-            "is_active",
-            "latest_snapshot",
-        )
-
-    def get_latest_snapshot(self, obj: ExternalAccount) -> dict | None:
-        snapshot = obj.snapshots.first()
-        if snapshot is None:
-            return None
-        return ProfileSnapshotSummarySerializer(snapshot).data
-
-
-class ConnectExternalAccountSerializer(serializers.Serializer):
-    source = serializers.ChoiceField(choices=ExternalAccount.Source.choices)
-    handle_or_slug = serializers.CharField(max_length=255)

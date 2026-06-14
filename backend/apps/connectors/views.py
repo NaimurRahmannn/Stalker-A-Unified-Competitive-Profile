@@ -4,14 +4,13 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.connectors.base.exceptions import (
+    ExternalServiceError,
+    InvalidExternalAccountError,
+)
 from apps.connectors.models import CodeforcesStats, PlatformAccount
 from apps.connectors.serializers import PlatformAccountSerializer
-from apps.connectors.services.codeforces import (
-    CodeforcesAPIError,
-    CodeforcesInvalidHandleError,
-    CodeforcesUnavailableError,
-    build_codeforces_profile,
-)
+from apps.connectors.services import get_connector
 
 
 class PlatformAccountViewSet(viewsets.ModelViewSet):
@@ -34,11 +33,12 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        connector = get_connector(platform_account.platform)
         try:
-            profile = build_codeforces_profile(platform_account.handle)
-        except CodeforcesInvalidHandleError as exc:
+            profile = connector.fetch_normalized_profile(platform_account.handle)
+        except InvalidExternalAccountError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except (CodeforcesUnavailableError, CodeforcesAPIError) as exc:
+        except ExternalServiceError as exc:
             return Response(
                 {"detail": str(exc) or "Codeforces sync failed."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -46,9 +46,18 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             platform_account.handle = profile["handle"]
+            platform_account.profile_url = profile.get("profile_url", platform_account.profile_url)
             platform_account.is_verified = True
             platform_account.last_synced_at = timezone.now()
-            platform_account.save(update_fields=["handle", "is_verified", "last_synced_at", "updated_at"])
+            platform_account.save(
+                update_fields=[
+                    "handle",
+                    "profile_url",
+                    "is_verified",
+                    "last_synced_at",
+                    "updated_at",
+                ]
+            )
 
             CodeforcesStats.objects.update_or_create(
                 platform_account=platform_account,

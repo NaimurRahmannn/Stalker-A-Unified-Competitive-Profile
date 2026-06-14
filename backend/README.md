@@ -97,29 +97,43 @@ python manage.py runserver
 ## Run Tests
 
 ```bash
-python manage.py test apps.accounts apps.dashboard
+python manage.py test
 ```
 
 ## Implemented Endpoints
 
-Auth:
+All endpoints are served under the `/api/v1/` prefix.
 
-- `POST /api/v1/auth/register/`
-- `POST /api/v1/auth/login/`
-- `GET /api/v1/auth/me/`
+Auth / Accounts:
 
-Accounts:
+- `POST /api/v1/accounts/register/`
+- `POST /api/v1/accounts/login/` (JWT — `TokenObtainPair`)
+- `POST /api/v1/accounts/token/refresh/`
+- `GET /api/v1/accounts/me/`
+- `PATCH /api/v1/accounts/me/update/`
 
-- `GET /api/v1/accounts/`
-- `POST /api/v1/accounts/connect/`
-- `POST /api/v1/accounts/<id>/sync/`
+Platform accounts (connectors):
+
+- `GET /api/v1/platform-accounts/` — list the authenticated user's platform accounts
+- `POST /api/v1/platform-accounts/` — add a platform account (`platform`, `handle`)
+- `GET /api/v1/platform-accounts/<id>/` — retrieve one
+- `PATCH /api/v1/platform-accounts/<id>/` — update the handle
+- `DELETE /api/v1/platform-accounts/<id>/` — remove it
+- `POST /api/v1/platform-accounts/<id>/sync/` — verify the handle and refresh stats via the platform connector
 
 Dashboard:
 
-- `GET /api/v1/dashboard/me/`
+- `GET /api/v1/dashboard/me/` — returns `{ user, platforms: [{ ..., stats }] }`
 
 ## Notes
 
-- `source=codeforces` is currently the only supported connector source.
-- External calls are encapsulated in connectors provider architecture for future platforms.
+- `PlatformAccount` supports an 11-platform enum; `codeforces` is the only platform with an
+  implemented connector and stats today (`CodeforcesStats`).
+- The sync action resolves a connector from the provider registry
+  (`apps.connectors.services.get_connector`) keyed by `PlatformAccount.Platform`, calls
+  `CodeforcesConnector.fetch_normalized_profile(handle)`, and `update_or_create`s the
+  `CodeforcesStats` row. Adding a new platform means writing a provider (client → connector →
+  mapper) and registering it — no model or viewset changes.
+- Sync error taxonomy: `InvalidExternalAccountError` → `400`, `ExternalServiceError` → `503`.
+- External calls are encapsulated in the connectors provider architecture for future platforms.
 - Unit tests mock external Codeforces API calls and do not hit real network APIs.

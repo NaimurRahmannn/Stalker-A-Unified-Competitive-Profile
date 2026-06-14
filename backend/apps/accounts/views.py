@@ -1,20 +1,13 @@
-from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.accounts.models import ExternalAccount
-from apps.accounts.selectors import get_user_external_accounts
 from apps.accounts.serializers import (
-    ConnectExternalAccountSerializer,
-    ExternalAccountSerializer,
-    ProfileSnapshotSummarySerializer,
     RegisterSerializer,
     UserProfileUpdateSerializer,
     UserSerializer,
 )
-from apps.accounts.services import connect_external_account, sync_external_account
 
 
 def _tokens_for_user(user) -> dict[str, str]:
@@ -63,49 +56,3 @@ class ProfileUpdateView(generics.UpdateAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(UserSerializer(user, context={"request": request}).data)
-
-
-class RegisterAPIView(RegisterView):
-    pass
-
-
-class MeAPIView(MeView):
-    pass
-
-
-class ExternalAccountListAPIView(generics.ListAPIView):
-    permission_classes = [permissions.IsAuthenticated]
-    serializer_class = ExternalAccountSerializer
-
-    def get_queryset(self):
-        return get_user_external_accounts(self.request.user)
-
-
-class ExternalAccountConnectAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        serializer = ConnectExternalAccountSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        external_account, snapshot = connect_external_account(
-            user=request.user,
-            source=serializer.validated_data["source"],
-            handle_or_slug=serializer.validated_data["handle_or_slug"],
-        )
-        return Response(
-            {
-                "account": ExternalAccountSerializer(external_account).data,
-                "latest_snapshot": ProfileSnapshotSummarySerializer(snapshot).data,
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-class ExternalAccountSyncAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, pk: int):
-        external_account = get_object_or_404(ExternalAccount, pk=pk, user=request.user)
-        snapshot = sync_external_account(external_account)
-        return Response(ProfileSnapshotSummarySerializer(snapshot).data, status=status.HTTP_200_OK)

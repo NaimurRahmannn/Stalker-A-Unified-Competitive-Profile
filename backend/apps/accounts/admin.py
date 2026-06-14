@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from apps.accounts.models import ExternalAccount, User
+from apps.accounts.models import User
 
 
 @admin.register(User)
@@ -36,21 +36,4 @@ class UserAdmin(DjangoUserAdmin):
         ),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )
-    readonly_fields = ("created_at", "updated_at")
-
-
-@admin.register(ExternalAccount)
-class ExternalAccountAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "user",
-        "source",
-        "handle_or_slug",
-        "verification_status",
-        "sync_status",
-        "last_synced_at",
-        "is_active",
-    )
-    list_filter = ("source", "verification_status", "sync_status", "is_active")
-    search_fields = ("user__username", "user__email", "handle_or_slug")
     readonly_fields = ("created_at", "updated_at")

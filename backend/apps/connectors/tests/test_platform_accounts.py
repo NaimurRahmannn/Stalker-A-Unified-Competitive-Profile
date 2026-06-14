@@ -7,12 +7,12 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.connectors.models import CodeforcesStats, PlatformAccount
-from apps.connectors.services.codeforces import (
-    CodeforcesInvalidHandleError,
-    CodeforcesUnavailableError,
-    calculate_solved_stats,
+from apps.connectors.base.exceptions import (
+    ExternalServiceError,
+    InvalidExternalAccountError,
 )
+from apps.connectors.models import CodeforcesStats, PlatformAccount
+from apps.connectors.providers.codeforces.mapper import calculate_solved_stats
 
 
 User = get_user_model()
@@ -167,7 +167,7 @@ class PlatformAccountAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("handle", response.data)
 
-    @patch("apps.connectors.views.build_codeforces_profile")
+    @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
     def test_authenticated_user_can_sync_their_own_codeforces_account(self, mocked_profile):
         account = PlatformAccount.objects.create(
             user=self.user,
@@ -209,7 +209,7 @@ class PlatformAccountAPITests(APITestCase):
         self.assertEqual(account.handle, "tourist")
         self.assertTrue(CodeforcesStats.objects.filter(platform_account=account).exists())
 
-    @patch("apps.connectors.views.build_codeforces_profile")
+    @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
     def test_sync_updates_existing_codeforces_stats(self, mocked_profile):
         account = PlatformAccount.objects.create(
             user=self.user,
@@ -272,14 +272,14 @@ class PlatformAccountAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    @patch("apps.connectors.views.build_codeforces_profile")
+    @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
     def test_sync_handles_invalid_codeforces_handle_with_400(self, mocked_profile):
         account = PlatformAccount.objects.create(
             user=self.user,
             platform=PlatformAccount.Platform.CODEFORCES,
             handle="invalid_handle",
         )
-        mocked_profile.side_effect = CodeforcesInvalidHandleError("Codeforces handle was not found.")
+        mocked_profile.side_effect = InvalidExternalAccountError("Codeforces handle was not found.")
         self.authenticate()
 
         response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
@@ -287,14 +287,14 @@ class PlatformAccountAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["detail"], "Codeforces handle was not found.")
 
-    @patch("apps.connectors.views.build_codeforces_profile")
+    @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
     def test_sync_handles_codeforces_network_failure_with_503(self, mocked_profile):
         account = PlatformAccount.objects.create(
             user=self.user,
             platform=PlatformAccount.Platform.CODEFORCES,
             handle="tourist",
         )
-        mocked_profile.side_effect = CodeforcesUnavailableError("Codeforces API is currently unavailable.")
+        mocked_profile.side_effect = ExternalServiceError("Codeforces API is currently unavailable.")
         self.authenticate()
 
         response = self.client.post(reverse("platform-account-sync", args=[account.pk]))

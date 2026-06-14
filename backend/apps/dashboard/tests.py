@@ -13,7 +13,7 @@ User = get_user_model()
 
 
 class DashboardMeEndpointTests(APITestCase):
-    url = "/api/dashboard/me/"
+    url = "/api/v1/dashboard/me/"
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -220,7 +220,7 @@ class DashboardMeEndpointTests(APITestCase):
         self.assertNotIn("raw_user_info", stats)
         self.assertNotIn("raw_rating_history", stats)
 
-    @patch("apps.connectors.views.build_codeforces_profile")
+    @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
     def test_dashboard_endpoint_does_not_call_external_apis(self, mocked_profile):
         PlatformAccount.objects.create(
             user=self.user,
