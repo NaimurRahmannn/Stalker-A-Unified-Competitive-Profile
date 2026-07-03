@@ -105,7 +105,7 @@ const platformItems: SidebarItem[] = [
   {
     id: "platforms",
     label: "Platforms",
-    href: "#",
+    href: "/platforms",
     icon: Link2,
     accent: "slate",
   },
