@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Link2 } from "lucide-react";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/features/platforms/api";
 import type { ConnectPlatformFormValues } from "@/features/platforms/schemas";
 import type { PlatformAccount } from "@/features/platforms/types";
+import { useAuth } from "@/hooks/use-auth";
 import { formatPlatformName, getApiErrorMessage } from "@/lib/utils";
 import { ConnectPlatformForm } from "./connect-platform-form";
 import { PlatformAccountCard } from "./platform-account-card";
@@ -18,11 +20,20 @@ import { PlatformAccountCard } from "./platform-account-card";
 const DEFAULT_PLATFORM = "codeforces";
 
 export function PlatformsManager() {
+  const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [accounts, setAccounts] = useState<PlatformAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const applyAccounts = useCallback(async () => {
+    if (!user) {
+      setAccounts([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const data = await listPlatformAccounts();
       setAccounts(data);
@@ -32,12 +43,23 @@ export function PlatformsManager() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
     let cancelled = false;
 
     void (async () => {
+      setIsLoading(true);
+
       try {
         const data = await listPlatformAccounts();
         if (cancelled) return;
@@ -54,16 +76,31 @@ export function PlatformsManager() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAuthLoading, router, user]);
 
   const reloadAccounts = useCallback(() => {
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     void applyAccounts();
-  }, [applyAccounts]);
+  }, [applyAccounts, router, user]);
 
   const handleConnect = useCallback(
     async (values: ConnectPlatformFormValues): Promise<boolean> => {
+      if (isAuthLoading) {
+        return false;
+      }
+
+      if (!user) {
+        toast.error("Please sign in to connect a platform.");
+        router.replace("/login");
+        return false;
+      }
+
       try {
         const account = await connectPlatformAccount({
           platform: DEFAULT_PLATFORM,
@@ -82,10 +119,16 @@ export function PlatformsManager() {
         return false;
       }
     },
-    [],
+    [isAuthLoading, router, user],
   );
 
   const handleSync = useCallback(async (id: number) => {
+    if (!user) {
+      toast.error("Please sign in to sync a platform.");
+      router.replace("/login");
+      return;
+    }
+
     try {
       const updated = await syncPlatformAccount(id);
       setAccounts((prev) =>
@@ -95,9 +138,15 @@ export function PlatformsManager() {
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Sync failed. Please try again."));
     }
-  }, []);
+  }, [router, user]);
 
   const handleDelete = useCallback(async (id: number) => {
+    if (!user) {
+      toast.error("Please sign in to remove a platform.");
+      router.replace("/login");
+      return;
+    }
+
     try {
       await deletePlatformAccount(id);
       setAccounts((prev) => prev.filter((account) => account.id !== id));
@@ -105,7 +154,7 @@ export function PlatformsManager() {
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not remove that platform."));
     }
-  }, []);
+  }, [router, user]);
 
   return (
     <div className="flex flex-col gap-6">
