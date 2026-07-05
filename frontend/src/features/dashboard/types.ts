@@ -20,16 +20,32 @@ export type JourneyItem = {
     value: string;
     label: string;
   }>;
-  sparkline: number[];
+  sparkline?: number[];
+  trendLabel?: string;
+  note?: string;
+  actionLabel?: string;
+  actionHref?: string;
+  isActionDisabled?: boolean;
+  isPlaceholder?: boolean;
 };
 
 export type PlatformStatus = "Verified" | "Unverified";
 
+export type PlatformMark =
+  | "codeforces"
+  | "leetcode"
+  | "atcoder"
+  | "codechef"
+  | "github"
+  | "kaggle";
+
 export type ConnectedPlatform = {
+  id: number;
   name: string;
   handle: string;
   status: PlatformStatus;
-  mark: "codeforces" | "leetcode" | "atcoder" | "codechef" | "github" | "kaggle";
+  mark: PlatformMark | null;
+  profileUrl: string;
 };
 
 export type RecentAchievement = {

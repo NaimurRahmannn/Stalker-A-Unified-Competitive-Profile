@@ -1,7 +1,6 @@
 import Image from "next/image";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, RefreshCw } from "lucide-react";
 import type { CSSProperties } from "react";
-import { nextSteps, profileChecklist, streakItems } from "../data";
 import { widgetAccentStyles } from "../styles";
 import type { ChecklistItem, NextStep } from "../types";
 import { WidgetCard } from "./widget-card";
@@ -44,13 +43,19 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
   );
 }
 
-function ProfileCompletionCard() {
+function ProfileCompletionCard({
+  checklist,
+  progress,
+}: {
+  checklist: ChecklistItem[];
+  progress: number;
+}) {
   return (
     <WidgetCard title="Profile Completion">
       <div className="mt-4 grid gap-4 sm:grid-cols-[124px_minmax(0,1fr)] sm:items-center xl:grid-cols-1 min-[1750px]:grid-cols-[124px_minmax(0,1fr)]">
-        <ProgressRing progress={72} />
+        <ProgressRing progress={progress} />
         <div className="grid gap-2.5">
-          {profileChecklist.map((item) => (
+          {checklist.map((item) => (
             <ChecklistRow key={item.label} item={item} />
           ))}
         </div>
@@ -58,9 +63,10 @@ function ProfileCompletionCard() {
 
       <button
         type="button"
-        className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-lime-400 px-4 text-xs font-semibold text-slate-950 shadow-[0_12px_24px_rgba(132,204,22,0.25)] transition hover:bg-lime-300"
+        disabled
+        className="mt-4 inline-flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-xs font-semibold text-slate-500"
       >
-        Complete Your Profile
+        Profile Editing Coming Soon
         <ArrowRight className="size-3.5" />
       </button>
     </WidgetCard>
@@ -91,22 +97,25 @@ function NextStepRow({ step }: { step: NextStep }) {
   );
 }
 
-function NextStepsCard() {
+function NextStepsCard({ steps }: { steps: NextStep[] }) {
   return (
     <WidgetCard title="Next Steps">
-      <div className="mt-4 divide-y divide-slate-100">
-        {nextSteps.map((step) => (
-          <NextStepRow key={step.title} step={step} />
-        ))}
-      </div>
-
-      <button
-        type="button"
-        className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
-      >
-        View All Steps
-        <ArrowRight className="size-3.5" />
-      </button>
+      {steps.length > 0 ? (
+        <div className="mt-4 divide-y divide-slate-100">
+          {steps.map((step) => (
+            <NextStepRow key={step.title} step={step} />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center">
+          <p className="text-sm font-semibold text-slate-950">
+            No next steps right now
+          </p>
+          <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+            You are caught up with the profile and platform data available here.
+          </p>
+        </div>
+      )}
     </WidgetCard>
   );
 }
@@ -114,33 +123,16 @@ function NextStepsCard() {
 function StreakSummaryCard() {
   return (
     <WidgetCard title="Streak Summary">
-      <div className="mt-4 grid grid-cols-4 gap-2">
-        {streakItems.map((item) => {
-          const Icon = item.icon;
-          const accent = widgetAccentStyles[item.accent];
-
-          return (
-            <article
-              className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/60 p-2.5 text-center"
-              key={item.label}
-            >
-              <span
-                className={`mx-auto grid size-9 place-items-center rounded-xl ${accent.iconBg} ${accent.icon}`}
-              >
-                <Icon className="size-4" />
-              </span>
-              <p className="mt-2 text-xl font-semibold leading-none text-slate-950">
-                {item.value}
-              </p>
-              <p className="mt-1 text-[10px] font-medium text-slate-500">
-                days
-              </p>
-              <p className="mt-2 truncate text-[10px] font-medium text-slate-600">
-                {item.label}
-              </p>
-            </article>
-          );
-        })}
+      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center">
+        <span className="mx-auto grid size-11 place-items-center rounded-2xl bg-white text-slate-400">
+          <RefreshCw className="size-5" />
+        </span>
+        <p className="mt-3 text-sm font-semibold text-slate-950">
+          Streak tracking coming soon
+        </p>
+        <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+          No streak endpoint is available yet.
+        </p>
       </div>
     </WidgetCard>
   );
@@ -160,11 +152,22 @@ function QuoteCard() {
   );
 }
 
-export function RightWidgetsPanel() {
+export function RightWidgetsPanel({
+  nextSteps,
+  profileChecklist,
+  profileProgress,
+}: {
+  nextSteps: NextStep[];
+  profileChecklist: ChecklistItem[];
+  profileProgress: number;
+}) {
   return (
     <div className="grid gap-4">
-      <ProfileCompletionCard />
-      <NextStepsCard />
+      <ProfileCompletionCard
+        checklist={profileChecklist}
+        progress={profileProgress}
+      />
+      <NextStepsCard steps={nextSteps} />
       <StreakSummaryCard />
       <QuoteCard />
     </div>

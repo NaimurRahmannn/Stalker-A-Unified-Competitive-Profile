@@ -25,15 +25,26 @@ function HeaderIconButton({
   );
 }
 
-export function DashboardTopHeader() {
+export function DashboardTopHeader({
+  displayName,
+  isRefreshing,
+  onRefresh,
+  platformSummary,
+}: {
+  displayName: string;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  platformSummary: string;
+}) {
   return (
     <header className="flex flex-col gap-5 min-[1180px]:flex-row min-[1180px]:items-start min-[1180px]:justify-between">
       <div className="min-w-0">
         <h1 className="text-[25px] font-semibold leading-tight tracking-normal text-slate-950 sm:text-[28px]">
-          Good morning, Naimur <span aria-hidden="true">{"\uD83D\uDC4B"}</span>
+          Good morning, {displayName}{" "}
+          <span aria-hidden="true">{"\uD83D\uDC4B"}</span>
         </h1>
         <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
-          Track your progress across 4 domains and 10+ platforms.
+          {platformSummary}
         </p>
       </div>
 
@@ -53,18 +64,21 @@ export function DashboardTopHeader() {
 
         <button
           type="button"
+          onClick={onRefresh}
+          disabled={isRefreshing}
           className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
         >
-          <RefreshCw className="size-4 text-blue-600" />
-          Sync All
+          <RefreshCw
+            className={`size-4 text-blue-600 ${
+              isRefreshing ? "animate-spin" : ""
+            }`}
+          />
+          {isRefreshing ? "Refreshing..." : "Refresh"}
         </button>
 
         <div className="hidden items-center gap-2 lg:flex">
           <HeaderIconButton label="Notifications">
             <Bell className="size-5" />
-            <span className="absolute right-1.5 top-1 grid size-4 place-items-center rounded-full bg-red-500 text-[10px] font-semibold leading-none text-white ring-2 ring-slate-50">
-              3
-            </span>
           </HeaderIconButton>
           <HeaderIconButton label="Theme">
             <Sun className="size-5" />

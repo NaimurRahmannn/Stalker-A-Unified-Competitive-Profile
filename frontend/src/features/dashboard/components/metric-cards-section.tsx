@@ -1,4 +1,3 @@
-import { metricItems } from "../data";
 import { metricAccentStyles } from "../styles";
 import type { MetricItem } from "../types";
 
@@ -28,10 +27,10 @@ function MetricCard({ metric }: { metric: MetricItem }) {
   );
 }
 
-export function MetricCardsSection() {
+export function MetricCardsSection({ metrics }: { metrics: MetricItem[] }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {metricItems.map((metric) => (
+      {metrics.map((metric) => (
         <MetricCard key={metric.label} metric={metric} />
       ))}
     </div>
