@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Code2,
   ExternalLink,
@@ -18,6 +18,52 @@ type PlatformAccountCardProps = {
   onSync: (id: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
 };
+
+const SYNC_COOLDOWN_SECONDS = 60;
+
+function getInferredCooldownSeconds(
+  lastSyncedAt: string | null,
+  nowMs: number,
+): number {
+  if (!lastSyncedAt) {
+    return 0;
+  }
+
+  const syncedAtMs = new Date(lastSyncedAt).getTime();
+
+  if (Number.isNaN(syncedAtMs)) {
+    return 0;
+  }
+
+  const remainingMs = SYNC_COOLDOWN_SECONDS * 1000 - (nowMs - syncedAtMs);
+
+  if (remainingMs <= 0) {
+    return 0;
+  }
+
+  return Math.min(SYNC_COOLDOWN_SECONDS, Math.ceil(remainingMs / 1000));
+}
+
+function getCooldownSeconds(account: PlatformAccount, nowMs: number): number {
+  const inferredCooldown = getInferredCooldownSeconds(
+    account.last_synced_at,
+    nowMs,
+  );
+
+  if (inferredCooldown > 0) {
+    return inferredCooldown;
+  }
+
+  if (
+    account.can_sync === false &&
+    typeof account.sync_cooldown_seconds === "number" &&
+    account.sync_cooldown_seconds > 0
+  ) {
+    return Math.ceil(account.sync_cooldown_seconds);
+  }
+
+  return 0;
+}
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
@@ -39,11 +85,38 @@ export function PlatformAccountCard({
 }: PlatformAccountCardProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const stats = account.codeforces_stats;
+  const cooldownSeconds = getCooldownSeconds(account, nowMs);
   const isBusy = isSyncing || isDeleting;
+  const isSyncDisabled = isBusy || cooldownSeconds > 0;
+  const isCodeforces = account.platform.toLowerCase() === "codeforces";
+  const syncLabel = isSyncing
+    ? "Syncing..."
+    : cooldownSeconds > 0
+      ? `Try again in ${cooldownSeconds}s`
+      : "Sync";
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [cooldownSeconds]);
 
   const handleSync = async () => {
+    if (isSyncDisabled) {
+      return;
+    }
+
     setIsSyncing(true);
     try {
       await onSync(account.id);
@@ -137,7 +210,9 @@ export function PlatformAccountCard({
         </div>
       ) : (
         <p className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2.5 text-xs font-medium text-slate-500">
-          No stats yet. Run a sync to pull data from Codeforces.
+          {isCodeforces
+            ? "Codeforces connected but not synced yet. Run a sync to pull real stats."
+            : "Stats are not available for this platform yet."}
         </p>
       )}
 
@@ -145,7 +220,7 @@ export function PlatformAccountCard({
         <button
           type="button"
           onClick={handleSync}
-          disabled={isBusy}
+          disabled={isSyncDisabled}
           className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSyncing ? (
@@ -153,7 +228,7 @@ export function PlatformAccountCard({
           ) : (
             <RefreshCw className="size-4 text-blue-600" />
           )}
-          {isSyncing ? "Syncing..." : "Sync"}
+          {syncLabel}
         </button>
 
         <button

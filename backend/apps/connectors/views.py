@@ -7,10 +7,11 @@ from rest_framework.response import Response
 from apps.connectors.base.exceptions import (
     ExternalServiceError,
     InvalidExternalAccountError,
+    UnsupportedSourceError,
 )
 from apps.connectors.models import CodeforcesStats, PlatformAccount
 from apps.connectors.serializers import PlatformAccountSerializer
-from apps.connectors.services import get_connector
+from apps.connectors.services import get_connector, get_sync_cooldown_seconds
 
 
 class PlatformAccountViewSet(viewsets.ModelViewSet):
@@ -29,18 +30,36 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
         platform_account = self.get_object()
         if platform_account.platform != PlatformAccount.Platform.CODEFORCES:
             return Response(
-                {"detail": "Sync is currently only available for Codeforces."},
+                {"detail": "Sync is not supported for this platform yet."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        connector = get_connector(platform_account.platform)
+        cooldown_seconds = get_sync_cooldown_seconds(platform_account)
+        if cooldown_seconds > 0:
+            return Response(
+                {
+                    "detail": "Please wait before syncing this account again.",
+                    "retry_after_seconds": cooldown_seconds,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
         try:
+            connector = get_connector(platform_account.platform)
             profile = connector.fetch_normalized_profile(platform_account.handle)
         except InvalidExternalAccountError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except UnsupportedSourceError:
+            return Response(
+                {"detail": "Sync is not supported for this platform yet."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except ExternalServiceError as exc:
             return Response(
-                {"detail": str(exc) or "Codeforces sync failed."},
+                {
+                    "detail": str(exc)
+                    or "Codeforces is temporarily unavailable. Please try again later."
+                },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 

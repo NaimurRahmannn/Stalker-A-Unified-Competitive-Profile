@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -50,6 +51,8 @@ class PlatformAccountAPITests(APITestCase):
         self.assertEqual(response.data["profile_url"], "")
         self.assertFalse(response.data["is_verified"])
         self.assertIsNone(response.data["last_synced_at"])
+        self.assertTrue(response.data["can_sync"])
+        self.assertEqual(response.data["sync_cooldown_seconds"], 0)
         self.assertEqual(PlatformAccount.objects.get().user, self.user)
 
     def test_unauthenticated_user_cannot_create_platform_account(self):
@@ -202,6 +205,9 @@ class PlatformAccountAPITests(APITestCase):
         self.assertIn("codeforces_stats", response.data)
         self.assertEqual(response.data["codeforces_stats"]["handle"], "tourist")
         self.assertEqual(response.data["codeforces_stats"]["rating"], 3900)
+        self.assertFalse(response.data["can_sync"])
+        self.assertGreater(response.data["sync_cooldown_seconds"], 0)
+        self.assertLessEqual(response.data["sync_cooldown_seconds"], 60)
 
         account.refresh_from_db()
         self.assertTrue(account.is_verified)
@@ -258,7 +264,61 @@ class PlatformAccountAPITests(APITestCase):
         response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"], "Sync is currently only available for Codeforces.")
+        self.assertEqual(response.data["detail"], "Sync is not supported for this platform yet.")
+
+    @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
+    def test_sync_returns_429_during_cooldown(self, mocked_profile):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="tourist",
+            last_synced_at=timezone.now() - timedelta(seconds=30),
+        )
+        self.authenticate()
+
+        response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertEqual(
+            response.data["detail"],
+            "Please wait before syncing this account again.",
+        )
+        self.assertGreater(response.data["retry_after_seconds"], 0)
+        self.assertLessEqual(response.data["retry_after_seconds"], 60)
+        mocked_profile.assert_not_called()
+
+    @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
+    def test_sync_allows_retry_after_cooldown_expires(self, mocked_profile):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="Tourist",
+            last_synced_at=timezone.now() - timedelta(seconds=61),
+        )
+        last_online_at = timezone.now()
+        registered_at = timezone.now()
+        mocked_profile.return_value = {
+            "handle": "tourist",
+            "rating": 3900,
+            "max_rating": 3900,
+            "rank": "legendary grandmaster",
+            "max_rank": "legendary grandmaster",
+            "solved_count": 2000,
+            "attempted_count": 2500,
+            "accepted_submission_count": 3000,
+            "contest_count": 100,
+            "last_online_at": last_online_at,
+            "registered_at": registered_at,
+            "raw_user_info": {"handle": "tourist"},
+            "raw_rating_history": [{"contestId": 1}],
+        }
+        self.authenticate()
+
+        response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["handle"], "tourist")
+        mocked_profile.assert_called_once_with("Tourist")
 
     def test_sync_fails_if_user_tries_to_sync_another_users_account(self):
         account = PlatformAccount.objects.create(
@@ -279,13 +339,13 @@ class PlatformAccountAPITests(APITestCase):
             platform=PlatformAccount.Platform.CODEFORCES,
             handle="invalid_handle",
         )
-        mocked_profile.side_effect = InvalidExternalAccountError("Codeforces handle was not found.")
+        mocked_profile.side_effect = InvalidExternalAccountError("Codeforces handle not found.")
         self.authenticate()
 
         response = self.client.post(reverse("platform-account-sync", args=[account.pk]))
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"], "Codeforces handle was not found.")
+        self.assertEqual(response.data["detail"], "Codeforces handle not found.")
 
     @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
     def test_sync_handles_codeforces_network_failure_with_503(self, mocked_profile):

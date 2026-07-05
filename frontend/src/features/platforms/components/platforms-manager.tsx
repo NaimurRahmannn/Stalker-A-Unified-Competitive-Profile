@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Link2 } from "lucide-react";
@@ -134,11 +135,17 @@ export function PlatformsManager() {
       setAccounts((prev) =>
         prev.map((account) => (account.id === id ? updated : account)),
       );
-      toast.success(`Synced @${updated.handle}.`);
+      toast.success("Account synced successfully");
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Sync failed. Please try again."));
+      toast.error(
+        getApiErrorMessage(err, "Could not sync account. Please try again."),
+      );
+
+      if (isAxiosError(err) && err.response?.status === 429) {
+        void applyAccounts();
+      }
     }
-  }, [router, user]);
+  }, [applyAccounts, router, user]);
 
   const handleDelete = useCallback(async (id: number) => {
     if (!user) {

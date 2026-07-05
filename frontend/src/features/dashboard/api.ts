@@ -29,6 +29,8 @@ export type DashboardPlatform = {
   created_at: string;
   updated_at: string;
   stats: DashboardCodeforcesStats | null;
+  can_sync?: boolean;
+  sync_cooldown_seconds?: number;
 };
 
 export type DashboardResponse = {

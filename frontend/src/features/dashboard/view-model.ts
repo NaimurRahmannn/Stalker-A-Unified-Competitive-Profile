@@ -30,6 +30,7 @@ type ProfileField = {
 
 export type DashboardViewModel = {
   displayName: string;
+  username: string;
   platformSummary: string;
   metrics: MetricItem[];
   connectedPlatforms: ConnectedPlatform[];
@@ -407,6 +408,7 @@ export function buildDashboardViewModel(
   return {
     displayName:
       dashboard.user.full_name.trim() || dashboard.user.username || "there",
+    username: dashboard.user.username,
     platformSummary: buildPlatformSummary(dashboard.platforms),
     metrics: buildMetrics(dashboard.platforms, profileCompletion.progress),
     connectedPlatforms: buildConnectedPlatforms(dashboard.platforms),

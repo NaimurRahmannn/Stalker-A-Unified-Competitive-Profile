@@ -24,6 +24,8 @@ export type PlatformAccount = {
   created_at: string;
   updated_at: string;
   codeforces_stats: CodeforcesStats | null;
+  can_sync?: boolean;
+  sync_cooldown_seconds?: number;
 };
 
 export type ConnectPlatformPayload = {

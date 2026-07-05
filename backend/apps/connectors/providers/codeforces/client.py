@@ -15,9 +15,19 @@ class CodeforcesApiClient:
         url = f"{self.BASE_URL}/{method}"
         try:
             response = requests.get(url, params=params, timeout=timeout or self.timeout)
+            if response.status_code == 429:
+                raise ExternalServiceError(
+                    "Codeforces rate limit reached. Please try again later."
+                )
+            if response.status_code >= 500:
+                raise ExternalServiceError(
+                    "Codeforces is temporarily unavailable. Please try again later."
+                )
             response.raise_for_status()
         except requests.RequestException as exc:
-            raise ExternalServiceError("Unable to reach Codeforces API right now.") from exc
+            raise ExternalServiceError(
+                "Codeforces is temporarily unavailable. Please try again later."
+            ) from exc
 
         try:
             payload = response.json()
@@ -29,7 +39,7 @@ class CodeforcesApiClient:
             comment = str(payload.get("comment", "Codeforces API request failed."))
             lowered = comment.lower()
             if "not found" in lowered or "user with handle" in lowered:
-                raise InvalidExternalAccountError("Codeforces handle was not found.")
+                raise InvalidExternalAccountError("Codeforces handle not found.")
             raise ExternalServiceError(f"Codeforces API error: {comment}")
 
         if "result" not in payload:
@@ -40,7 +50,7 @@ class CodeforcesApiClient:
     def get_user_info(self, handle: str) -> dict[str, Any]:
         result = self._get("user.info", {"handles": handle})
         if not result:
-            raise InvalidExternalAccountError("Codeforces handle was not found.")
+            raise InvalidExternalAccountError("Codeforces handle not found.")
         return result[0]
 
     def get_user_submissions(self, handle: str, count: int = 10000) -> list[dict[str, Any]]:

@@ -5,6 +5,7 @@ import {
   Sun,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { PublicProfileActions } from "./public-profile-actions";
 
 function HeaderIconButton({
   label,
@@ -30,11 +31,13 @@ export function DashboardTopHeader({
   isRefreshing,
   onRefresh,
   platformSummary,
+  username,
 }: {
   displayName: string;
   isRefreshing: boolean;
   onRefresh: () => void;
   platformSummary: string;
+  username?: string;
 }) {
   return (
     <header className="flex flex-col gap-5 min-[1180px]:flex-row min-[1180px]:items-start min-[1180px]:justify-between">
@@ -61,6 +64,8 @@ export function DashboardTopHeader({
             {"\u2318"} K
           </span>
         </label>
+
+        {username ? <PublicProfileActions username={username} /> : null}
 
         <button
           type="button"

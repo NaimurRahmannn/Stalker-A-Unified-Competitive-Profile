@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.connectors.models import CodeforcesStats, PlatformAccount
+from apps.connectors.services import can_sync_platform_account, get_sync_cooldown_seconds
 
 
 class ConnectorHealthSerializer(serializers.Serializer):
@@ -30,6 +31,8 @@ class CodeforcesStatsSerializer(serializers.ModelSerializer):
 
 class PlatformAccountSerializer(serializers.ModelSerializer):
     codeforces_stats = CodeforcesStatsSerializer(read_only=True)
+    can_sync = serializers.SerializerMethodField()
+    sync_cooldown_seconds = serializers.SerializerMethodField()
 
     class Meta:
         model = PlatformAccount
@@ -43,6 +46,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "codeforces_stats",
+            "can_sync",
+            "sync_cooldown_seconds",
         )
         read_only_fields = (
             "id",
@@ -51,6 +56,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "codeforces_stats",
+            "can_sync",
+            "sync_cooldown_seconds",
         )
         extra_kwargs = {
             "profile_url": {"required": False, "allow_blank": True},
@@ -61,6 +68,12 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("Handle cannot be empty.")
         return value
+
+    def get_can_sync(self, obj: PlatformAccount) -> bool:
+        return can_sync_platform_account(obj)
+
+    def get_sync_cooldown_seconds(self, obj: PlatformAccount) -> int:
+        return get_sync_cooldown_seconds(obj)
 
     def validate(self, attrs: dict) -> dict:
         request = self.context.get("request")

@@ -225,6 +225,7 @@ export function DashboardPageContent() {
               isRefreshing={isLoading}
               onRefresh={retry}
               platformSummary={viewModel.platformSummary}
+              username={viewModel.username}
             />
           </section>
 
