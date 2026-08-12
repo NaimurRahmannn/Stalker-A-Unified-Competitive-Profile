@@ -1,336 +1,100 @@
-import {
-  BarChart3,
-  BriefcaseBusiness,
-  Link2,
-  ShieldCheck,
-  Trophy,
-} from "lucide-react";
+import { Activity, CheckCircle2, CircleDot, RefreshCw } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import {
-  formatDashboardPlatformName,
-  getPlatformMark,
-} from "@/features/dashboard/data";
-import type {
-  MetricAccent,
-  PlatformMark,
-  PlatformStatus,
-} from "@/features/dashboard/types";
+import { formatDashboardPlatformName, getPlatformMark } from "@/features/dashboard/data";
+import type { MetricAccent, PlatformMark } from "@/features/dashboard/types";
 import { formatRelativeTime } from "@/lib/utils";
-import type {
-  PublicCodeforcesStats,
-  PublicProfilePlatform,
-  PublicProfileResponse,
-  PublicProfileUser,
-} from "./types";
+import type { PublicCodeforcesStats, PublicProfilePlatform, PublicProfileResponse, PublicProfileUser } from "./types";
 
-export type ProfileSocialLink = {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-};
-
+export type ProfileSocialLink = { label: string; href: string; kind: "github" | "linkedin" };
 export type ProfileHeroView = {
-  displayName: string;
-  username: string;
-  initials: string;
-  avatarUrl: string | null;
-  bio: string | null;
-  country: string | null;
-  institution: string | null;
-  socialLinks: ProfileSocialLink[];
+  displayName: string; username: string; initials: string; avatarUrl: string | null;
+  bio: string | null; country: string | null; institution: string | null; socialLinks: ProfileSocialLink[];
 };
-
+export type ProfileMetricView = { label: string; value: string; icon: LucideIcon; accent: MetricAccent };
 export type PublicPlatformView = {
-  id: number;
-  name: string;
-  handle: string;
-  status: PlatformStatus;
-  mark: PlatformMark | null;
-  profileUrl: string;
-  lastSyncedLabel: string;
+  id: number; slug: string; name: string; handle: string; isVerified: boolean;
+  mark: PlatformMark | null; profileUrl: string | null; lastSyncedLabel: string;
+  rating: string; maxRating: string; rank: string; solved: string; contests: string; hasDetailedStats: boolean;
 };
-
-export type ProfileStatView = {
-  label: string;
-  value: string;
-};
-
-export type CodeforcesSummaryView = {
-  state: "not_connected" | "not_synced" | "synced";
-  title: string;
-  description: string;
-  handle: string | null;
-  profileUrl: string | null;
-  primaryStats: ProfileStatView[];
-  detailStats: ProfileStatView[];
-};
-
-export type ProfileDomainPlaceholder = {
-  title: string;
-  label: string;
-  icon: LucideIcon;
-  accent: MetricAccent;
-};
-
+export type CompetitiveMetricView = { label: string; value: string };
+export type DomainAccountView = Pick<PublicPlatformView, "id" | "name" | "handle" | "isVerified" | "mark" | "profileUrl">;
+export type DomainCardView = { key: "ctf" | "hackathon" | "datathon"; title: string; subtitle: string; accounts: DomainAccountView[] };
+export type PerformanceSummaryView = { lastActive: string; memberSince: string };
 export type PublicProfileViewModel = {
-  hero: ProfileHeroView;
-  platforms: PublicPlatformView[];
-  codeforces: CodeforcesSummaryView;
-  domainPlaceholders: ProfileDomainPlaceholder[];
+  hero: ProfileHeroView; summaryMetrics: ProfileMetricView[]; platforms: PublicPlatformView[];
+  competitivePlatforms: PublicPlatformView[]; competitiveMetrics: CompetitiveMetricView[];
+  domainCards: DomainCardView[]; performance: PerformanceSummaryView;
 };
 
-function hasText(value: string | null): value is string {
-  return value !== null && value.trim().length > 0;
-}
-
-function nullableText(value: string | null): string | null {
-  return hasText(value) ? value.trim() : null;
-}
-
-function formatHandle(handle: string): string {
-  return handle.startsWith("@") ? handle : `@${handle}`;
-}
-
-function formatNumber(value: number | null, fallback: string): string {
-  return value === null ? fallback : String(value);
-}
-
-function isCodeforcesPlatform(platform: PublicProfilePlatform): boolean {
-  return platform.platform.toLowerCase() === "codeforces";
-}
-
-function formatRelativeDateTime(value: string | null, fallback: string): string {
-  if (!hasText(value)) {
-    return fallback;
-  }
-
-  const timestamp = new Date(value).getTime();
-
-  if (Number.isNaN(timestamp)) {
-    return "Unknown";
-  }
-
-  return formatRelativeTime(value);
-}
-
-function formatAbsoluteDate(value: string | null): string | null {
-  if (!hasText(value)) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-
-function buildInitials(user: PublicProfileUser): string {
-  const source = nullableText(user.full_name) ?? user.username;
-  const parts = source.split(/\s+/).filter(Boolean);
-
-  if (parts.length >= 2) {
-    return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
-  }
-
-  return source.slice(0, 2).toUpperCase();
-}
+const competitiveSlugs = new Set(["codeforces", "atcoder", "leetcode", "codechef"]);
+function hasText(value: string | null | undefined): value is string { return typeof value === "string" && value.trim().length > 0; }
+function text(value: string | null | undefined): string | null { return hasText(value) ? value.trim() : null; }
+function formatNumber(value: number | null | undefined, fallback = "\u2014") { return value == null ? fallback : new Intl.NumberFormat("en").format(value); }
+function formatHandle(handle: string) { return handle.startsWith("@") ? handle : `@${handle}`; }
+function validDate(value: string | null | undefined): Date | null { if (!hasText(value)) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date; }
+function relativeDate(value: string | null | undefined, fallback = "Never") { return validDate(value) ? formatRelativeTime(value as string) : fallback; }
+function monthYear(value: string | null | undefined, fallback = "\u2014") { const date = validDate(value); return date ? new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(date) : fallback; }
+function newestDate(values: Array<string | null | undefined>) { return values.reduce<string | null>((latest, value) => { const date = validDate(value); const current = validDate(latest); return date && (!current || date > current) ? (value as string) : latest; }, null); }
+function oldestDate(values: Array<string | null | undefined>) { return values.reduce<string | null>((oldest, value) => { const date = validDate(value); const current = validDate(oldest); return date && (!current || date < current) ? (value as string) : oldest; }, null); }
+function initialsFor(user: PublicProfileUser) { const source = text(user.full_name) ?? user.username; const parts = source.split(/\s+/).filter(Boolean); return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : source.slice(0, 2)).toUpperCase(); }
 
 function buildHero(user: PublicProfileUser): ProfileHeroView {
   const socialLinks: ProfileSocialLink[] = [];
+  if (hasText(user.github_url)) socialLinks.push({ label: "GitHub", href: user.github_url, kind: "github" });
+  if (hasText(user.linkedin_url)) socialLinks.push({ label: "LinkedIn", href: user.linkedin_url, kind: "linkedin" });
+  return { displayName: text(user.full_name) ?? user.username, username: user.username, initials: initialsFor(user), avatarUrl: text(user.avatar), bio: text(user.bio), country: text(user.country), institution: text(user.institution), socialLinks };
+}
 
-  if (hasText(user.github_url)) {
-    socialLinks.push({
-      label: "GitHub",
-      href: user.github_url,
-      icon: Link2,
-    });
-  }
-
-  if (hasText(user.linkedin_url)) {
-    socialLinks.push({
-      label: "LinkedIn",
-      href: user.linkedin_url,
-      icon: BriefcaseBusiness,
-    });
-  }
-
+function buildPlatform(platform: PublicProfilePlatform): PublicPlatformView {
+  const stats: PublicCodeforcesStats | null = platform.stats;
   return {
-    displayName: nullableText(user.full_name) ?? user.username,
-    username: user.username,
-    initials: buildInitials(user),
-    avatarUrl: nullableText(user.avatar),
-    bio: nullableText(user.bio),
-    country: nullableText(user.country),
-    institution: nullableText(user.institution),
-    socialLinks,
+    id: platform.id, slug: platform.platform.toLowerCase(), name: formatDashboardPlatformName(platform.platform),
+    handle: formatHandle(platform.handle), isVerified: platform.is_verified, mark: getPlatformMark(platform.platform),
+    profileUrl: text(platform.profile_url), lastSyncedLabel: relativeDate(platform.last_synced_at),
+    rating: formatNumber(stats?.rating, stats ? "Unrated" : "\u2014"),
+    maxRating: formatNumber(stats?.max_rating, stats ? "Unrated" : "\u2014"), rank: text(stats?.rank) ?? "\u2014",
+    solved: stats ? formatNumber(stats.solved_count) : "\u2014", contests: stats ? formatNumber(stats.contest_count) : "\u2014", hasDetailedStats: Boolean(stats),
   };
 }
 
-function buildPlatformView(platform: PublicProfilePlatform): PublicPlatformView {
-  return {
-    id: platform.id,
-    name: formatDashboardPlatformName(platform.platform),
-    handle: formatHandle(platform.handle),
-    status: platform.is_verified ? "Verified" : "Unverified",
-    mark: getPlatformMark(platform.platform),
-    profileUrl: platform.profile_url,
-    lastSyncedLabel: formatRelativeDateTime(
-      platform.last_synced_at,
-      "Never synced",
-    ),
-  };
+function sumStats(platforms: PublicProfilePlatform[], key: keyof Pick<PublicCodeforcesStats, "solved_count" | "attempted_count" | "accepted_submission_count" | "contest_count">) {
+  const available = platforms.flatMap((platform) => platform.stats ? [platform.stats[key]] : []);
+  return available.length ? new Intl.NumberFormat("en").format(available.reduce((total, value) => total + value, 0)) : "\u2014";
 }
 
-function buildSyncedCodeforcesSummary(
-  platform: PublicProfilePlatform,
-  stats: PublicCodeforcesStats,
-): CodeforcesSummaryView {
-  const detailStats: ProfileStatView[] = [
-    {
-      label: "Rating",
-      value: formatNumber(stats.rating, "Unrated"),
-    },
-    {
-      label: "Max rating",
-      value: formatNumber(stats.max_rating, "Unrated"),
-    },
-    {
-      label: "Rank",
-      value: stats.rank ?? "Unranked",
-    },
-    {
-      label: "Max rank",
-      value: stats.max_rank ?? "Unranked",
-    },
-    {
-      label: "Last synced",
-      value: formatRelativeDateTime(platform.last_synced_at, "Never synced"),
-    },
+function buildDomains(platforms: PublicPlatformView[]): DomainCardView[] {
+  const select = (slugs: string[]) => platforms.filter((platform) => slugs.includes(platform.slug)).map(({ id, name, handle, isVerified, mark, profileUrl }) => ({ id, name, handle, isVerified, mark, profileUrl }));
+  return [
+    { key: "ctf", title: "CTF / Cybersecurity", subtitle: "Security platforms and capture-the-flag profiles", accounts: select(["ctftime", "tryhackme", "hackthebox"]) },
+    { key: "hackathon", title: "Hackathon", subtitle: "Hackathon profiles and project showcases", accounts: select(["devpost", "dorahacks"]) },
+    { key: "datathon", title: "Datathon / Data Science", subtitle: "Data science and competition profiles", accounts: select(["kaggle"]) },
   ];
-  const lastOnline = formatRelativeDateTime(stats.last_online_at, "");
-  const registeredAt = formatAbsoluteDate(stats.registered_at);
-
-  if (lastOnline) {
-    detailStats.push({
-      label: "Last online",
-      value: lastOnline,
-    });
-  }
-
-  if (registeredAt) {
-    detailStats.push({
-      label: "Registered",
-      value: registeredAt,
-    });
-  }
-
-  return {
-    state: "synced",
-    title: "Competitive Programming",
-    description: "Real Codeforces stats from the connected account.",
-    handle: formatHandle(platform.handle),
-    profileUrl: platform.profile_url || null,
-    primaryStats: [
-      {
-        label: "Problems solved",
-        value: String(stats.solved_count),
-      },
-      {
-        label: "Attempted",
-        value: String(stats.attempted_count),
-      },
-      {
-        label: "Accepted submissions",
-        value: String(stats.accepted_submission_count),
-      },
-      {
-        label: "Contests",
-        value: String(stats.contest_count),
-      },
-    ],
-    detailStats,
-  };
 }
 
-function buildCodeforcesSummary(
-  platforms: PublicProfilePlatform[],
-): CodeforcesSummaryView {
-  const codeforcesAccount = platforms.find(isCodeforcesPlatform);
-
-  if (!codeforcesAccount) {
-    return {
-      state: "not_connected",
-      title: "Competitive Programming",
-      description: "Codeforces not connected yet",
-      handle: null,
-      profileUrl: null,
-      primaryStats: [],
-      detailStats: [],
-    };
-  }
-
-  if (!codeforcesAccount.stats) {
-    return {
-      state: "not_synced",
-      title: "Competitive Programming",
-      description: "Codeforces connected but not synced yet",
-      handle: formatHandle(codeforcesAccount.handle),
-      profileUrl: codeforcesAccount.profile_url || null,
-      primaryStats: [],
-      detailStats: [
-        {
-          label: "Status",
-          value: codeforcesAccount.is_verified ? "Verified" : "Unverified",
-        },
-        {
-          label: "Last synced",
-          value: formatRelativeDateTime(
-            codeforcesAccount.last_synced_at,
-            "Never synced",
-          ),
-        },
-      ],
-    };
-  }
-
-  return buildSyncedCodeforcesSummary(codeforcesAccount, codeforcesAccount.stats);
-}
-
-const domainPlaceholders: ProfileDomainPlaceholder[] = [
-  {
-    title: "CTF",
-    label: "Backend support pending",
-    icon: ShieldCheck,
-    accent: "blue",
-  },
-  {
-    title: "Hackathon",
-    label: "No public stats available yet",
-    icon: Trophy,
-    accent: "purple",
-  },
-  {
-    title: "Datathon",
-    label: "Backend support pending",
-    icon: BarChart3,
-    accent: "orange",
-  },
-];
-
-export function buildPublicProfileViewModel(
-  profile: PublicProfileResponse,
-): PublicProfileViewModel {
+export function buildPublicProfileViewModel(profile: PublicProfileResponse): PublicProfileViewModel {
+  const platformViews = profile.platforms.map(buildPlatform);
+  const latestSync = newestDate(profile.platforms.map((item) => item.last_synced_at));
+  const totalSolved = profile.platforms.reduce((sum, item) => sum + (item.stats?.solved_count ?? 0), 0);
+  const lastActive = newestDate(profile.platforms.flatMap((item) => [item.stats?.last_online_at, item.last_synced_at]));
+  const memberSince = oldestDate(profile.platforms.flatMap((item) => [item.stats?.registered_at, item.created_at]));
+  const competitivePlatforms = platformViews.filter((item) => competitiveSlugs.has(item.slug));
   return {
     hero: buildHero(profile.user),
-    platforms: profile.platforms.map(buildPlatformView),
-    codeforces: buildCodeforcesSummary(profile.platforms),
-    domainPlaceholders,
+    summaryMetrics: [
+      { label: "Platforms Connected", value: String(profile.platforms.length), icon: CircleDot, accent: "green" },
+      { label: "Verified Platforms", value: String(profile.platforms.filter((item) => item.is_verified).length), icon: CheckCircle2, accent: "blue" },
+      { label: "Total Problems Solved", value: new Intl.NumberFormat("en").format(totalSolved), icon: Activity, accent: "purple" },
+      { label: "Last Synced", value: relativeDate(latestSync), icon: RefreshCw, accent: "orange" },
+    ],
+    platforms: platformViews, competitivePlatforms,
+    competitiveMetrics: [
+      { label: "Total Problems Solved", value: sumStats(profile.platforms, "solved_count") },
+      { label: "Total Attempted", value: sumStats(profile.platforms, "attempted_count") },
+      { label: "Accepted Submissions", value: sumStats(profile.platforms, "accepted_submission_count") },
+      { label: "Contests Participated", value: sumStats(profile.platforms, "contest_count") },
+      { label: "Platforms Active", value: String(competitivePlatforms.length) },
+    ],
+    domainCards: buildDomains(platformViews),
+    performance: { lastActive: relativeDate(lastActive, "\u2014"), memberSince: monthYear(memberSince) },
   };
 }
