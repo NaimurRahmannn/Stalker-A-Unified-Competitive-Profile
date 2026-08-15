@@ -12,6 +12,7 @@ import type {
   DashboardResponse,
   DashboardUser,
 } from "./api";
+import type { CompetitiveOverviewSummary, CompetitivePlatformSummary } from "@/features/competitive-programming/types";
 import { formatDashboardPlatformName, getPlatformMark } from "./data";
 import type {
   ChecklistItem,
@@ -20,7 +21,6 @@ import type {
   MetricItem,
   NextStep,
 } from "./types";
-import { formatRelativeTime } from "@/lib/utils";
 
 type ProfileField = {
   label: string;
@@ -52,36 +52,12 @@ function formatNumber(value: number | null, fallback: string): string {
   return value === null ? fallback : String(value);
 }
 
-function isCodeforcesPlatform(platform: DashboardPlatform): boolean {
-  return platform.platform.toLowerCase() === "codeforces";
+function isSupportedPlatform(platform: DashboardPlatform): boolean {
+  return platform.platform === "codeforces" || platform.platform === "atcoder";
 }
 
 function pluralize(value: number, singular: string, plural = `${singular}s`) {
   return value === 1 ? singular : plural;
-}
-
-function getLatestSyncedAt(platforms: DashboardPlatform[]): string | null {
-  let latestTimestamp: number | null = null;
-  let latestValue: string | null = null;
-
-  for (const platform of platforms) {
-    if (!platform.last_synced_at) {
-      continue;
-    }
-
-    const timestamp = new Date(platform.last_synced_at).getTime();
-
-    if (Number.isNaN(timestamp)) {
-      continue;
-    }
-
-    if (latestTimestamp === null || timestamp > latestTimestamp) {
-      latestTimestamp = timestamp;
-      latestValue = platform.last_synced_at;
-    }
-  }
-
-  return latestValue;
 }
 
 function getProfileFields(user: DashboardUser): ProfileField[] {
@@ -172,28 +148,27 @@ function buildProfileCompletion(user: DashboardUser) {
 }
 
 function buildMetrics(
-  platforms: DashboardPlatform[],
   profileProgress: number,
+  competitive: CompetitiveOverviewSummary,
 ): MetricItem[] {
-  const latestSyncedAt = getLatestSyncedAt(platforms);
-  const verifiedCount = platforms.filter((platform) => platform.is_verified).length;
+  const incomplete = !competitive.solved_count_complete;
 
   return [
     {
-      label: "Platforms Connected",
-      value: String(platforms.length),
+      label: incomplete ? "Known Problems Solved" : "Problems Solved",
+      value: `${competitive.solved_count}${incomplete ? "+" : ""}`,
       icon: Users,
       accent: "green",
     },
     {
-      label: "Verified",
-      value: String(verifiedCount),
+      label: "Tracked Contests",
+      value: String(competitive.contest_count),
       icon: ShieldCheck,
       accent: "blue",
     },
     {
-      label: "Last Synced",
-      value: latestSyncedAt ? formatRelativeTime(latestSyncedAt) : "Never",
+      label: "Competitive Platforms",
+      value: String(competitive.active_platforms),
       icon: RefreshCw,
       accent: "purple",
     },
@@ -209,18 +184,19 @@ function buildMetrics(
 function buildConnectedPlatforms(
   platforms: DashboardPlatform[],
 ): ConnectedPlatform[] {
-  return platforms.map((platform) => ({
+  return platforms.filter(isSupportedPlatform).map((platform) => ({
     id: platform.id,
     name: formatDashboardPlatformName(platform.platform),
     handle: formatHandle(platform.handle),
-    status: platform.is_verified ? "Verified" : "Unverified",
+    status: platform.handle_validated ? "Handle valid" : "Handle not validated",
     mark: getPlatformMark(platform.platform),
     profileUrl: platform.profile_url,
   }));
 }
 
 function buildCompetitiveProgrammingJourney(
-  codeforcesAccount: DashboardPlatform | undefined,
+  platforms: CompetitivePlatformSummary[],
+  summary: CompetitiveOverviewSummary,
 ): JourneyItem {
   const baseItem = {
     title: "Competitive Programming",
@@ -233,67 +209,40 @@ function buildCompetitiveProgrammingJourney(
     "accent" | "icon" | "stats" | "title" | "trendLabel"
   >;
 
-  if (!codeforcesAccount) {
+  const connected = platforms.filter((platform) => platform.connected);
+  if (connected.length === 0) {
     return {
       ...baseItem,
       value: "Not connected",
-      label: "Connect Codeforces to show real stats",
-      note: "No Codeforces account is connected yet.",
+      label: "Connect Codeforces or AtCoder",
+      note: "No competitive platform is connected yet.",
       actionLabel: "Connect Platform",
       actionHref: "/platforms",
       isPlaceholder: true,
     };
   }
 
-  if (!codeforcesAccount.stats) {
+  if (connected.every((platform) => platform.solved_count === null)) {
     return {
       ...baseItem,
       value: "Not synced",
-      label: "Sync Codeforces to show real stats",
-      note: `Codeforces ${formatHandle(codeforcesAccount.handle)}`,
-      stats: [
-        {
-          value: codeforcesAccount.is_verified ? "Verified" : "Unverified",
-          label: "Status",
-        },
-        {
-          value: codeforcesAccount.last_synced_at
-            ? formatRelativeTime(codeforcesAccount.last_synced_at)
-            : "Never",
-          label: "Last synced",
-        },
-      ],
+      label: "Sync a platform to show real stats",
+      note: `${connected.length} competitive ${pluralize(connected.length, "platform")} connected`,
       actionLabel: "Manage Platform",
       actionHref: "/platforms",
       isPlaceholder: true,
     };
   }
 
-  const stats = codeforcesAccount.stats;
-
   return {
     ...baseItem,
-    value: String(stats.solved_count),
-    label: "Problems Solved",
-    note: `Codeforces ${formatHandle(codeforcesAccount.handle)}`,
-    stats: [
-      {
-        value: formatNumber(stats.rating, "Unrated"),
-        label: "Rating",
-      },
-      {
-        value: stats.rank ?? "Unranked",
-        label: "Rank",
-      },
-      {
-        value: formatNumber(stats.max_rating, "Unrated"),
-        label: "Max rating",
-      },
-      {
-        value: String(stats.contest_count),
-        label: "Contests",
-      },
-    ],
+    value: `${summary.solved_count}${summary.solved_count_complete ? "" : "+"}`,
+    label: summary.solved_count_complete ? "Problems Solved" : "Known Problems Solved",
+    note: summary.solved_count_complete ? `${connected.length} active ${pluralize(connected.length, "platform")}` : "AtCoder history is still indexing.",
+    stats: connected.flatMap((platform) => [
+      { value: formatNumber(platform.rating, "Unrated"), label: `${platform.platform === "codeforces" ? "Codeforces" : "AtCoder"} rating` },
+      { value: platform.rank ?? "Unranked", label: `${platform.platform === "codeforces" ? "CF" : "AC"} rank` },
+    ]),
     actionLabel: "View Details",
     actionHref: "/competitive-programming",
   };
@@ -320,11 +269,9 @@ function buildComingSoonJourneyItem(
   };
 }
 
-function buildJourneyItems(platforms: DashboardPlatform[]): JourneyItem[] {
-  const codeforcesAccount = platforms.find(isCodeforcesPlatform);
-
+function buildJourneyItems(platforms: DashboardPlatform[], competitivePlatforms: CompetitivePlatformSummary[], summary: CompetitiveOverviewSummary): JourneyItem[] {
   return [
-    buildCompetitiveProgrammingJourney(codeforcesAccount),
+    buildCompetitiveProgrammingJourney(competitivePlatforms, summary),
     buildComingSoonJourneyItem(
       "CTF / Cybersecurity",
       "Connector not available yet",
@@ -351,19 +298,19 @@ function buildNextSteps(
   platforms: DashboardPlatform[],
 ): NextStep[] {
   const steps: NextStep[] = [];
-  const codeforcesAccount = platforms.find(isCodeforcesPlatform);
+  const competitiveAccounts = platforms.filter(isSupportedPlatform);
 
-  if (!codeforcesAccount) {
+  if (competitiveAccounts.length === 0) {
     steps.push({
-      title: "Connect Codeforces",
-      subtitle: "Pull solved count, rating, and rank into the dashboard.",
+      title: "Connect a competitive platform",
+      subtitle: "Add Codeforces or AtCoder progress to the dashboard.",
       icon: Code2,
       accent: "green",
     });
-  } else if (!codeforcesAccount.stats) {
+  } else if (competitiveAccounts.some((platform) => !platform.stats)) {
     steps.push({
-      title: "Sync Codeforces",
-      subtitle: "Load the real Codeforces stats for this account.",
+      title: "Sync competitive data",
+      subtitle: "Load real stats for your connected account.",
       icon: RefreshCw,
       accent: "blue",
     });
@@ -388,16 +335,17 @@ function buildNextSteps(
 }
 
 function buildPlatformSummary(platforms: DashboardPlatform[]): string {
-  if (platforms.length === 0) {
+  const supported = platforms.filter(isSupportedPlatform);
+  if (supported.length === 0) {
     return "Connect a platform to start tracking real progress.";
   }
 
-  const verifiedCount = platforms.filter((platform) => platform.is_verified).length;
+  const validCount = supported.filter((platform) => platform.handle_validated).length;
 
-  return `Tracking ${platforms.length} connected ${pluralize(
-    platforms.length,
+  return `Tracking ${supported.length} connected ${pluralize(
+    supported.length,
     "platform",
-  )} with ${verifiedCount} verified.`;
+  )} with ${validCount} valid ${pluralize(validCount, "handle")}.`;
 }
 
 export function buildDashboardViewModel(
@@ -410,9 +358,9 @@ export function buildDashboardViewModel(
       dashboard.user.full_name.trim() || dashboard.user.username || "there",
     username: dashboard.user.username,
     platformSummary: buildPlatformSummary(dashboard.platforms),
-    metrics: buildMetrics(dashboard.platforms, profileCompletion.progress),
+    metrics: buildMetrics(profileCompletion.progress, dashboard.competitive_programming.summary),
     connectedPlatforms: buildConnectedPlatforms(dashboard.platforms),
-    journeyItems: buildJourneyItems(dashboard.platforms),
+    journeyItems: buildJourneyItems(dashboard.platforms, dashboard.competitive_programming.platforms, dashboard.competitive_programming.summary),
     profileProgress: profileCompletion.progress,
     profileChecklist: profileCompletion.checklist,
     nextSteps: buildNextSteps(profileCompletion.fields, dashboard.platforms),

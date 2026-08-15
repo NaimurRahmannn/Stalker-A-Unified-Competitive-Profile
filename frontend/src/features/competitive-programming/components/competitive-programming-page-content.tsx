@@ -2,53 +2,33 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { isAxiosError } from "axios";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, BarChart3, Code2, RefreshCw, Target, Trophy } from "lucide-react";
+import { AlertCircle, Code2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardMobileNav } from "@/components/layout/dashboard-mobile-nav";
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
 import { syncPlatformAccount } from "@/features/platforms/api";
 import { useAuth } from "@/hooks/use-auth";
 import { getApiErrorMessage } from "@/lib/utils";
-import { getCodeforcesAnalytics } from "../api";
-import type { CodeforcesAnalyticsResponse } from "../types";
-import { CodeforcesGrowthSummary } from "./codeforces-growth-summary";
-import { CodeforcesPerformanceCard } from "./codeforces-performance-card";
-import { RatingProgressChart } from "./rating-progress-chart";
-import { RecentCodeforcesActivity } from "./recent-codeforces-activity";
+import { getAtCoderAnalytics, getCodeforcesAnalytics, getCompetitiveProgrammingOverview } from "../api";
+import type { AtCoderAnalyticsResponse, CodeforcesAnalyticsResponse, CompetitiveOverviewResponse } from "../types";
+import { AtCoderAnalyticsView } from "./atcoder-analytics-view";
+import { CodeforcesAnalyticsView } from "./codeforces-analytics-view";
+import { CompetitiveOverview } from "./competitive-overview";
+
+type Tab = "overview" | "codeforces" | "atcoder";
 
 function DashboardShell({ children }: { children: ReactNode }) {
   return <main className="min-h-screen bg-slate-50 text-slate-900"><div className="mx-auto grid min-h-screen w-full grid-cols-1 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)]"><aside className="hidden bg-white p-5 sm:p-6 lg:block lg:border-r lg:border-slate-200"><DashboardSidebar activeItem="competitive-programming" /></aside><div className="min-w-0 bg-slate-50"><DashboardMobileNav activeItem="competitive-programming" />{children}</div></div></main>;
 }
 
-function PageHeader() {
-  return <header><div className="flex items-center gap-3"><h1 className="text-[25px] font-semibold leading-tight text-slate-950 sm:text-[28px]">Competitive Programming</h1><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"><Code2 className="size-5" /></span></div><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">Real Codeforces rating, contest, problem-solving, and submission analytics.</p></header>;
+function PageHeader({ tab, onTabChange }: { tab: Tab; onTabChange: (tab: Tab) => void }) {
+  const tabs: Array<{ id: Tab; label: string }> = [{ id: "overview", label: "Overview" }, { id: "codeforces", label: "Codeforces" }, { id: "atcoder", label: "AtCoder" }];
+  return <header><div className="flex items-center gap-3"><h1 className="text-[25px] font-semibold leading-tight text-slate-950 sm:text-[28px]">Competitive Programming</h1><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"><Code2 className="size-5" /></span></div><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">Track real Codeforces and AtCoder progress from data cached by STALKER.</p><div role="tablist" aria-label="Competitive programming platform" className="mt-5 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">{tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => onTabChange(item.id)} className={`h-9 rounded-lg px-4 text-xs font-semibold transition ${tab === item.id ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>{item.label}</button>)}</div></header>;
 }
 
-function LoadingState() {
-  return <DashboardShell><section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8"><PageHeader /></section><div className="animate-pulse p-5 sm:p-6 lg:p-8"><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-25 rounded-2xl border border-slate-200 bg-white" />)}</div><div className="mt-6 h-62 rounded-2xl border border-slate-200 bg-white" /><div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"><div className="h-90 rounded-2xl border border-slate-200 bg-white" /><div className="h-72 rounded-2xl border border-slate-200 bg-white" /></div></div></DashboardShell>;
-}
-
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return <DashboardShell><section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8"><PageHeader /></section><div className="p-5 sm:p-6 lg:p-8"><div className="rounded-2xl border border-red-100 bg-white px-6 py-14 text-center shadow-sm"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-red-50 text-red-600"><AlertCircle className="size-6" /></span><h2 className="mt-4 text-base font-semibold text-slate-950">Could not load Codeforces analytics</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">{message}</p><button type="button" onClick={onRetry} className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white hover:bg-emerald-700"><RefreshCw className="size-4" />Try again</button></div></div></DashboardShell>;
-}
-
-function EmptyState() {
-  return <DashboardShell><section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8"><PageHeader /></section><div className="p-5 sm:p-6 lg:p-8"><div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-18 text-center shadow-sm"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-600"><Code2 className="size-7" /></span><h2 className="mt-5 text-lg font-semibold text-slate-950">Connect Codeforces to begin</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">Add your Codeforces handle, then sync it to load real rating history, solved problems, contests, and recent submissions.</p><Link href="/platforms" className="mt-6 inline-flex h-10 items-center rounded-xl bg-emerald-600 px-5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700">Connect Codeforces</Link></div></div></DashboardShell>;
-}
-
-const metricConfig = [
-  { key: "solved", label: "Problems Solved", Icon: Target, style: "bg-emerald-50 text-emerald-600" },
-  { key: "contests", label: "Contests", Icon: BarChart3, style: "bg-blue-50 text-blue-600" },
-  { key: "rating", label: "Current Rating", Icon: Code2, style: "bg-violet-50 text-violet-600" },
-  { key: "max", label: "Max Rating", Icon: Trophy, style: "bg-orange-50 text-orange-600" },
-] as const;
-
-function SummaryMetrics({ analytics }: { analytics: CodeforcesAnalyticsResponse }) {
-  const stats = analytics.stats;
-  const values = { solved: stats ? String(stats.solved_count) : "—", contests: stats ? String(stats.contest_count) : "—", rating: stats ? (stats.rating === null ? "Unrated" : String(stats.rating)) : "—", max: stats ? (stats.max_rating === null ? "Unrated" : String(stats.max_rating)) : "—" };
-  return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{metricConfig.map(({ key, label, Icon, style }) => <article key={key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.035)]"><div className="flex min-h-16 items-center gap-4"><span className={`grid size-12 shrink-0 place-items-center rounded-2xl ${style}`}><Icon className="size-5" /></span><div className="min-w-0"><strong className="block truncate text-2xl font-semibold text-slate-950">{values[key]}</strong><span className="mt-1 block truncate text-xs font-medium text-slate-600">{label}</span></div></div></article>)}</div>;
+function LoadingState({ tab, onTabChange }: { tab: Tab; onTabChange: (tab: Tab) => void }) {
+  return <DashboardShell><section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8"><PageHeader tab={tab} onTabChange={onTabChange} /></section><div className="animate-pulse p-5 sm:p-6 lg:p-8"><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-25 rounded-2xl border border-slate-200 bg-white" />)}</div><div className="mt-6 h-62 rounded-2xl border border-slate-200 bg-white" /><div className="mt-6 h-90 rounded-2xl border border-slate-200 bg-white" /></div></DashboardShell>;
 }
 
 function retryAfterSeconds(error: unknown) {
@@ -60,63 +40,78 @@ function retryAfterSeconds(error: unknown) {
 export function CompetitiveProgrammingPageContent() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
-  const [analytics, setAnalytics] = useState<CodeforcesAnalyticsResponse | null>(null);
+  const [tab, setTab] = useState<Tab>("overview");
+  const [overview, setOverview] = useState<CompetitiveOverviewResponse | null>(null);
+  const [codeforces, setCodeforces] = useState<CodeforcesAnalyticsResponse | null>(null);
+  const [atcoder, setAtCoder] = useState<AtCoderAnalyticsResponse | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<Tab, string>>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState<Tab | null>(null);
+  const [cooldowns, setCooldowns] = useState<Record<Exclude<Tab, "overview">, number>>({ codeforces: 0, atcoder: 0 });
 
   const loadAnalytics = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getCodeforcesAnalytics();
-      setAnalytics(data);
-      setCooldownSeconds(data.account?.sync_cooldown_seconds ?? 0);
-    } catch (requestError) {
-      setError(getApiErrorMessage(requestError, "The analytics service is unavailable."));
-    } finally {
-      setIsLoading(false);
+    const results = await Promise.allSettled([getCompetitiveProgrammingOverview(), getCodeforcesAnalytics(), getAtCoderAnalytics()]);
+    setOverview((current) => results[0].status === "fulfilled" ? results[0].value : current);
+    setCodeforces((current) => {
+      if (results[1].status === "fulfilled") return results[1].value;
+      return current;
+    });
+    setAtCoder((current) => {
+      if (results[2].status === "fulfilled") return results[2].value;
+      return current;
+    });
+    setErrors({
+      ...(results[0].status === "rejected" ? { overview: getApiErrorMessage(results[0].reason, "Could not load the competitive overview.") } : {}),
+      ...(results[1].status === "rejected" ? { codeforces: getApiErrorMessage(results[1].reason, "Could not load Codeforces analytics.") } : {}),
+      ...(results[2].status === "rejected" ? { atcoder: getApiErrorMessage(results[2].reason, "Could not load AtCoder analytics.") } : {}),
+    });
+    const codeforcesResult = results[1];
+    const atcoderResult = results[2];
+    if (codeforcesResult.status === "fulfilled") {
+      const seconds = codeforcesResult.value.account?.sync_cooldown_seconds ?? 0;
+      setCooldowns((value) => ({ ...value, codeforces: seconds }));
     }
+    if (atcoderResult.status === "fulfilled") {
+      const seconds = atcoderResult.value.account?.sync_cooldown_remaining_seconds ?? 0;
+      setCooldowns((value) => ({ ...value, atcoder: seconds }));
+    }
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
     if (isAuthLoading) return;
     if (!user) { router.replace("/login"); return; }
-    let cancelled = false;
-    void getCodeforcesAnalytics().then((data) => { if (!cancelled) { setAnalytics(data); setCooldownSeconds(data.account?.sync_cooldown_seconds ?? 0); setError(null); } }).catch((requestError: unknown) => { if (!cancelled) setError(getApiErrorMessage(requestError, "The analytics service is unavailable.")); }).finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
-  }, [isAuthLoading, router, user]);
+    const timeout = window.setTimeout(() => void loadAnalytics(), 0);
+    return () => window.clearTimeout(timeout);
+  }, [isAuthLoading, loadAnalytics, router, user]);
 
   useEffect(() => {
-    if (cooldownSeconds <= 0) return;
-    const interval = window.setInterval(() => setCooldownSeconds((value) => Math.max(0, value - 1)), 1000);
+    if (!Object.values(cooldowns).some((value) => value > 0)) return;
+    const interval = window.setInterval(() => setCooldowns((value) => ({ codeforces: Math.max(0, value.codeforces - 1), atcoder: Math.max(0, value.atcoder - 1) })), 1000);
     return () => window.clearInterval(interval);
-  }, [cooldownSeconds]);
+  }, [cooldowns]);
 
-  const handleSync = async () => {
-    const account = analytics?.account;
-    if (!account || isSyncing || cooldownSeconds > 0) return;
-    setIsSyncing(true);
+  const handleSync = async (platform: Exclude<Tab, "overview">) => {
+    const account = platform === "codeforces" ? codeforces?.account : atcoder?.account;
+    if (!account || syncing || cooldowns[platform] > 0) return;
+    setSyncing(platform);
     try {
-      await syncPlatformAccount(account.id);
-      toast.success("Codeforces analytics updated");
-      const data = await getCodeforcesAnalytics();
-      setAnalytics(data);
-      setCooldownSeconds(data.account?.sync_cooldown_seconds ?? 0);
+      const result = await syncPlatformAccount(account.id);
+      if (platform === "atcoder" && result.status === "partial") toast.warning("AtCoder partially updated. Cached data is still being shown for one source.");
+      else if (platform === "atcoder" && result.sources && Object.values(result.sources).every((source) => source.status === "skipped_fresh")) toast.info("Your AtCoder data is already fresh.");
+      else toast.success(`${platform === "atcoder" ? "AtCoder" : "Codeforces"} analytics updated.`);
+      await loadAnalytics();
     } catch (syncError) {
       const retry = retryAfterSeconds(syncError);
-      if (retry) setCooldownSeconds(retry);
-      toast.error(getApiErrorMessage(syncError, "Could not sync Codeforces. Please try again."));
-    } finally {
-      setIsSyncing(false);
-    }
+      if (retry) setCooldowns((value) => ({ ...value, [platform]: retry }));
+      toast.error(getApiErrorMessage(syncError, `Could not sync ${platform === "atcoder" ? "AtCoder" : "Codeforces"}. Please try again.`));
+      await loadAnalytics();
+    } finally { setSyncing(null); }
   };
 
-  if (isAuthLoading || isLoading) return <LoadingState />;
-  if (!user) return <LoadingState />;
-  if (error || !analytics) return <ErrorState message={error ?? "No analytics response was returned."} onRetry={() => void loadAnalytics()} />;
-  if (!analytics.account) return <EmptyState />;
+  if (isAuthLoading || isLoading || !user) return <LoadingState tab={tab} onTabChange={setTab} />;
+  const data = tab === "overview" ? overview : tab === "codeforces" ? codeforces : atcoder;
+  const error = errors[tab];
 
-  return <DashboardShell><section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8"><PageHeader /></section><div className="p-5 sm:p-6 lg:p-8"><SummaryMetrics analytics={analytics} /><div className="mt-6"><CodeforcesPerformanceCard account={analytics.account} stats={analytics.stats} onSync={() => void handleSync()} isSyncing={isSyncing} cooldownSeconds={cooldownSeconds} /></div><div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"><div className="min-w-0 space-y-6"><RatingProgressChart history={analytics.rating_history} /><RecentCodeforcesActivity activity={analytics.recent_activity} /></div><CodeforcesGrowthSummary account={analytics.account} snapshots={analytics.snapshots} historyCount={analytics.rating_history.length} /></div></div></DashboardShell>;
+  return <DashboardShell><section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8"><PageHeader tab={tab} onTabChange={setTab} /></section><div className="p-5 sm:p-6 lg:p-8">{error ? <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-red-100 bg-red-50/70 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between"><span className="inline-flex items-center gap-2 font-medium"><AlertCircle className="size-4" />{error}{data ? " Cached data remains visible below." : ""}</span><button type="button" onClick={() => void loadAnalytics()} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-xs font-semibold"><RefreshCw className="size-4" />Retry</button></div> : null}{tab === "overview" && overview ? <CompetitiveOverview overview={overview} onSelectPlatform={setTab} /> : null}{tab === "codeforces" && codeforces ? <CodeforcesAnalyticsView analytics={codeforces} onSync={() => void handleSync("codeforces")} isSyncing={syncing === "codeforces"} cooldownSeconds={cooldowns.codeforces} /> : null}{tab === "atcoder" && atcoder ? <AtCoderAnalyticsView analytics={atcoder} onSync={() => void handleSync("atcoder")} isSyncing={syncing === "atcoder"} cooldownSeconds={cooldowns.atcoder} /> : null}{!data ? <div className="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center"><p className="text-sm font-semibold text-slate-900">Analytics are unavailable</p><p className="mt-2 text-xs text-slate-500">Try again to load this view.</p></div> : null}</div></DashboardShell>;
 }

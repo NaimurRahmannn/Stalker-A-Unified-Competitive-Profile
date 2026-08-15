@@ -10,6 +10,7 @@ from apps.connectors.base.exceptions import (
     ProviderRateLimitError,
     UnsupportedSourceError,
 )
+from apps.connectors.competitive import build_competitive_programming_overview
 from apps.connectors.models import (
     AtCoderStats,
     AtCoderSubmission,
@@ -356,3 +357,10 @@ class AtCoderAnalyticsView(APIView):
             return getattr(account, relation_name)
         except model_class.DoesNotExist:
             return None
+
+
+class CompetitiveProgrammingOverviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        return Response(build_competitive_programming_overview(request.user))

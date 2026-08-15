@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
 from apps.accounts.models import User
-from apps.connectors.models import CodeforcesStats, PlatformAccount
+from apps.connectors.models import AtCoderStats, CodeforcesStats, PlatformAccount
+from apps.connectors.providers.atcoder.mapper import get_atcoder_rating_color
 from apps.connectors.services import can_sync_platform_account, get_sync_cooldown_seconds
 
 
@@ -42,6 +43,34 @@ class DashboardCodeforcesStatsSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class DashboardAtCoderStatsSerializer(serializers.ModelSerializer):
+    rating_color = serializers.SerializerMethodField()
+    submission_stats_complete = serializers.BooleanField(
+        source="submission_backfill_complete"
+    )
+
+    class Meta:
+        model = AtCoderStats
+        fields = (
+            "current_rating",
+            "max_rating",
+            "rating_color",
+            "rated_contest_count",
+            "solved_count",
+            "attempted_count",
+            "accepted_submission_count",
+            "indexed_submission_count",
+            "submission_stats_complete",
+            "rating_data_updated_at",
+            "submission_data_updated_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_rating_color(self, obj: AtCoderStats) -> str | None:
+        return get_atcoder_rating_color(obj.current_rating)
+
+
 class DashboardPlatformSerializer(serializers.ModelSerializer):
     stats = serializers.SerializerMethodField()
     handle_validated = serializers.SerializerMethodField()
@@ -71,15 +100,19 @@ class DashboardPlatformSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_stats(self, obj: PlatformAccount) -> dict | None:
-        if obj.platform != PlatformAccount.Platform.CODEFORCES:
-            return None
-
-        try:
-            stats = obj.codeforces_stats
-        except CodeforcesStats.DoesNotExist:
-            return None
-
-        return DashboardCodeforcesStatsSerializer(stats).data
+        if obj.platform == PlatformAccount.Platform.CODEFORCES:
+            try:
+                stats = obj.codeforces_stats
+            except CodeforcesStats.DoesNotExist:
+                return None
+            return DashboardCodeforcesStatsSerializer(stats).data
+        if obj.platform == PlatformAccount.Platform.ATCODER:
+            try:
+                stats = obj.atcoder_stats
+            except AtCoderStats.DoesNotExist:
+                return None
+            return DashboardAtCoderStatsSerializer(stats).data
+        return None
 
     def get_handle_validated(self, obj: PlatformAccount) -> bool:
         return obj.handle_validated_at is not None or obj.is_verified

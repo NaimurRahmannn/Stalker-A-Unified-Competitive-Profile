@@ -2,6 +2,7 @@ import api from "@/lib/api";
 import type {
   ConnectPlatformPayload,
   PlatformAccount,
+  PlatformSyncResponse,
 } from "@/features/platforms/types";
 
 export async function listPlatformAccounts(): Promise<PlatformAccount[]> {
@@ -23,8 +24,8 @@ export async function connectPlatformAccount(
 
 export async function syncPlatformAccount(
   id: number,
-): Promise<PlatformAccount> {
-  const { data } = await api.post<PlatformAccount>(
+): Promise<PlatformSyncResponse> {
+  const { data } = await api.post<PlatformSyncResponse>(
     `/platform-accounts/${id}/sync/`,
   );
 

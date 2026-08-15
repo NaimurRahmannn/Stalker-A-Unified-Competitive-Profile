@@ -32,7 +32,7 @@ function PlatformMark({ mark }: { mark: ConnectedPlatform["mark"] }) {
 
 function PlatformMiniCard({ platform }: { platform: ConnectedPlatform }) {
   const badgeClass =
-    platform.status === "Verified"
+    platform.status === "Handle valid"
       ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
       : "bg-orange-50 text-orange-700 ring-1 ring-orange-200";
 
@@ -91,7 +91,7 @@ function EmptyPlatformsState() {
         No platforms connected yet
       </p>
       <p className="mt-1 text-xs font-medium text-slate-500">
-        Connect Codeforces to start pulling real dashboard stats.
+        Connect Codeforces or AtCoder to start pulling real dashboard stats.
       </p>
     </div>
   );

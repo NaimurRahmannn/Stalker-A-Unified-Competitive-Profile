@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.connectors.models import CodeforcesStats, PlatformAccount
+from apps.connectors.models import AtCoderStats, CodeforcesStats, PlatformAccount
 
 
 User = get_user_model()
@@ -170,3 +170,33 @@ class PublicProfileEndpointTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         mocked_profile.assert_not_called()
+
+    def test_public_profile_includes_atcoder_without_sync_internals(self):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.ATCODER,
+            handle="atcoder-user",
+        )
+        AtCoderStats.objects.create(
+            platform_account=account,
+            current_rating=1542,
+            max_rating=1681,
+            rated_contest_count=47,
+            solved_count=428,
+            attempted_count=501,
+            accepted_submission_count=683,
+            indexed_submission_count=900,
+            submission_backfill_complete=False,
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        platform = response.data["platforms"][0]
+        self.assertEqual(platform["stats"]["current_rating"], 1542)
+        self.assertEqual(platform["stats"]["rating_color"], "cyan")
+        self.assertFalse(platform["stats"]["submission_stats_complete"])
+        self.assertNotIn("atcoder_sync_state", platform)
+        summary = response.data["competitive_programming"]["summary"]
+        self.assertEqual(summary["solved_count"], 428)
+        self.assertFalse(summary["solved_count_complete"])

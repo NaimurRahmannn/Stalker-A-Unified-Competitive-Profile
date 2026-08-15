@@ -11,7 +11,7 @@ function PlatformCard({ platform }: { platform: PublicPlatformView }) {
         {platform.profileUrl ? <ExternalLink className="size-3.5 shrink-0 text-slate-400" /> : null}
       </div>
       <div className="mt-8 flex items-end gap-3"><strong className={`text-xl font-bold ${platform.hasDetailedStats ? "text-emerald-600" : "text-slate-400"}`}>{platform.rating}</strong><div className="pb-0.5"><p className="text-[10px] font-semibold text-slate-800">Rating</p><p className="mt-0.5 max-w-20 truncate text-[9px] capitalize text-slate-500">{platform.rank}</p></div></div>
-      <div className="mt-auto flex items-center justify-between pt-6"><strong className="text-lg font-semibold text-slate-900">{platform.solved}</strong>{platform.isVerified ? <span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700">Verified</span> : <span className="rounded bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-500">Unverified</span>}</div>
+      <div className="mt-auto flex items-center justify-between pt-6"><strong className="text-lg font-semibold text-slate-900">{platform.solved}</strong>{platform.handleValid ? <span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700">Handle valid</span> : <span className="rounded bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-500">Not validated</span>}</div>
     </>
   );
   const className = "flex min-h-49 flex-col rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-200 hover:shadow-sm";

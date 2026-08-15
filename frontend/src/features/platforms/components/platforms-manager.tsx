@@ -18,7 +18,11 @@ import { formatPlatformName, getApiErrorMessage } from "@/lib/utils";
 import { ConnectPlatformForm } from "./connect-platform-form";
 import { PlatformAccountCard } from "./platform-account-card";
 
-const DEFAULT_PLATFORM = "codeforces";
+function implementedAccounts(accounts: PlatformAccount[]) {
+  return accounts.filter(
+    (account) => account.platform === "codeforces" || account.platform === "atcoder",
+  );
+}
 
 export function PlatformsManager() {
   const router = useRouter();
@@ -37,7 +41,7 @@ export function PlatformsManager() {
 
     try {
       const data = await listPlatformAccounts();
-      setAccounts(data);
+      setAccounts(implementedAccounts(data));
       setError(null);
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to load your platforms."));
@@ -64,7 +68,7 @@ export function PlatformsManager() {
       try {
         const data = await listPlatformAccounts();
         if (cancelled) return;
-        setAccounts(data);
+        setAccounts(implementedAccounts(data));
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -104,7 +108,7 @@ export function PlatformsManager() {
 
       try {
         const account = await connectPlatformAccount({
-          platform: DEFAULT_PLATFORM,
+          platform: values.platform,
           handle: values.handle,
         });
 
@@ -135,15 +139,30 @@ export function PlatformsManager() {
       setAccounts((prev) =>
         prev.map((account) => (account.id === id ? updated : account)),
       );
-      toast.success("Account synced successfully");
+      if (updated.platform === "atcoder") {
+        if (updated.status === "partial") {
+          toast.warning(
+            "AtCoder partially updated. Cached data is still being shown for one source.",
+          );
+        } else if (
+          updated.sources &&
+          Object.values(updated.sources).every(
+            (source) => source.status === "skipped_fresh",
+          )
+        ) {
+          toast.info("Your AtCoder data is already fresh.");
+        } else {
+          toast.success("AtCoder analytics updated.");
+        }
+      } else {
+        toast.success("Codeforces analytics updated.");
+      }
     } catch (err) {
       toast.error(
         getApiErrorMessage(err, "Could not sync account. Please try again."),
       );
 
-      if (isAxiosError(err) && err.response?.status === 429) {
-        void applyAccounts();
-      }
+      if (isAxiosError(err)) void applyAccounts();
     }
   }, [applyAccounts, router, user]);
 
@@ -197,14 +216,14 @@ export function PlatformsManager() {
               No platforms connected yet
             </p>
             <p className="mt-1 text-xs font-medium text-slate-500">
-              Add a Codeforces handle above to get started.
+              Add a Codeforces or AtCoder handle above to get started.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3">
             {accounts.map((account) => (
               <PlatformAccountCard
-                key={account.id}
+                key={`${account.id}-${account.sync_cooldown_seconds}`}
                 account={account}
                 onSync={handleSync}
                 onDelete={handleDelete}

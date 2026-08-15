@@ -29,7 +29,7 @@ export type JourneyItem = {
   isPlaceholder?: boolean;
 };
 
-export type PlatformStatus = "Verified" | "Unverified";
+export type PlatformStatus = "Handle valid" | "Handle not validated";
 
 export type PlatformMark =
   | "codeforces"

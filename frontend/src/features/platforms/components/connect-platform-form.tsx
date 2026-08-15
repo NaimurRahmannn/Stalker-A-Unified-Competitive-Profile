@@ -21,7 +21,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
     formState: { errors, isSubmitting },
   } = useForm<ConnectPlatformFormValues>({
     resolver: zodResolver(connectPlatformSchema),
-    defaultValues: { handle: "" },
+    defaultValues: { platform: "codeforces", handle: "" },
   });
 
   const submit = handleSubmit(async (values) => {
@@ -38,7 +38,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
         Connect a platform
       </h2>
       <p className="mt-1 text-xs font-medium text-slate-500">
-        Add a Codeforces handle, then sync to pull in real stats.
+        Add a Codeforces or AtCoder handle, then sync to validate it and load real stats.
       </p>
 
       <form
@@ -55,12 +55,12 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
           </label>
           <select
             id="platform"
-            disabled
-            defaultValue="codeforces"
             aria-label="Platform"
-            className="h-11 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none"
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+            {...register("platform")}
           >
             <option value="codeforces">Codeforces</option>
+            <option value="atcoder">AtCoder</option>
           </select>
         </div>
 

@@ -157,8 +157,15 @@ Competitive programming analytics:
   AtCoder account summary, combined/source sync state, Algorithm rating history, bounded recent
   submissions, completeness-aware stats, and normalized growth snapshots. This read never
   contacts either AtCoder provider.
+- `GET /api/v1/competitive-programming/overview/` returns completeness-aware Codeforces +
+  AtCoder totals, separate platform rating summaries, and a bounded timestamp-ordered activity
+  feed. This read uses cached STALKER data only.
 - A successful Codeforces sync stores a bounded recent-activity list and creates a historical
   stats snapshot when the tracked values changed.
+
+Dashboard and public-profile responses include the same normalized competitive-programming
+summary. AtCoder solved and accepted totals remain explicitly incomplete until submission
+backfill is caught up; public responses do not expose provider sync errors or cursor state.
 
 AtCoder Algorithm rating ingestion:
 
