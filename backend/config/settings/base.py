@@ -2,7 +2,6 @@ from pathlib import Path
 
 from decouple import AutoConfig, Csv
 
-
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 config = AutoConfig(search_path=str(BASE_DIR))
 
@@ -152,6 +151,11 @@ ATCODER_SYNC_COOLDOWN_SECONDS = config(
     default=3600,
     cast=int,
 )
+ATCODER_HISTORY_SYNC_COOLDOWN_SECONDS = config(
+    "ATCODER_HISTORY_SYNC_COOLDOWN_SECONDS",
+    default=ATCODER_SYNC_COOLDOWN_SECONDS,
+    cast=int,
+)
 ATCODER_CONNECT_TIMEOUT_SECONDS = config(
     "ATCODER_CONNECT_TIMEOUT_SECONDS",
     default=3.05,
@@ -192,5 +196,10 @@ ATCODER_PROBLEMS_MIN_REQUEST_INTERVAL_SECONDS = config(
 ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC = config(
     "ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC",
     default=2,
+    cast=int,
+)
+ATCODER_PROBLEMS_SYNC_COOLDOWN_SECONDS = config(
+    "ATCODER_PROBLEMS_SYNC_COOLDOWN_SECONDS",
+    default=300,
     cast=int,
 )

@@ -13,7 +13,7 @@ from apps.connectors.models import PlatformAccount
 @dataclass(frozen=True)
 class SnapshotValues:
     rating: int | None
-    solved_count: int = 0
+    solved_count: int | None = None
     contest_count: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -52,7 +52,12 @@ class BaseConnector(ABC):
     ) -> SnapshotValues | None:
         raise NotImplementedError
 
-    def sync(self, platform_account: PlatformAccount) -> PlatformAccount:
+    def sync(
+        self,
+        platform_account: PlatformAccount,
+        *,
+        update_account_sync_metadata: bool = True,
+    ) -> PlatformAccount:
         """Fetch outside a transaction, then atomically persist validated data."""
         if not self.is_enabled:
             raise ProviderSyncDisabledError(
@@ -77,19 +82,20 @@ class BaseConnector(ABC):
             # never external-account ownership verified.
             locked_account.is_verified = True
             locked_account.handle_validated_at = synced_at
-            locked_account.last_sync_attempted_at = synced_at
-            locked_account.last_synced_at = synced_at
-            locked_account.save(
-                update_fields=[
-                    "handle",
-                    "profile_url",
-                    "is_verified",
-                    "handle_validated_at",
-                    "last_sync_attempted_at",
-                    "last_synced_at",
-                    "updated_at",
-                ]
-            )
+            update_fields = [
+                "handle",
+                "profile_url",
+                "is_verified",
+                "handle_validated_at",
+                "updated_at",
+            ]
+            if update_account_sync_metadata:
+                locked_account.last_sync_attempted_at = synced_at
+                locked_account.last_synced_at = synced_at
+                update_fields.extend(
+                    ["last_sync_attempted_at", "last_synced_at"]
+                )
+            locked_account.save(update_fields=update_fields)
 
             if snapshot is not None:
                 self._record_snapshot(locked_account, snapshot)

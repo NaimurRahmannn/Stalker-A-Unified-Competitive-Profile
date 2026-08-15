@@ -60,7 +60,8 @@ Required for Django:
 AtCoder synchronization safety settings (all optional):
 
 - `ATCODER_HISTORY_SYNC_ENABLED` (default: `True`)
-- `ATCODER_SYNC_COOLDOWN_SECONDS` (default: `3600`)
+- `ATCODER_HISTORY_SYNC_COOLDOWN_SECONDS` (default: legacy
+  `ATCODER_SYNC_COOLDOWN_SECONDS`, then `3600`)
 - `ATCODER_CONNECT_TIMEOUT_SECONDS` (default: `3.05`)
 - `ATCODER_READ_TIMEOUT_SECONDS` (default: `10`)
 - `STALKER_EXTERNAL_USER_AGENT` (identifies STALKER to external providers)
@@ -72,6 +73,7 @@ AtCoderProblems submission-ingestion settings (all optional):
 - `ATCODER_PROBLEMS_TIMEOUT_SECONDS` (default: `10`)
 - `ATCODER_PROBLEMS_MIN_REQUEST_INTERVAL_SECONDS` (default: `1.1`)
 - `ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC` (default: `2`)
+- `ATCODER_PROBLEMS_SYNC_COOLDOWN_SECONDS` (default: `300`)
 
 Optional PostgreSQL variables:
 
@@ -135,11 +137,12 @@ Platform accounts (connectors):
 - `GET /api/v1/platform-accounts/<id>/` — retrieve one
 - `PATCH /api/v1/platform-accounts/<id>/` — update the handle
 - `DELETE /api/v1/platform-accounts/<id>/` — remove it
-- `POST /api/v1/platform-accounts/<id>/sync/` — verify the handle and refresh stats via the platform connector
+- `POST /api/v1/platform-accounts/<id>/sync/` — canonical platform sync; AtCoder
+  independently refreshes official rating history and AtCoderProblems submissions
 - `GET /api/v1/platform-accounts/<id>/atcoder-submissions/` — return cached AtCoder
   submission stats, source-specific cursor state, and the latest 20 submissions
-- `POST /api/v1/platform-accounts/<id>/sync-submissions/` — incrementally ingest bounded
-  AtCoderProblems submission pages for an owned AtCoder account
+- `POST /api/v1/platform-accounts/<id>/sync-submissions/` — temporary compatibility /
+  development endpoint using the same cooldown-aware submission service as unified sync
 
 Dashboard:
 
@@ -155,11 +158,17 @@ Competitive programming analytics:
 
 AtCoder Algorithm rating ingestion:
 
-- AtCoder accounts use the same `POST /api/v1/platform-accounts/<id>/sync/` entry point.
+- AtCoder accounts use `POST /api/v1/platform-accounts/<id>/sync/` as the canonical combined
+  entry point. It returns `success`, `partial`, or `failed`, plus structured `rating` and
+  `submissions` source results with stable statuses/error codes and independent freshness.
 - Sync reads only `/users/<handle>/history/json?contestType=algo`, validates and normalizes the
   complete response, and transactionally caches Algorithm rating events and derived stats.
-- AtCoder's configurable cooldown is measured from the latest attempt, including failed
-  provider calls, while `last_synced_at` continues to mean the last successful synchronization.
+- Rating and submission account cooldowns are independent and measured from each source's
+  latest attempt. A fresh source is skipped without an external call while another eligible
+  source can still run. Provider request throttling remains a separate protection.
+- Each source persists atomically on its own. One source succeeding while the other fails
+  produces `partial`, preserves both caches correctly, and advances only successful-source
+  freshness. `last_synced_at` advances when at least one source actually refreshes successfully.
 - Platform-account responses expose `atcoder_stats`, `atcoder_rating_history`, explicit
   handle-validation state, and separate ownership-verification state.
 - Dashboard and public-profile reads never contact AtCoder. They continue to read STALKER's
@@ -171,10 +180,18 @@ AtCoderProblems submission ingestion:
 - The provider's inclusive timestamp cursor is paired with the last submission ID. STALKER
   re-fetches the boundary second and relies on a database uniqueness constraint for safe overlap.
 - Each validated page is persisted atomically with cursor advancement and metric recalculation.
-- Backfill is limited by `ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC`; a completion flag distinguishes
-  indexed counts from confirmed lifetime totals.
+- Backfill is limited by `ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC`; explicit `backfilling`,
+  `caught_up`, and `blocked` states distinguish normal progress, completion, and the saturated
+  same-timestamp boundary that cannot be advanced safely.
 - The in-process limiter spaces provider-wide requests by more than one second by default. It
   does not coordinate across multiple application processes; distributed limiting is deferred.
+
+AtCoder snapshot semantics:
+
+- Rating sync can create a useful rating snapshot while submissions are still backfilling.
+- `PlatformStatsSnapshot.solved_count` is nullable. Incomplete AtCoder submission history is
+  stored as `null` with `submission_stats_complete=false`, never as a fabricated zero.
+- Codeforces snapshots continue storing exact integer solved counts.
 
 ## Notes
 

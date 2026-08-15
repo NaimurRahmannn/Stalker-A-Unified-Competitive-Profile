@@ -10,12 +10,14 @@ from apps.connectors.base.exceptions import (
     ExternalServiceError,
     InvalidExternalAccountError,
     ProviderAccessDeniedError,
+    ProviderNetworkError,
     ProviderRateLimitError,
     ProviderSchemaError,
+    ProviderServerError,
     ProviderSyncDisabledError,
+    ProviderTimeoutError,
 )
 from apps.connectors.base.utils import normalize_handle
-
 
 logger = logging.getLogger(__name__)
 ATCODER_HANDLE_PATTERN = re.compile(r"^[A-Za-z0-9_]{1,32}$")
@@ -67,12 +69,12 @@ class AtCoderHistoryClient:
             )
         except requests.Timeout as exc:
             self._log_failure("timeout")
-            raise ExternalServiceError(
+            raise ProviderTimeoutError(
                 "AtCoder timed out. Previously synchronized data was preserved."
             ) from exc
         except requests.RequestException as exc:
             self._log_failure("network")
-            raise ExternalServiceError(
+            raise ProviderNetworkError(
                 "AtCoder is temporarily unavailable. Previously synchronized data was preserved."
             ) from exc
 
@@ -91,7 +93,7 @@ class AtCoderHistoryClient:
             )
         if response.status_code >= 500:
             self._log_failure("server_error", response.status_code)
-            raise ExternalServiceError(
+            raise ProviderServerError(
                 "AtCoder is temporarily unavailable. Please try again later."
             )
         if response.status_code != 200:

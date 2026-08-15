@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 
 from django.conf import settings
 from django.db import transaction
@@ -18,7 +19,6 @@ from apps.connectors.providers.atcoder.problems_mapper import (
     normalize_atcoder_submissions,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -29,6 +29,9 @@ class AtCoderSubmissionSyncResult:
     backfill_complete: bool
     last_submission_epoch: int
     last_submission_id: int
+    progress_status: str
+    error_code: str | None
+    updated_at: datetime | None
 
 
 class AtCoderSubmissionIngestionService:
@@ -62,12 +65,25 @@ class AtCoderSubmissionIngestionService:
         cursor_epoch = (
             existing_state.last_submission_epoch if existing_state is not None else 0
         )
-        cursor_id = existing_state.last_submission_id if existing_state is not None else 0
+        cursor_id = (
+            existing_state.last_submission_id if existing_state is not None else 0
+        )
         pages_fetched = 0
         indexed_count = AtCoderSubmission.objects.filter(
             platform_account=platform_account
         ).count()
-        backfill_complete = existing_state.backfill_complete if existing_state else False
+        backfill_complete = (
+            existing_state.backfill_complete if existing_state else False
+        )
+        progress_status = (
+            existing_state.progress_status
+            if existing_state
+            else AtCoderSubmissionSyncState.ProgressStatus.BACKFILLING
+        )
+        error_code = existing_state.blocked_reason if existing_state else ""
+        updated_at = (
+            existing_state.submission_data_updated_at if existing_state else None
+        )
 
         for page_number in range(1, self.max_pages + 1):
             raw_batch = self.client.get_user_submissions(
@@ -93,6 +109,9 @@ class AtCoderSubmissionIngestionService:
             cursor_id = state.last_submission_id
             indexed_count = stats.indexed_submission_count
             backfill_complete = state.backfill_complete
+            progress_status = state.progress_status
+            error_code = state.blocked_reason
+            updated_at = state.submission_data_updated_at
 
             logger.info(
                 "AtCoderProblems submission batch synchronized",
@@ -112,6 +131,10 @@ class AtCoderSubmissionIngestionService:
             if (cursor_epoch, cursor_id) <= previous_cursor:
                 # The API cursor is timestamp-only and inclusive. Refuse to skip a
                 # saturated same-second boundary that cannot advance safely.
+                state = self._mark_boundary_blocked(platform_account)
+                progress_status = state.progress_status
+                error_code = state.blocked_reason
+                backfill_complete = state.backfill_complete
                 break
 
         return AtCoderSubmissionSyncResult(
@@ -120,6 +143,9 @@ class AtCoderSubmissionIngestionService:
             backfill_complete=backfill_complete,
             last_submission_epoch=cursor_epoch,
             last_submission_id=cursor_id,
+            progress_status=progress_status,
+            error_code=error_code or None,
+            updated_at=updated_at,
         )
 
     @staticmethod
@@ -137,8 +163,10 @@ class AtCoderSubmissionIngestionService:
                 platform=PlatformAccount.Platform.ATCODER,
                 handle=platform_account.handle,
             )
-            state, _ = AtCoderSubmissionSyncState.objects.select_for_update().get_or_create(
-                platform_account=locked_account
+            state, _ = (
+                AtCoderSubmissionSyncState.objects.select_for_update().get_or_create(
+                    platform_account=locked_account
+                )
             )
 
             AtCoderSubmission.objects.bulk_create(
@@ -180,15 +208,26 @@ class AtCoderSubmissionIngestionService:
                     state.last_submission_epoch,
                     state.last_submission_id,
                 ):
-                    state.last_submission_epoch, state.last_submission_id = latest_cursor
+                    (
+                        state.last_submission_epoch,
+                        state.last_submission_id,
+                    ) = latest_cursor
 
             state.backfill_complete = page_complete
+            state.progress_status = (
+                AtCoderSubmissionSyncState.ProgressStatus.CAUGHT_UP
+                if page_complete
+                else AtCoderSubmissionSyncState.ProgressStatus.BACKFILLING
+            )
+            state.blocked_reason = ""
             state.submission_data_updated_at = updated_at
             state.save(
                 update_fields=[
                     "last_submission_epoch",
                     "last_submission_id",
                     "backfill_complete",
+                    "progress_status",
+                    "blocked_reason",
                     "submission_data_updated_at",
                     "updated_at",
                 ]
@@ -225,3 +264,27 @@ class AtCoderSubmissionIngestionService:
             )
 
         return state, stats
+
+    @staticmethod
+    def _mark_boundary_blocked(
+        platform_account: PlatformAccount,
+    ) -> AtCoderSubmissionSyncState:
+        with transaction.atomic():
+            state = AtCoderSubmissionSyncState.objects.select_for_update().get(
+                platform_account=platform_account
+            )
+            state.backfill_complete = False
+            state.progress_status = AtCoderSubmissionSyncState.ProgressStatus.BLOCKED
+            state.blocked_reason = "saturated_timestamp_boundary"
+            state.save(
+                update_fields=[
+                    "backfill_complete",
+                    "progress_status",
+                    "blocked_reason",
+                    "updated_at",
+                ]
+            )
+            AtCoderStats.objects.filter(platform_account=platform_account).update(
+                submission_backfill_complete=False
+            )
+        return state

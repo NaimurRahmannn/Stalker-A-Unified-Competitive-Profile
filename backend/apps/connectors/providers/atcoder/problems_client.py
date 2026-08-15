@@ -9,12 +9,14 @@ from django.conf import settings
 from apps.connectors.base.exceptions import (
     ExternalServiceError,
     ProviderAccessDeniedError,
+    ProviderNetworkError,
     ProviderRateLimitError,
     ProviderSchemaError,
+    ProviderServerError,
     ProviderSyncDisabledError,
+    ProviderTimeoutError,
 )
 from apps.connectors.providers.atcoder.client import normalize_atcoder_handle
-
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +77,12 @@ class AtCoderProblemsClient:
                 )
         except requests.Timeout as exc:
             self._log_failure("timeout")
-            raise ExternalServiceError(
+            raise ProviderTimeoutError(
                 "AtCoderProblems timed out. Cached submissions were preserved."
             ) from exc
         except requests.RequestException as exc:
             self._log_failure("network")
-            raise ExternalServiceError(
+            raise ProviderNetworkError(
                 "AtCoderProblems is temporarily unavailable. Cached submissions were preserved."
             ) from exc
 
@@ -96,7 +98,7 @@ class AtCoderProblemsClient:
             )
         if response.status_code >= 500:
             self._log_failure("server_error", response.status_code)
-            raise ExternalServiceError(
+            raise ProviderServerError(
                 "AtCoderProblems is temporarily unavailable. Please try again later."
             )
         if response.status_code != 200:

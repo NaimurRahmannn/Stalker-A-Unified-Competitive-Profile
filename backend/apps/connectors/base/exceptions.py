@@ -10,6 +10,18 @@ class ExternalServiceError(ConnectorError):
     """Raised when provider API is unavailable or returns unexpected errors."""
 
 
+class ProviderTimeoutError(ExternalServiceError):
+    """Raised when a provider request times out."""
+
+
+class ProviderNetworkError(ExternalServiceError):
+    """Raised when a provider cannot be reached."""
+
+
+class ProviderServerError(ExternalServiceError):
+    """Raised when a provider returns a server-side failure."""
+
+
 class InvalidExternalAccountError(ConnectorError):
     """Raised when provider handle/slug is invalid or not found."""
 

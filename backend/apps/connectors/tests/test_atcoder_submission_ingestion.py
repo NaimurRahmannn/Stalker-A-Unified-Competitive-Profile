@@ -1,4 +1,5 @@
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime
+from datetime import timezone as datetime_timezone
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -21,7 +22,6 @@ from apps.connectors.models import (
 from apps.connectors.providers.atcoder.submission_service import (
     AtCoderSubmissionIngestionService,
 )
-
 
 User = get_user_model()
 
@@ -207,6 +207,7 @@ class AtCoderSubmissionIngestionTests(TestCase):
         ).sync(self.account)
 
         self.assertFalse(first_result.backfill_complete)
+        self.assertEqual(first_result.progress_status, "backfilling")
         self.assertEqual(first_result.pages_fetched, 1)
         self.assertEqual(first_client.calls, [("atcoder_user", 0)])
         stats = AtCoderStats.objects.get(platform_account=self.account)
@@ -264,6 +265,8 @@ class AtCoderSubmissionIngestionTests(TestCase):
 
         self.assertEqual(repeated_client.calls, [("atcoder_user", 100)])
         self.assertFalse(result.backfill_complete)
+        self.assertEqual(result.progress_status, "blocked")
+        self.assertEqual(result.error_code, "saturated_timestamp_boundary")
         self.assertEqual(result.last_submission_epoch, 100)
         self.assertEqual(result.last_submission_id, 500)
         self.assertEqual(AtCoderSubmission.objects.count(), 500)
@@ -274,6 +277,7 @@ class AtCoderSubmissionIngestionTests(TestCase):
         ).sync(self.account)
 
         self.assertTrue(result.backfill_complete)
+        self.assertEqual(result.progress_status, "caught_up")
         self.assertEqual(result.indexed_submission_count, 0)
         stats = AtCoderStats.objects.get(platform_account=self.account)
         self.assertEqual(stats.solved_count, 0)

@@ -139,7 +139,71 @@ class AtCoderStats(models.Model):
         return f"AtCoder stats for {self.platform_account.handle}"
 
 
+class AtCoderSyncState(models.Model):
+    class OverallStatus(models.TextChoices):
+        NEVER = "never", "Never synchronized"
+        SUCCESS = "success", "Success"
+        PARTIAL = "partial", "Partial"
+        FAILED = "failed", "Failed"
+
+    class SourceStatus(models.TextChoices):
+        NEVER = "never", "Never synchronized"
+        SUCCESS = "success", "Success"
+        SKIPPED_FRESH = "skipped_fresh", "Skipped (fresh)"
+        FAILED = "failed", "Failed"
+        BLOCKED = "blocked", "Blocked"
+        DISABLED = "disabled", "Disabled"
+
+    platform_account = models.OneToOneField(
+        PlatformAccount,
+        on_delete=models.CASCADE,
+        related_name="atcoder_sync_state",
+    )
+    overall_status = models.CharField(
+        max_length=16,
+        choices=OverallStatus.choices,
+        default=OverallStatus.NEVER,
+    )
+    rating_status = models.CharField(
+        max_length=20,
+        choices=SourceStatus.choices,
+        default=SourceStatus.NEVER,
+    )
+    rating_error_code = models.CharField(max_length=64, blank=True)
+    rating_sync_attempted_at = models.DateTimeField(null=True, blank=True)
+    submission_status = models.CharField(
+        max_length=20,
+        choices=SourceStatus.choices,
+        default=SourceStatus.NEVER,
+    )
+    submission_error_code = models.CharField(max_length=64, blank=True)
+    submission_sync_attempted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if (
+            self.platform_account_id
+            and self.platform_account.platform != PlatformAccount.Platform.ATCODER
+        ):
+            raise ValidationError(
+                "AtCoder sync state can only be attached to AtCoder accounts."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"AtCoder sync state for {self.platform_account.handle}"
+
+
 class AtCoderSubmissionSyncState(models.Model):
+    class ProgressStatus(models.TextChoices):
+        BACKFILLING = "backfilling", "Backfilling"
+        CAUGHT_UP = "caught_up", "Caught up"
+        BLOCKED = "blocked", "Blocked"
+
     platform_account = models.OneToOneField(
         PlatformAccount,
         on_delete=models.CASCADE,
@@ -148,6 +212,12 @@ class AtCoderSubmissionSyncState(models.Model):
     last_submission_epoch = models.BigIntegerField(default=0)
     last_submission_id = models.BigIntegerField(default=0)
     backfill_complete = models.BooleanField(default=False)
+    progress_status = models.CharField(
+        max_length=16,
+        choices=ProgressStatus.choices,
+        default=ProgressStatus.BACKFILLING,
+    )
+    blocked_reason = models.CharField(max_length=64, blank=True)
     submission_data_updated_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -286,7 +356,7 @@ class PlatformStatsSnapshot(models.Model):
     )
     captured_at = models.DateTimeField(default=timezone.now)
     rating = models.IntegerField(blank=True, null=True)
-    solved_count = models.PositiveIntegerField(default=0)
+    solved_count = models.PositiveIntegerField(blank=True, null=True)
     contest_count = models.PositiveIntegerField(default=0)
     metadata = models.JSONField(default=dict, blank=True)
 

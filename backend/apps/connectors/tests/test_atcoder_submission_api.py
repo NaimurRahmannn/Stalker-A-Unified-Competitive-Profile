@@ -1,4 +1,5 @@
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime
+from datetime import timezone as datetime_timezone
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -15,7 +16,6 @@ from apps.connectors.models import (
     AtCoderSubmissionSyncState,
     PlatformAccount,
 )
-
 
 User = get_user_model()
 
@@ -81,6 +81,25 @@ class AtCoderSubmissionAPITests(APITestCase):
         self.account.refresh_from_db()
         self.assertIsNone(self.account.ownership_verified_at)
         self.assertIsNone(self.account.handle_validated_at)
+
+    @override_settings(ATCODER_PROBLEMS_SYNC_COOLDOWN_SECONDS=3600)
+    @patch(
+        "apps.connectors.providers.atcoder.problems_client.AtCoderProblemsClient.get_user_submissions"
+    )
+    def test_compatibility_sync_endpoint_enforces_account_cooldown(self, mocked_get):
+        mocked_get.return_value = [raw_submission()]
+        first = self.client.post(self.sync_url)
+
+        second = self.client.post(self.sync_url)
+
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.data["source"]["status"], "skipped_fresh")
+        self.assertGreater(
+            second.data["source"]["details"]["retry_after_seconds"],
+            0,
+        )
+        mocked_get.assert_called_once()
 
     def test_user_cannot_read_or_sync_another_users_account(self):
         other_account = PlatformAccount.objects.create(

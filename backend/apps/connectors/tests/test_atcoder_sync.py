@@ -1,6 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import timezone as datetime_timezone
-from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -17,11 +16,11 @@ from apps.connectors.base.exceptions import (
 )
 from apps.connectors.models import (
     AtCoderStats,
+    AtCoderSyncState,
     PlatformAccount,
     PlatformRatingEvent,
     PlatformStatsSnapshot,
 )
-
 
 User = get_user_model()
 
@@ -71,6 +70,7 @@ def normalized_profile(events: list[dict]) -> dict:
     }
 
 
+@override_settings(ATCODER_PROBLEMS_SYNC_ENABLED=False)
 class AtCoderSynchronizationTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -292,11 +292,25 @@ class AtCoderSynchronizationTests(APITestCase):
     def test_atcoder_uses_configurable_conservative_cooldown(self, mocked_fetch):
         self.account.last_synced_at = timezone.now() - timedelta(minutes=10)
         self.account.save(update_fields=["last_synced_at"])
+        AtCoderStats.objects.create(
+            platform_account=self.account,
+            current_rating=1200,
+            rating_data_updated_at=self.account.last_synced_at,
+        )
 
         response = self.client.post(self.sync_url)
 
-        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
-        self.assertGreaterEqual(response.data["retry_after_seconds"], 3000)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["sources"]["rating"]["status"],
+            "skipped_fresh",
+        )
+        self.assertGreaterEqual(
+            response.data["sources"]["rating"]["details"][
+                "retry_after_seconds"
+            ],
+            3000,
+        )
         mocked_fetch.assert_not_called()
 
     @override_settings(ATCODER_HISTORY_SYNC_ENABLED=False)
@@ -433,4 +447,8 @@ class AtCoderSynchronizationTests(APITestCase):
         self.account.last_sync_attempted_at = timezone.now() - timedelta(hours=2)
         self.account.save(
             update_fields=["last_synced_at", "last_sync_attempted_at"]
+        )
+        AtCoderSyncState.objects.filter(platform_account=self.account).update(
+            rating_sync_attempted_at=timezone.now() - timedelta(hours=2),
+            submission_sync_attempted_at=timezone.now() - timedelta(hours=2),
         )

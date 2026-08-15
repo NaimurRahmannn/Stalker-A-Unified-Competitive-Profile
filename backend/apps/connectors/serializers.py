@@ -2,20 +2,24 @@ from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
 
+from apps.connectors.base.exceptions import InvalidExternalAccountError
 from apps.connectors.models import (
     AtCoderStats,
     AtCoderSubmission,
     AtCoderSubmissionSyncState,
+    AtCoderSyncState,
     CodeforcesStats,
     PlatformAccount,
     PlatformRatingEvent,
     PlatformStatsSnapshot,
 )
-from apps.connectors.base.exceptions import InvalidExternalAccountError
 from apps.connectors.providers.atcoder.client import normalize_atcoder_handle
 from apps.connectors.providers.atcoder.mapper import get_atcoder_rating_color
 from apps.connectors.providers.codeforces.mapper import normalize_rating_history
-from apps.connectors.services import can_sync_platform_account, get_sync_cooldown_seconds
+from apps.connectors.services import (
+    can_sync_platform_account,
+    get_sync_cooldown_seconds,
+)
 
 
 class ConnectorHealthSerializer(serializers.Serializer):
@@ -79,7 +83,24 @@ class AtCoderSubmissionSyncStateSerializer(serializers.ModelSerializer):
             "last_submission_epoch",
             "last_submission_id",
             "backfill_complete",
+            "progress_status",
+            "blocked_reason",
             "submission_data_updated_at",
+        )
+        read_only_fields = fields
+
+
+class AtCoderSyncStateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AtCoderSyncState
+        fields = (
+            "overall_status",
+            "rating_status",
+            "rating_error_code",
+            "rating_sync_attempted_at",
+            "submission_status",
+            "submission_error_code",
+            "submission_sync_attempted_at",
         )
         read_only_fields = fields
 
@@ -194,6 +215,7 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
     codeforces_stats = CodeforcesStatsSerializer(read_only=True)
     atcoder_stats = AtCoderStatsSerializer(read_only=True)
     atcoder_rating_history = serializers.SerializerMethodField()
+    atcoder_sync_state = AtCoderSyncStateSerializer(read_only=True)
     handle_validated = serializers.SerializerMethodField()
     ownership_verified = serializers.SerializerMethodField()
     can_sync = serializers.SerializerMethodField()
@@ -218,6 +240,7 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "codeforces_stats",
             "atcoder_stats",
             "atcoder_rating_history",
+            "atcoder_sync_state",
             "can_sync",
             "sync_cooldown_seconds",
         )
@@ -235,6 +258,7 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "codeforces_stats",
             "atcoder_stats",
             "atcoder_rating_history",
+            "atcoder_sync_state",
             "can_sync",
             "sync_cooldown_seconds",
         )
@@ -295,7 +319,11 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def update(self, instance: PlatformAccount, validated_data: dict) -> PlatformAccount:
+    def update(
+        self,
+        instance: PlatformAccount,
+        validated_data: dict,
+    ) -> PlatformAccount:
         handle_changed = (
             "handle" in validated_data
             and validated_data["handle"] != instance.handle
@@ -327,6 +355,7 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 )
                 CodeforcesStats.objects.filter(platform_account=instance).delete()
                 AtCoderStats.objects.filter(platform_account=instance).delete()
+                AtCoderSyncState.objects.filter(platform_account=instance).delete()
                 AtCoderSubmissionSyncState.objects.filter(
                     platform_account=instance
                 ).delete()
@@ -338,6 +367,7 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 instance._state.fields_cache.pop(
                     "atcoder_submission_sync_state", None
                 )
+                instance._state.fields_cache.pop("atcoder_sync_state", None)
                 getattr(instance, "_prefetched_objects_cache", {}).pop(
                     "rating_events", None
                 )

@@ -4,6 +4,7 @@ from apps.connectors.models import (
     AtCoderStats,
     AtCoderSubmission,
     AtCoderSubmissionSyncState,
+    AtCoderSyncState,
     CodeforcesStats,
     PlatformAccount,
     PlatformRatingEvent,
@@ -101,9 +102,26 @@ class AtCoderSubmissionSyncStateAdmin(admin.ModelAdmin):
         "last_submission_epoch",
         "last_submission_id",
         "backfill_complete",
+        "progress_status",
+        "blocked_reason",
         "submission_data_updated_at",
     )
-    list_filter = ("backfill_complete",)
+    list_filter = ("backfill_complete", "progress_status")
+    search_fields = ("platform_account__handle",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(AtCoderSyncState)
+class AtCoderSyncStateAdmin(admin.ModelAdmin):
+    list_display = (
+        "platform_account",
+        "overall_status",
+        "rating_status",
+        "submission_status",
+        "rating_sync_attempted_at",
+        "submission_sync_attempted_at",
+    )
+    list_filter = ("overall_status", "rating_status", "submission_status")
     search_fields = ("platform_account__handle",)
     readonly_fields = ("created_at", "updated_at")
 

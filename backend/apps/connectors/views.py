@@ -10,23 +10,27 @@ from apps.connectors.base.exceptions import (
     ProviderRateLimitError,
     UnsupportedSourceError,
 )
-from apps.connectors.models import CodeforcesStats, PlatformAccount, PlatformStatsSnapshot
+from apps.connectors.models import (
+    CodeforcesStats,
+    PlatformAccount,
+    PlatformStatsSnapshot,
+)
+from apps.connectors.providers.atcoder.orchestrator import (
+    AtCoderSyncOrchestrator,
+    OverallSyncStatus,
+    SourceSyncStatus,
+    SyncErrorCode,
+)
 from apps.connectors.serializers import (
     CodeforcesAnalyticsAccountSerializer,
     CodeforcesStatsSerializer,
     PlatformAccountSerializer,
     PlatformStatsSnapshotSerializer,
+    serialize_atcoder_submission_overview,
     serialize_codeforces_rating_history,
     serialize_codeforces_recent_activity,
-    serialize_atcoder_submission_overview,
 )
-from apps.connectors.services import (
-    get_connector,
-    get_sync_cooldown_seconds,
-)
-from apps.connectors.providers.atcoder.submission_service import (
-    AtCoderSubmissionIngestionService,
-)
+from apps.connectors.services import get_connector, get_sync_cooldown_seconds
 
 
 class PlatformAccountViewSet(viewsets.ModelViewSet):
@@ -37,7 +41,11 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return (
             PlatformAccount.objects.filter(user=self.request.user)
-            .select_related("codeforces_stats", "atcoder_stats")
+            .select_related(
+                "codeforces_stats",
+                "atcoder_stats",
+                "atcoder_sync_state",
+            )
             .prefetch_related("rating_events")
         )
 
@@ -47,6 +55,17 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="sync")
     def sync(self, request, pk=None):
         platform_account = self.get_object()
+
+        if platform_account.platform == PlatformAccount.Platform.ATCODER:
+            result = AtCoderSyncOrchestrator().sync(platform_account)
+            refreshed_account = self.get_queryset().get(pk=platform_account.pk)
+            payload = self.get_serializer(refreshed_account).data
+            payload.update(result.as_dict())
+            payload["last_synced_at"] = refreshed_account.last_synced_at
+            return Response(
+                payload,
+                status=self._atcoder_result_http_status(result),
+            )
 
         try:
             connector = get_connector(platform_account.platform)
@@ -60,7 +79,8 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail": (
-                        f"{connector.display_name} synchronization is currently disabled."
+                        f"{connector.display_name} synchronization is currently "
+                        "disabled."
                     )
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -86,7 +106,10 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
         try:
             platform_account = connector.sync(platform_account)
         except InvalidExternalAccountError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except ProviderRateLimitError as exc:
             return Response(
                 {"detail": str(exc)},
@@ -96,7 +119,10 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail": str(exc)
-                    or "The provider is temporarily unavailable. Please try again later."
+                    or (
+                        "The provider is temporarily unavailable. Please try "
+                        "again later."
+                    )
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
@@ -123,26 +149,49 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            result = AtCoderSubmissionIngestionService().sync(platform_account)
-        except ProviderRateLimitError as exc:
+        result = AtCoderSyncOrchestrator().sync_submissions_only(platform_account)
+        if result.status in {SourceSyncStatus.FAILED, SourceSyncStatus.BLOCKED}:
             return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                {"source": result.as_dict()},
+                status=self._atcoder_source_http_status(result.error_code),
             )
-        except ExternalServiceError as exc:
+        if result.status == SourceSyncStatus.DISABLED:
             return Response(
-                {"detail": str(exc)},
+                {"source": result.as_dict()},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         payload = serialize_atcoder_submission_overview(platform_account)
-        payload["sync"] = {
-            "pages_fetched": result.pages_fetched,
-            "indexed_submission_count": result.indexed_submission_count,
-            "backfill_complete": result.backfill_complete,
-        }
+        payload["source"] = result.as_dict()
+        payload["sync"] = result.details
         return Response(payload, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _atcoder_source_http_status(error_code):
+        if error_code == SyncErrorCode.RATE_LIMITED:
+            return status.HTTP_429_TOO_MANY_REQUESTS
+        if error_code == SyncErrorCode.INVALID_ACCOUNT:
+            return status.HTTP_400_BAD_REQUEST
+        return status.HTTP_503_SERVICE_UNAVAILABLE
+
+    @classmethod
+    def _atcoder_result_http_status(cls, result):
+        if result.status != OverallSyncStatus.FAILED:
+            return status.HTTP_200_OK
+        active_errors = [
+            source.error_code
+            for source in (result.rating, result.submissions)
+            if source.status != SourceSyncStatus.DISABLED
+        ]
+        if active_errors and all(
+            error == SyncErrorCode.RATE_LIMITED for error in active_errors
+        ):
+            return status.HTTP_429_TOO_MANY_REQUESTS
+        if active_errors and all(
+            error == SyncErrorCode.INVALID_ACCOUNT for error in active_errors
+        ):
+            return status.HTTP_400_BAD_REQUEST
+        return status.HTTP_503_SERVICE_UNAVAILABLE
 
 
 class CodeforcesAnalyticsView(APIView):
