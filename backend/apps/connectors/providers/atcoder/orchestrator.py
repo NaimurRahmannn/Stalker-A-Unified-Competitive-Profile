@@ -8,6 +8,7 @@ from typing import Any
 from django.conf import settings
 from django.utils import timezone
 
+from apps.connectors.base.connector import SnapshotValues
 from apps.connectors.base.exceptions import (
     ExternalServiceError,
     InvalidExternalAccountError,
@@ -133,11 +134,18 @@ class AtCoderSyncOrchestrator:
         )
 
         rating = self.sync_rating_source(platform_account, state, attempted_at)
-        submissions = self.sync_submission_source(
-            platform_account,
-            state,
-            attempted_at,
-        )
+        if rating.error_code == SyncErrorCode.INVALID_ACCOUNT:
+            self._mark_account_invalid(platform_account)
+            submissions = self._invalid_account_submission_result(
+                platform_account,
+                state,
+            )
+        else:
+            submissions = self.sync_submission_source(
+                platform_account,
+                state,
+                attempted_at,
+            )
         overall = self.combine_status(rating, submissions)
 
         state.overall_status = overall.value
@@ -145,6 +153,11 @@ class AtCoderSyncOrchestrator:
         if rating.updated or submissions.updated:
             PlatformAccount.objects.filter(pk=platform_account.pk).update(
                 last_synced_at=attempted_at
+            )
+            self._record_combined_snapshot(
+                platform_account,
+                rating,
+                submissions,
             )
 
         logger.info(
@@ -218,6 +231,7 @@ class AtCoderSyncOrchestrator:
             self.rating_connector.sync(
                 platform_account,
                 update_account_sync_metadata=False,
+                record_snapshot=False,
             )
             freshness = self._rating_freshness(platform_account)
             result = ProviderSyncResult(
@@ -237,6 +251,70 @@ class AtCoderSyncOrchestrator:
         self._store_source_result(state, "rating", result)
         self._log_source(platform_account, result)
         return result
+
+    def _invalid_account_submission_result(
+        self,
+        platform_account: PlatformAccount,
+        state: AtCoderSyncState,
+    ) -> ProviderSyncResult:
+        freshness = self._submission_freshness(platform_account)
+        result = ProviderSyncResult(
+            source="atcoder_problems",
+            status=SourceSyncStatus.BLOCKED,
+            using_cached_data=freshness is not None,
+            updated_at=freshness,
+            error_code=SyncErrorCode.INVALID_ACCOUNT,
+            message=(
+                "Submission synchronization was skipped because the official "
+                "AtCoder source could not validate this account."
+            ),
+        )
+        self._store_source_result(state, "submission", result)
+        self._log_source(platform_account, result)
+        return result
+
+    @staticmethod
+    def _mark_account_invalid(platform_account: PlatformAccount) -> None:
+        PlatformAccount.objects.filter(pk=platform_account.pk).update(
+            is_verified=False,
+            handle_validated_at=None,
+        )
+
+    def _record_combined_snapshot(
+        self,
+        platform_account: PlatformAccount,
+        rating: ProviderSyncResult,
+        submissions: ProviderSyncResult,
+    ) -> None:
+        stats = AtCoderStats.objects.filter(
+            platform_account=platform_account
+        ).first()
+        if stats is None:
+            return
+
+        self.rating_connector.record_snapshot(
+            platform_account,
+            SnapshotValues(
+                rating=stats.current_rating,
+                solved_count=(
+                    stats.solved_count
+                    if stats.submission_backfill_complete
+                    else None
+                ),
+                contest_count=stats.rated_contest_count,
+                metadata={
+                    "discipline": stats.discipline,
+                    "max_rating": stats.max_rating,
+                    "last_performance": stats.last_performance,
+                    "rating_complete": stats.rating_data_updated_at is not None,
+                    "submission_stats_complete": (
+                        stats.submission_backfill_complete
+                    ),
+                    "rating_source_status": rating.status.value,
+                    "submission_source_status": submissions.status.value,
+                },
+            ),
+        )
 
     def sync_submission_source(
         self,
@@ -383,6 +461,20 @@ class AtCoderSyncOrchestrator:
         retry_after_seconds: int,
         previous_error_code: str,
     ) -> ProviderSyncResult:
+        if previous_error_code == SyncErrorCode.INVALID_ACCOUNT:
+            return ProviderSyncResult(
+                source=source,
+                status=SourceSyncStatus.BLOCKED,
+                using_cached_data=freshness is not None,
+                updated_at=freshness,
+                attempted_at=attempted_at,
+                error_code=SyncErrorCode.INVALID_ACCOUNT,
+                message=(
+                    "The account remains invalid while the source cooldown is "
+                    "active."
+                ),
+                details={"retry_after_seconds": retry_after_seconds},
+            )
         if freshness is None:
             try:
                 error_code = SyncErrorCode(previous_error_code)

@@ -3,6 +3,7 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
 
 from apps.connectors.base.exceptions import InvalidExternalAccountError
+from apps.connectors.base.utils import build_atcoder_profile_url
 from apps.connectors.models import (
     AtCoderStats,
     AtCoderSubmission,
@@ -121,12 +122,85 @@ class AtCoderRecentSubmissionSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class PlatformRatingEventSerializer(serializers.ModelSerializer):
+class AtCoderAnalyticsAccountSerializer(serializers.ModelSerializer):
+    profile_url = serializers.SerializerMethodField()
+    handle_validated = serializers.SerializerMethodField()
+    ownership_verified = serializers.SerializerMethodField()
+    can_sync = serializers.SerializerMethodField()
+    sync_cooldown_remaining_seconds = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PlatformAccount
+        fields = (
+            "id",
+            "handle",
+            "profile_url",
+            "handle_validated",
+            "handle_validated_at",
+            "ownership_verified",
+            "ownership_verified_at",
+            "last_sync_attempted_at",
+            "last_synced_at",
+            "can_sync",
+            "sync_cooldown_remaining_seconds",
+        )
+        read_only_fields = fields
+
+    def get_profile_url(self, obj: PlatformAccount) -> str:
+        return obj.profile_url or build_atcoder_profile_url(obj.handle)
+
+    def get_handle_validated(self, obj: PlatformAccount) -> bool:
+        return obj.handle_validated_at is not None or obj.is_verified
+
+    def get_ownership_verified(self, obj: PlatformAccount) -> bool:
+        return obj.ownership_verified_at is not None
+
+    def get_can_sync(self, obj: PlatformAccount) -> bool:
+        return can_sync_platform_account(obj)
+
+    def get_sync_cooldown_remaining_seconds(
+        self,
+        obj: PlatformAccount,
+    ) -> int:
+        return get_sync_cooldown_seconds(obj)
+
+
+class AtCoderAnalyticsStatsSerializer(serializers.ModelSerializer):
+    rating_color = serializers.SerializerMethodField()
+    submission_stats_complete = serializers.BooleanField(
+        source="submission_backfill_complete"
+    )
+
+    class Meta:
+        model = AtCoderStats
+        fields = (
+            "discipline",
+            "current_rating",
+            "max_rating",
+            "rating_color",
+            "rated_contest_count",
+            "last_rated_at",
+            "last_performance",
+            "solved_count",
+            "attempted_count",
+            "accepted_submission_count",
+            "indexed_submission_count",
+            "submission_stats_complete",
+        )
+        read_only_fields = fields
+
+    def get_rating_color(self, obj: AtCoderStats) -> str | None:
+        return get_atcoder_rating_color(obj.current_rating)
+
+
+class AtCoderAnalyticsRatingEventSerializer(serializers.ModelSerializer):
+    contest_id = serializers.CharField(source="external_contest_id")
+    rated = serializers.BooleanField(source="is_rated")
+
     class Meta:
         model = PlatformRatingEvent
         fields = (
-            "discipline",
-            "external_contest_id",
+            "contest_id",
             "contest_name",
             "rank",
             "performance",
@@ -134,10 +208,85 @@ class PlatformRatingEventSerializer(serializers.ModelSerializer):
             "old_rating",
             "new_rating",
             "rating_change",
-            "is_rated",
+            "rated",
             "occurred_at",
         )
         read_only_fields = fields
+
+
+class AtCoderAnalyticsActivitySerializer(serializers.ModelSerializer):
+    submission_id = serializers.IntegerField(source="external_submission_id")
+    contest_id = serializers.CharField(source="external_contest_id")
+    problem_id = serializers.CharField(source="external_problem_id")
+    accepted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AtCoderSubmission
+        fields = (
+            "submission_id",
+            "contest_id",
+            "problem_id",
+            "verdict",
+            "accepted",
+            "language",
+            "submitted_at",
+            "execution_time_ms",
+            "code_size_bytes",
+        )
+        read_only_fields = fields
+
+    def get_accepted(self, obj: AtCoderSubmission) -> bool:
+        return obj.verdict == "AC"
+
+
+class AtCoderAnalyticsSnapshotSerializer(serializers.ModelSerializer):
+    rated_contest_count = serializers.IntegerField(source="contest_count")
+    submission_stats_complete = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PlatformStatsSnapshot
+        fields = (
+            "captured_at",
+            "rating",
+            "solved_count",
+            "rated_contest_count",
+            "submission_stats_complete",
+        )
+        read_only_fields = fields
+
+    def get_submission_stats_complete(
+        self,
+        obj: PlatformStatsSnapshot,
+    ) -> bool:
+        if "submission_stats_complete" in obj.metadata:
+            return bool(obj.metadata["submission_stats_complete"])
+        return obj.solved_count is not None
+
+
+class AtCoderAnalyticsProgressSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    stats_complete = serializers.BooleanField()
+    error_code = serializers.CharField(allow_null=True)
+
+
+class AtCoderAnalyticsSourceSyncSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    updated_at = serializers.DateTimeField(allow_null=True)
+    attempted_at = serializers.DateTimeField(allow_null=True)
+    using_cached_data = serializers.BooleanField()
+    error_code = serializers.CharField(allow_null=True)
+
+
+class AtCoderAnalyticsSubmissionSyncSerializer(
+    AtCoderAnalyticsSourceSyncSerializer
+):
+    progress = AtCoderAnalyticsProgressSerializer()
+
+
+class AtCoderAnalyticsSyncSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    rating = AtCoderAnalyticsSourceSyncSerializer()
+    submissions = AtCoderAnalyticsSubmissionSyncSerializer()
 
 
 class CodeforcesRatingHistorySerializer(serializers.Serializer):
@@ -214,7 +363,6 @@ class CodeforcesAnalyticsAccountSerializer(serializers.ModelSerializer):
 class PlatformAccountSerializer(serializers.ModelSerializer):
     codeforces_stats = CodeforcesStatsSerializer(read_only=True)
     atcoder_stats = AtCoderStatsSerializer(read_only=True)
-    atcoder_rating_history = serializers.SerializerMethodField()
     atcoder_sync_state = AtCoderSyncStateSerializer(read_only=True)
     handle_validated = serializers.SerializerMethodField()
     ownership_verified = serializers.SerializerMethodField()
@@ -239,7 +387,6 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "updated_at",
             "codeforces_stats",
             "atcoder_stats",
-            "atcoder_rating_history",
             "atcoder_sync_state",
             "can_sync",
             "sync_cooldown_seconds",
@@ -257,7 +404,6 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "updated_at",
             "codeforces_stats",
             "atcoder_stats",
-            "atcoder_rating_history",
             "atcoder_sync_state",
             "can_sync",
             "sync_cooldown_seconds",
@@ -277,16 +423,6 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
 
     def get_ownership_verified(self, obj: PlatformAccount) -> bool:
         return obj.ownership_verified_at is not None
-
-    def get_atcoder_rating_history(self, obj: PlatformAccount) -> list[dict]:
-        if obj.platform != PlatformAccount.Platform.ATCODER:
-            return []
-        events = [
-            event
-            for event in obj.rating_events.all()
-            if event.discipline == PlatformRatingEvent.Discipline.ALGORITHM
-        ]
-        return PlatformRatingEventSerializer(events, many=True).data
 
     def get_can_sync(self, obj: PlatformAccount) -> bool:
         return can_sync_platform_account(obj)

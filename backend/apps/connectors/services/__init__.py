@@ -67,10 +67,9 @@ def can_sync_platform_account(platform_account: PlatformAccount) -> bool:
 def get_atcoder_sync_cooldown_seconds(
     platform_account: PlatformAccount,
 ) -> int:
-    state = AtCoderSyncState.objects.filter(
-        platform_account=platform_account
-    ).first()
-    if state is None:
+    try:
+        state = platform_account.atcoder_sync_state
+    except AtCoderSyncState.DoesNotExist:
         return 0
 
     source_policies = []

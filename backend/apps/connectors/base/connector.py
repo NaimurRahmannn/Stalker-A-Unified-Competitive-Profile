@@ -57,6 +57,7 @@ class BaseConnector(ABC):
         platform_account: PlatformAccount,
         *,
         update_account_sync_metadata: bool = True,
+        record_snapshot: bool = True,
     ) -> PlatformAccount:
         """Fetch outside a transaction, then atomically persist validated data."""
         if not self.is_enabled:
@@ -97,13 +98,13 @@ class BaseConnector(ABC):
                 )
             locked_account.save(update_fields=update_fields)
 
-            if snapshot is not None:
-                self._record_snapshot(locked_account, snapshot)
+            if record_snapshot and snapshot is not None:
+                self.record_snapshot(locked_account, snapshot)
 
         return locked_account
 
     @staticmethod
-    def _record_snapshot(
+    def record_snapshot(
         platform_account: PlatformAccount,
         values: SnapshotValues,
     ) -> None:

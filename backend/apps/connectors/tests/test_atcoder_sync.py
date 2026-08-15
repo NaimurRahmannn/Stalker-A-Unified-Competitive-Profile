@@ -130,7 +130,7 @@ class AtCoderSynchronizationTests(APITestCase):
         self.assertEqual(PlatformRatingEvent.objects.count(), 2)
         self.assertEqual(PlatformStatsSnapshot.objects.count(), 1)
         self.assertEqual(response.data["atcoder_stats"]["rating_color"], "green")
-        self.assertEqual(len(response.data["atcoder_rating_history"]), 2)
+        self.assertNotIn("atcoder_rating_history", response.data)
 
     @patch(
         "apps.connectors.providers.atcoder.connector.AtCoderConnector.fetch_normalized_profile"
@@ -378,7 +378,7 @@ class AtCoderSynchronizationTests(APITestCase):
         self.assertFalse(response.data["ownership_verified"])
         self.assertIsNone(response.data["last_synced_at"])
         self.assertIsNone(response.data["atcoder_stats"])
-        self.assertEqual(response.data["atcoder_rating_history"], [])
+        self.assertNotIn("atcoder_rating_history", response.data)
         self.assertFalse(AtCoderStats.objects.exists())
         self.assertFalse(PlatformRatingEvent.objects.exists())
         self.assertFalse(PlatformStatsSnapshot.objects.exists())

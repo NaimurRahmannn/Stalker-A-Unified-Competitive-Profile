@@ -11,6 +11,7 @@ from rest_framework.test import APITestCase
 
 from apps.connectors.base.exceptions import (
     ExternalServiceError,
+    InvalidExternalAccountError,
     ProviderRateLimitError,
     ProviderSchemaError,
 )
@@ -125,6 +126,12 @@ class AtCoderOrchestrationTests(APITestCase):
         state = AtCoderSyncState.objects.get(platform_account=self.account)
         self.assertEqual(state.overall_status, AtCoderSyncState.OverallStatus.SUCCESS)
         self.assertIsNone(self.account.ownership_verified_at)
+        snapshot = PlatformStatsSnapshot.objects.get(
+            platform_account=self.account
+        )
+        self.assertEqual(snapshot.rating, 1200)
+        self.assertEqual(snapshot.solved_count, 1)
+        self.assertTrue(snapshot.metadata["submission_stats_complete"])
 
     @patch(
         "apps.connectors.providers.atcoder.problems_client."
@@ -460,6 +467,120 @@ class AtCoderOrchestrationTests(APITestCase):
         self.assertEqual(state.last_submission_epoch, 100)
         self.assertEqual(state.last_submission_id, 500)
         self.assertEqual(AtCoderSubmission.objects.count(), 500)
+
+    @override_settings(ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC=1)
+    @patch(
+        "apps.connectors.providers.atcoder.problems_client."
+        "AtCoderProblemsClient.get_user_submissions"
+    )
+    @patch(
+        "apps.connectors.providers.atcoder.connector."
+        "AtCoderConnector.fetch_normalized_profile",
+        return_value=rating_profile(1542),
+    )
+    def test_combined_snapshot_stays_incomplete_while_backfill_remains(
+        self,
+        mocked_rating,
+        mocked_submissions,
+    ):
+        mocked_submissions.return_value = [
+            raw_submission(index, index, "AC") for index in range(1, 501)
+        ]
+
+        response = self.client.post(self.sync_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        snapshot = PlatformStatsSnapshot.objects.get(
+            platform_account=self.account
+        )
+        self.assertEqual(snapshot.rating, 1542)
+        self.assertIsNone(snapshot.solved_count)
+        self.assertFalse(snapshot.metadata["submission_stats_complete"])
+        self.assertEqual(PlatformStatsSnapshot.objects.count(), 1)
+
+    @override_settings(ATCODER_HISTORY_SYNC_COOLDOWN_SECONDS=3600)
+    @patch(
+        "apps.connectors.providers.atcoder.problems_client."
+        "AtCoderProblemsClient.get_user_submissions",
+        return_value=[],
+    )
+    @patch(
+        "apps.connectors.providers.atcoder.connector."
+        "AtCoderConnector.fetch_normalized_profile",
+        side_effect=InvalidExternalAccountError("not found"),
+    )
+    def test_invalid_official_account_short_circuits_submission_enrichment(
+        self,
+        mocked_rating,
+        mocked_submissions,
+    ):
+        self.account.is_verified = True
+        self.account.handle_validated_at = timezone.now()
+        self.account.save(update_fields=["is_verified", "handle_validated_at"])
+
+        response = self.client.post(self.sync_url)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["status"], "failed")
+        self.assertEqual(
+            response.data["sources"]["rating"]["error_code"],
+            "invalid_account",
+        )
+        self.assertEqual(
+            response.data["sources"]["submissions"]["status"],
+            "blocked",
+        )
+        self.assertEqual(
+            response.data["sources"]["submissions"]["error_code"],
+            "invalid_account",
+        )
+        mocked_submissions.assert_not_called()
+        self.account.refresh_from_db()
+        self.assertFalse(self.account.is_verified)
+        self.assertIsNone(self.account.handle_validated_at)
+        self.assertFalse(AtCoderStats.objects.exists())
+        self.assertFalse(AtCoderSubmissionSyncState.objects.exists())
+        self.assertFalse(AtCoderSubmission.objects.exists())
+        self.assertFalse(PlatformStatsSnapshot.objects.exists())
+
+        immediate_retry = self.client.post(self.sync_url)
+
+        self.assertEqual(
+            immediate_retry.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        mocked_rating.assert_called_once()
+        mocked_submissions.assert_not_called()
+
+    @patch(
+        "apps.connectors.providers.atcoder.problems_client."
+        "AtCoderProblemsClient.get_user_submissions",
+        return_value=[raw_submission()],
+    )
+    @patch(
+        "apps.connectors.providers.atcoder.connector."
+        "AtCoderConnector.fetch_normalized_profile",
+        side_effect=ProviderRateLimitError("limited"),
+    )
+    def test_temporary_rating_failure_does_not_short_circuit_submissions(
+        self,
+        mocked_rating,
+        mocked_submissions,
+    ):
+        response = self.client.post(self.sync_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "partial")
+        self.assertEqual(
+            response.data["sources"]["rating"]["error_code"],
+            "rate_limited",
+        )
+        self.assertEqual(
+            response.data["sources"]["submissions"]["status"],
+            "success",
+        )
+        mocked_submissions.assert_called_once()
+        self.assertTrue(AtCoderSubmission.objects.exists())
 
     @override_settings(ATCODER_PROBLEMS_SYNC_ENABLED=False)
     @patch(

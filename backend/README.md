@@ -153,6 +153,10 @@ Competitive programming analytics:
 - `GET /api/v1/competitive-programming/codeforces/` returns the authenticated user's
   normalized Codeforces account, current stats, rating history, recent activity, and growth
   snapshots.
+- `GET /api/v1/competitive-programming/atcoder/` returns the authenticated user's cached
+  AtCoder account summary, combined/source sync state, Algorithm rating history, bounded recent
+  submissions, completeness-aware stats, and normalized growth snapshots. This read never
+  contacts either AtCoder provider.
 - A successful Codeforces sync stores a bounded recent-activity list and creates a historical
   stats snapshot when the tracked values changed.
 
@@ -188,10 +192,15 @@ AtCoderProblems submission ingestion:
 
 AtCoder snapshot semantics:
 
-- Rating sync can create a useful rating snapshot while submissions are still backfilling.
+- Combined sync records one coherent snapshot after both source attempts finish. Rating-only
+  partial success still creates a useful snapshot, while a completed submission refresh is
+  reflected immediately rather than leaving an intermediate incomplete snapshot.
 - `PlatformStatsSnapshot.solved_count` is nullable. Incomplete AtCoder submission history is
   stored as `null` with `submission_stats_complete=false`, never as a fabricated zero.
 - Codeforces snapshots continue storing exact integer solved counts.
+
+Platform-account list/detail responses remain lightweight: they expose current summary and sync
+state but not full AtCoder rating history. Heavy analytics live only at the dedicated endpoint.
 
 ## Notes
 

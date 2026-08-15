@@ -212,6 +212,7 @@ class AtCoderSubmissionAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[0]["atcoder_stats"]["indexed_submission_count"], 1)
         self.assertNotIn("recent_submissions", response.data[0])
+        self.assertNotIn("atcoder_rating_history", response.data[0])
 
     @patch(
         "apps.connectors.providers.atcoder.problems_client.AtCoderProblemsClient.get_user_submissions"

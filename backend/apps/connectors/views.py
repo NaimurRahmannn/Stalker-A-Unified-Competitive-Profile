@@ -11,9 +11,19 @@ from apps.connectors.base.exceptions import (
     UnsupportedSourceError,
 )
 from apps.connectors.models import (
+    AtCoderStats,
+    AtCoderSubmission,
+    AtCoderSubmissionSyncState,
+    AtCoderSyncState,
     CodeforcesStats,
     PlatformAccount,
+    PlatformRatingEvent,
     PlatformStatsSnapshot,
+)
+from apps.connectors.providers.atcoder.analytics import (
+    RECENT_ACTIVITY_LIMIT,
+    SNAPSHOT_LIMIT,
+    build_atcoder_sync_summary,
 )
 from apps.connectors.providers.atcoder.orchestrator import (
     AtCoderSyncOrchestrator,
@@ -22,6 +32,12 @@ from apps.connectors.providers.atcoder.orchestrator import (
     SyncErrorCode,
 )
 from apps.connectors.serializers import (
+    AtCoderAnalyticsAccountSerializer,
+    AtCoderAnalyticsActivitySerializer,
+    AtCoderAnalyticsRatingEventSerializer,
+    AtCoderAnalyticsSnapshotSerializer,
+    AtCoderAnalyticsStatsSerializer,
+    AtCoderAnalyticsSyncSerializer,
     CodeforcesAnalyticsAccountSerializer,
     CodeforcesStatsSerializer,
     PlatformAccountSerializer,
@@ -46,7 +62,6 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                 "atcoder_stats",
                 "atcoder_sync_state",
             )
-            .prefetch_related("rating_events")
         )
 
     def perform_create(self, serializer):
@@ -246,3 +261,98 @@ class CodeforcesAnalyticsView(APIView):
                 ).data,
             }
         )
+
+
+class AtCoderAnalyticsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        account = (
+            PlatformAccount.objects.filter(
+                user=request.user,
+                platform=PlatformAccount.Platform.ATCODER,
+            )
+            .select_related(
+                "atcoder_stats",
+                "atcoder_sync_state",
+                "atcoder_submission_sync_state",
+            )
+            .first()
+        )
+
+        if account is None:
+            return Response(
+                {
+                    "platform": PlatformAccount.Platform.ATCODER,
+                    "account": None,
+                    "sync": None,
+                    "stats": None,
+                    "rating_history": [],
+                    "recent_activity": [],
+                    "snapshots": [],
+                }
+            )
+
+        stats = self._related_or_none(account, "atcoder_stats", AtCoderStats)
+        sync_state = self._related_or_none(
+            account,
+            "atcoder_sync_state",
+            AtCoderSyncState,
+        )
+        submission_state = self._related_or_none(
+            account,
+            "atcoder_submission_sync_state",
+            AtCoderSubmissionSyncState,
+        )
+        rating_history = PlatformRatingEvent.objects.filter(
+            platform_account=account,
+            discipline=PlatformRatingEvent.Discipline.ALGORITHM,
+        ).order_by("occurred_at", "id")
+        recent_activity = AtCoderSubmission.objects.filter(
+            platform_account=account
+        ).order_by("-submitted_at", "-external_submission_id")[
+            :RECENT_ACTIVITY_LIMIT
+        ]
+        snapshots = list(
+            PlatformStatsSnapshot.objects.filter(platform_account=account)[
+                :SNAPSHOT_LIMIT
+            ]
+        )
+        snapshots.reverse()
+        sync_summary = build_atcoder_sync_summary(
+            stats,
+            sync_state,
+            submission_state,
+        )
+
+        return Response(
+            {
+                "platform": PlatformAccount.Platform.ATCODER,
+                "account": AtCoderAnalyticsAccountSerializer(account).data,
+                "sync": AtCoderAnalyticsSyncSerializer(sync_summary).data,
+                "stats": (
+                    AtCoderAnalyticsStatsSerializer(stats).data
+                    if stats
+                    else None
+                ),
+                "rating_history": AtCoderAnalyticsRatingEventSerializer(
+                    rating_history,
+                    many=True,
+                ).data,
+                "recent_activity": AtCoderAnalyticsActivitySerializer(
+                    recent_activity,
+                    many=True,
+                ).data,
+                "snapshots": AtCoderAnalyticsSnapshotSerializer(
+                    snapshots,
+                    many=True,
+                ).data,
+            }
+        )
+
+    @staticmethod
+    def _related_or_none(account, relation_name, model_class):
+        try:
+            return getattr(account, relation_name)
+        except model_class.DoesNotExist:
+            return None
