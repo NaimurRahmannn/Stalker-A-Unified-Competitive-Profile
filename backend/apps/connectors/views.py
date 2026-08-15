@@ -3,15 +3,27 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.connectors.base.exceptions import (
     ExternalServiceError,
     InvalidExternalAccountError,
     UnsupportedSourceError,
 )
-from apps.connectors.models import CodeforcesStats, PlatformAccount
-from apps.connectors.serializers import PlatformAccountSerializer
-from apps.connectors.services import get_connector, get_sync_cooldown_seconds
+from apps.connectors.models import CodeforcesStats, PlatformAccount, PlatformStatsSnapshot
+from apps.connectors.serializers import (
+    CodeforcesAnalyticsAccountSerializer,
+    CodeforcesStatsSerializer,
+    PlatformAccountSerializer,
+    PlatformStatsSnapshotSerializer,
+    serialize_codeforces_rating_history,
+    serialize_codeforces_recent_activity,
+)
+from apps.connectors.services import (
+    get_connector,
+    get_sync_cooldown_seconds,
+    record_platform_stats_snapshot,
+)
 
 
 class PlatformAccountViewSet(viewsets.ModelViewSet):
@@ -78,7 +90,7 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                 ]
             )
 
-            CodeforcesStats.objects.update_or_create(
+            stats_record, _ = CodeforcesStats.objects.update_or_create(
                 platform_account=platform_account,
                 defaults={
                     "handle": profile["handle"],
@@ -94,8 +106,64 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                     "registered_at": profile["registered_at"],
                     "raw_user_info": profile["raw_user_info"],
                     "raw_rating_history": profile["raw_rating_history"],
+                    "recent_activity": profile.get("recent_activity", []),
                 },
             )
+            record_platform_stats_snapshot(platform_account, stats_record)
 
         serializer = self.get_serializer(platform_account)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CodeforcesAnalyticsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        account = (
+            PlatformAccount.objects.filter(
+                user=request.user,
+                platform=PlatformAccount.Platform.CODEFORCES,
+            )
+            .select_related("codeforces_stats")
+            .first()
+        )
+
+        if account is None:
+            return Response(
+                {
+                    "platform": PlatformAccount.Platform.CODEFORCES,
+                    "account": None,
+                    "stats": None,
+                    "rating_history": [],
+                    "recent_activity": [],
+                    "snapshots": [],
+                }
+            )
+
+        try:
+            stats = account.codeforces_stats
+        except CodeforcesStats.DoesNotExist:
+            stats = None
+
+        snapshots = list(
+            PlatformStatsSnapshot.objects.filter(platform_account=account)[:180]
+        )
+        snapshots.reverse()
+
+        return Response(
+            {
+                "platform": PlatformAccount.Platform.CODEFORCES,
+                "account": CodeforcesAnalyticsAccountSerializer(account).data,
+                "stats": CodeforcesStatsSerializer(stats).data if stats else None,
+                "rating_history": (
+                    serialize_codeforces_rating_history(stats) if stats else []
+                ),
+                "recent_activity": (
+                    serialize_codeforces_recent_activity(stats) if stats else []
+                ),
+                "snapshots": PlatformStatsSnapshotSerializer(
+                    snapshots,
+                    many=True,
+                ).data,
+            }
+        )

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Bell, Menu, Sun, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import {
   DashboardSidebar,
   type DashboardSidebarActiveItem,
@@ -70,17 +70,6 @@ export function DashboardMobileNav({
           />
         </div>
 
-        <div className="flex items-center gap-1">
-          <MobileIconButton label="Notifications">
-            <Bell className="size-5" />
-            <span className="absolute right-1 top-0.5 grid size-4 place-items-center rounded-full bg-red-500 text-[10px] font-semibold leading-none text-white ring-2 ring-white">
-              3
-            </span>
-          </MobileIconButton>
-          <MobileIconButton label="Theme">
-            <Sun className="size-5" />
-          </MobileIconButton>
-        </div>
       </header>
 
       {open ? (

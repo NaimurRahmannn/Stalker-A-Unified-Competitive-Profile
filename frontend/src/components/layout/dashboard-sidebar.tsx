@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import Link from "next/link";
 import {
   Activity,
   Award,
@@ -16,6 +19,7 @@ import {
   Trophy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 type Accent = "green" | "blue" | "purple" | "orange" | "slate";
 
@@ -141,7 +145,7 @@ const platformItems: SidebarItem[] = [
   {
     id: "settings",
     label: "Settings",
-    href: "#",
+    href: "/settings",
     icon: Settings,
     accent: "slate",
   },
@@ -152,7 +156,7 @@ function SidebarLink({ item }: { item: SidebarItem }) {
   const accent = accentStyles[item.accent];
 
   return (
-    <a
+    <Link
       href={item.href}
       className={`group flex min-h-12 items-center gap-3 rounded-xl border-l-[3px] px-3 py-2 text-sm font-medium transition ${
         item.active
@@ -171,7 +175,7 @@ function SidebarLink({ item }: { item: SidebarItem }) {
       {item.chevron ? (
         <ChevronRight className="size-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
       ) : null}
-    </a>
+    </Link>
   );
 }
 
@@ -206,6 +210,20 @@ export function DashboardSidebar({
 }: {
   activeItem?: DashboardSidebarActiveItem;
 }) {
+  const { user, isLoading } = useAuth();
+  const displayName = user?.full_name.trim() || user?.username || "";
+  const initialsSource = displayName || "ST";
+  const nameParts = initialsSource.split(/\s+/).filter(Boolean);
+  const initials = (nameParts.length > 1
+    ? `${nameParts[0][0]}${nameParts[1][0]}`
+    : initialsSource.slice(0, 2)
+  ).toUpperCase();
+  const userPlatformItems = platformItems.map((item) =>
+    item.id === "public-profile" && user
+      ? { ...item, href: `/profile/${encodeURIComponent(user.username)}` }
+      : item,
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col lg:min-h-[calc(100vh-3rem)]">
       <div className="px-1 pb-8 pt-2">
@@ -240,21 +258,28 @@ export function DashboardSidebar({
         />
         <SidebarSection
           title="Platform"
-          items={platformItems}
+          items={userPlatformItems}
           activeItem={activeItem}
         />
       </nav>
 
       <div className="mt-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
         <div className="flex items-center gap-3">
-          <div className="grid size-12 shrink-0 place-items-center rounded-full bg-emerald-50 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100">
-            NR
+          <div
+            role={user?.avatar ? "img" : undefined}
+            aria-label={user?.avatar ? `${displayName || user.username} avatar` : undefined}
+            style={user?.avatar ? { backgroundImage: `url(${JSON.stringify(user.avatar)})` } : undefined}
+            className="grid size-12 shrink-0 place-items-center rounded-full bg-emerald-50 bg-cover bg-center text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100"
+          >
+            {!user?.avatar ? initials : null}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-slate-950">
-              Naimur Rahman
+              {isLoading ? "Loading profile..." : displayName || "Signed out"}
             </p>
-            <p className="mt-0.5 truncate text-xs text-slate-500">@naimur</p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">
+              {user ? `@${user.username}` : ""}
+            </p>
           </div>
           <ChevronDown className="size-4 shrink-0 text-slate-400" />
         </div>

@@ -1,0 +1,15 @@
+import { Activity, BarChart3, CheckCircle2, Clock3 } from "lucide-react";
+import type { CodeforcesAnalyticsAccount, CodeforcesSnapshot } from "../types";
+
+function signed(value: number) { return value > 0 ? `+${value}` : String(value); }
+
+export function CodeforcesGrowthSummary({ account, snapshots, historyCount }: { account: CodeforcesAnalyticsAccount; snapshots: CodeforcesSnapshot[]; historyCount: number }) {
+  const first = snapshots[0];
+  const latest = snapshots.at(-1);
+  const ratingGrowth = first && latest && first.rating !== null && latest.rating !== null ? latest.rating - first.rating : null;
+  const solvedGrowth = first && latest ? latest.solved_count - first.solved_count : null;
+  return <aside className="grid gap-4">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.04)]"><div className="flex items-center gap-2"><Activity className="size-4.5 text-violet-600" /><h2 className="text-sm font-semibold text-slate-950">Growth Tracking</h2></div>{snapshots.length ? <dl className="mt-4 grid gap-3"><div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3"><dt className="text-xs text-slate-500">Snapshots</dt><dd className="text-sm font-semibold text-slate-900">{snapshots.length}</dd></div><div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3"><dt className="text-xs text-slate-500">Rating growth</dt><dd className={`text-sm font-semibold ${ratingGrowth !== null && ratingGrowth > 0 ? "text-emerald-600" : "text-slate-900"}`}>{ratingGrowth === null ? "—" : signed(ratingGrowth)}</dd></div><div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3"><dt className="text-xs text-slate-500">Problems growth</dt><dd className={`text-sm font-semibold ${solvedGrowth !== null && solvedGrowth > 0 ? "text-emerald-600" : "text-slate-900"}`}>{solvedGrowth === null ? "—" : signed(solvedGrowth)}</dd></div></dl> : <p className="mt-4 rounded-xl bg-slate-50 px-4 py-5 text-xs leading-5 text-slate-500">The first successful sync creates a growth baseline. Future changed stats add snapshots.</p>}</section>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.04)]"><div className="flex items-center gap-2"><BarChart3 className="size-4.5 text-blue-600" /><h2 className="text-sm font-semibold text-slate-950">Account Status</h2></div><div className="mt-4 space-y-3 text-xs"><div className="flex items-center justify-between gap-3"><span className="inline-flex items-center gap-2 text-slate-500"><CheckCircle2 className="size-4" />Verification</span><strong className={account.is_verified ? "text-emerald-600" : "text-orange-600"}>{account.is_verified ? "Verified" : "Sync required"}</strong></div><div className="flex items-center justify-between gap-3"><span className="inline-flex items-center gap-2 text-slate-500"><Clock3 className="size-4" />Rated contests</span><strong className="text-slate-800">{historyCount}</strong></div></div></section>
+  </aside>;
+}

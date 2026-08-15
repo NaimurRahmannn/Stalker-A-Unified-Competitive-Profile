@@ -125,6 +125,14 @@ Dashboard:
 
 - `GET /api/v1/dashboard/me/` — returns `{ user, platforms: [{ ..., stats }] }`
 
+Competitive programming analytics:
+
+- `GET /api/v1/competitive-programming/codeforces/` returns the authenticated user's
+  normalized Codeforces account, current stats, rating history, recent activity, and growth
+  snapshots.
+- A successful Codeforces sync stores a bounded recent-activity list and creates a historical
+  stats snapshot when the tracked values changed.
+
 ## Notes
 
 - `PlatformAccount` supports an 11-platform enum; `codeforces` is the only platform with an

@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 
 class PlatformAccount(models.Model):
@@ -66,6 +67,7 @@ class CodeforcesStats(models.Model):
 
     raw_user_info = models.JSONField(default=dict, blank=True)
     raw_rating_history = models.JSONField(default=list, blank=True)
+    recent_activity = models.JSONField(default=list, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -88,3 +90,28 @@ class CodeforcesStats(models.Model):
 
     def __str__(self) -> str:
         return f"Codeforces stats for {self.handle}"
+
+
+class PlatformStatsSnapshot(models.Model):
+    platform_account = models.ForeignKey(
+        PlatformAccount,
+        on_delete=models.CASCADE,
+        related_name="stats_snapshots",
+    )
+    captured_at = models.DateTimeField(default=timezone.now)
+    rating = models.IntegerField(blank=True, null=True)
+    solved_count = models.PositiveIntegerField(default=0)
+    contest_count = models.PositiveIntegerField(default=0)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-captured_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=["platform_account", "-captured_at"],
+                name="platform_snapshot_time_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.platform_account} snapshot at {self.captured_at.isoformat()}"

@@ -12,8 +12,12 @@ from apps.connectors.base.exceptions import (
     ExternalServiceError,
     InvalidExternalAccountError,
 )
-from apps.connectors.models import CodeforcesStats, PlatformAccount
-from apps.connectors.providers.codeforces.mapper import calculate_solved_stats
+from apps.connectors.models import CodeforcesStats, PlatformAccount, PlatformStatsSnapshot
+from apps.connectors.providers.codeforces.mapper import (
+    calculate_solved_stats,
+    normalize_rating_history,
+    normalize_recent_activity,
+)
 
 
 User = get_user_model()
@@ -133,6 +137,44 @@ class PlatformAccountAPITests(APITestCase):
         account.refresh_from_db()
         self.assertEqual(account.handle, "new_handle")
 
+    def test_handle_change_invalidates_stale_codeforces_state(self):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="tourist",
+            profile_url="https://codeforces.com/profile/tourist",
+            is_verified=True,
+            last_synced_at=timezone.now(),
+        )
+        CodeforcesStats.objects.create(
+            platform_account=account,
+            handle="tourist",
+            rating=3900,
+            solved_count=2000,
+        )
+        PlatformStatsSnapshot.objects.create(
+            platform_account=account,
+            rating=3900,
+            solved_count=2000,
+        )
+        self.authenticate()
+
+        response = self.client.patch(
+            reverse("platform-account-detail", args=[account.pk]),
+            {"handle": "new_handle"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["is_verified"])
+        self.assertIsNone(response.data["last_synced_at"])
+        self.assertEqual(response.data["profile_url"], "")
+        self.assertIsNone(response.data["codeforces_stats"])
+        self.assertFalse(CodeforcesStats.objects.filter(platform_account=account).exists())
+        self.assertFalse(
+            PlatformStatsSnapshot.objects.filter(platform_account=account).exists()
+        )
+
     def test_user_can_delete_their_platform_account(self):
         account = PlatformAccount.objects.create(
             user=self.user,
@@ -214,6 +256,10 @@ class PlatformAccountAPITests(APITestCase):
         self.assertIsNotNone(account.last_synced_at)
         self.assertEqual(account.handle, "tourist")
         self.assertTrue(CodeforcesStats.objects.filter(platform_account=account).exists())
+        self.assertEqual(
+            PlatformStatsSnapshot.objects.filter(platform_account=account).count(),
+            1,
+        )
 
     @patch("apps.connectors.providers.codeforces.connector.CodeforcesConnector.fetch_normalized_profile")
     def test_sync_updates_existing_codeforces_stats(self, mocked_profile):
@@ -361,6 +407,9 @@ class PlatformAccountAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertEqual(response.data["detail"], "Codeforces API is currently unavailable.")
+        self.assertFalse(
+            PlatformStatsSnapshot.objects.filter(platform_account=account).exists()
+        )
 
 
 class CodeforcesStatsCalculationTests(SimpleTestCase):
@@ -389,3 +438,55 @@ class CodeforcesStatsCalculationTests(SimpleTestCase):
         self.assertEqual(stats["solved_count"], 2)
         self.assertEqual(stats["attempted_count"], 3)
         self.assertEqual(stats["accepted_submission_count"], 3)
+
+    def test_normalize_rating_history_sorts_and_ignores_malformed_entries(self):
+        history = [
+            {
+                "contestId": 2,
+                "contestName": "Round 2",
+                "rank": 20,
+                "oldRating": 1200,
+                "newRating": 1250,
+                "ratingUpdateTimeSeconds": 200,
+            },
+            "invalid",
+            {
+                "contestId": 1,
+                "newRating": 1200,
+                "ratingUpdateTimeSeconds": 100,
+            },
+            {"contestId": 3, "ratingUpdateTimeSeconds": 300},
+        ]
+
+        normalized = normalize_rating_history(history)
+
+        self.assertEqual([item["contest_id"] for item in normalized], [1, 2])
+        self.assertIsNone(normalized[0]["contest_name"])
+        self.assertIsNone(normalized[0]["rating_change"])
+        self.assertEqual(normalized[1]["rating_change"], 50)
+
+    def test_normalize_recent_activity_is_bounded_newest_first(self):
+        submissions = [
+            {
+                "id": 1,
+                "contestId": 10,
+                "creationTimeSeconds": 100,
+                "verdict": "WRONG_ANSWER",
+                "programmingLanguage": "GNU C++20",
+                "problem": {"index": "A", "name": "First"},
+            },
+            {"problem": None},
+            {
+                "id": 2,
+                "creationTimeSeconds": 200,
+                "verdict": "OK",
+                "problem": {"name": "Second", "rating": 800},
+            },
+        ]
+
+        activity = normalize_recent_activity(submissions, limit=1)
+
+        self.assertEqual(len(activity), 1)
+        self.assertEqual(activity[0]["submission_id"], 2)
+        self.assertEqual(activity[0]["problem_name"], "Second")
+        self.assertIsNone(activity[0]["contest_id"])
