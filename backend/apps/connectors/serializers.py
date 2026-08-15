@@ -3,10 +3,15 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
 
 from apps.connectors.models import (
+    AtCoderStats,
     CodeforcesStats,
     PlatformAccount,
+    PlatformRatingEvent,
     PlatformStatsSnapshot,
 )
+from apps.connectors.base.exceptions import InvalidExternalAccountError
+from apps.connectors.providers.atcoder.client import normalize_atcoder_handle
+from apps.connectors.providers.atcoder.mapper import get_atcoder_rating_color
 from apps.connectors.providers.codeforces.mapper import normalize_rating_history
 from apps.connectors.services import can_sync_platform_account, get_sync_cooldown_seconds
 
@@ -32,6 +37,48 @@ class CodeforcesStatsSerializer(serializers.ModelSerializer):
             "registered_at",
             "created_at",
             "updated_at",
+        )
+        read_only_fields = fields
+
+
+class AtCoderStatsSerializer(serializers.ModelSerializer):
+    rating_color = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AtCoderStats
+        fields = (
+            "discipline",
+            "current_rating",
+            "max_rating",
+            "rating_color",
+            "rated_contest_count",
+            "last_rated_at",
+            "last_performance",
+            "rating_data_updated_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_rating_color(self, obj: AtCoderStats) -> str | None:
+        return get_atcoder_rating_color(obj.current_rating)
+
+
+class PlatformRatingEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlatformRatingEvent
+        fields = (
+            "discipline",
+            "external_contest_id",
+            "contest_name",
+            "rank",
+            "performance",
+            "inner_performance",
+            "old_rating",
+            "new_rating",
+            "rating_change",
+            "is_rated",
+            "occurred_at",
         )
         read_only_fields = fields
 
@@ -70,6 +117,8 @@ class PlatformStatsSnapshotSerializer(serializers.ModelSerializer):
 
 
 class CodeforcesAnalyticsAccountSerializer(serializers.ModelSerializer):
+    handle_validated = serializers.SerializerMethodField()
+    ownership_verified = serializers.SerializerMethodField()
     can_sync = serializers.SerializerMethodField()
     sync_cooldown_seconds = serializers.SerializerMethodField()
 
@@ -81,6 +130,11 @@ class CodeforcesAnalyticsAccountSerializer(serializers.ModelSerializer):
             "handle",
             "profile_url",
             "is_verified",
+            "handle_validated",
+            "handle_validated_at",
+            "ownership_verified",
+            "ownership_verified_at",
+            "last_sync_attempted_at",
             "last_synced_at",
             "can_sync",
             "sync_cooldown_seconds",
@@ -90,12 +144,22 @@ class CodeforcesAnalyticsAccountSerializer(serializers.ModelSerializer):
     def get_can_sync(self, obj: PlatformAccount) -> bool:
         return can_sync_platform_account(obj)
 
+    def get_handle_validated(self, obj: PlatformAccount) -> bool:
+        return obj.handle_validated_at is not None or obj.is_verified
+
+    def get_ownership_verified(self, obj: PlatformAccount) -> bool:
+        return obj.ownership_verified_at is not None
+
     def get_sync_cooldown_seconds(self, obj: PlatformAccount) -> int:
         return get_sync_cooldown_seconds(obj)
 
 
 class PlatformAccountSerializer(serializers.ModelSerializer):
     codeforces_stats = CodeforcesStatsSerializer(read_only=True)
+    atcoder_stats = AtCoderStatsSerializer(read_only=True)
+    atcoder_rating_history = serializers.SerializerMethodField()
+    handle_validated = serializers.SerializerMethodField()
+    ownership_verified = serializers.SerializerMethodField()
     can_sync = serializers.SerializerMethodField()
     sync_cooldown_seconds = serializers.SerializerMethodField()
 
@@ -107,20 +171,34 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "handle",
             "profile_url",
             "is_verified",
+            "handle_validated",
+            "handle_validated_at",
+            "ownership_verified",
+            "ownership_verified_at",
+            "last_sync_attempted_at",
             "last_synced_at",
             "created_at",
             "updated_at",
             "codeforces_stats",
+            "atcoder_stats",
+            "atcoder_rating_history",
             "can_sync",
             "sync_cooldown_seconds",
         )
         read_only_fields = (
             "id",
             "is_verified",
+            "handle_validated",
+            "handle_validated_at",
+            "ownership_verified",
+            "ownership_verified_at",
+            "last_sync_attempted_at",
             "last_synced_at",
             "created_at",
             "updated_at",
             "codeforces_stats",
+            "atcoder_stats",
+            "atcoder_rating_history",
             "can_sync",
             "sync_cooldown_seconds",
         )
@@ -133,6 +211,22 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("Handle cannot be empty.")
         return value
+
+    def get_handle_validated(self, obj: PlatformAccount) -> bool:
+        return obj.handle_validated_at is not None or obj.is_verified
+
+    def get_ownership_verified(self, obj: PlatformAccount) -> bool:
+        return obj.ownership_verified_at is not None
+
+    def get_atcoder_rating_history(self, obj: PlatformAccount) -> list[dict]:
+        if obj.platform != PlatformAccount.Platform.ATCODER:
+            return []
+        events = [
+            event
+            for event in obj.rating_events.all()
+            if event.discipline == PlatformRatingEvent.Discipline.ALGORITHM
+        ]
+        return PlatformRatingEventSerializer(events, many=True).data
 
     def get_can_sync(self, obj: PlatformAccount) -> bool:
         return can_sync_platform_account(obj)
@@ -157,6 +251,12 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                     {"platform": "You already have an account for this platform."}
                 )
 
+        if platform == PlatformAccount.Platform.ATCODER and "handle" in attrs:
+            try:
+                attrs["handle"] = normalize_atcoder_handle(attrs["handle"])
+            except InvalidExternalAccountError as exc:
+                raise serializers.ValidationError({"handle": str(exc)}) from exc
+
         return attrs
 
     def update(self, instance: PlatformAccount, validated_data: dict) -> PlatformAccount:
@@ -174,17 +274,30 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             if handle_changed or platform_changed:
                 instance.profile_url = ""
                 instance.is_verified = False
+                instance.handle_validated_at = None
+                instance.ownership_verified_at = None
+                instance.last_sync_attempted_at = None
                 instance.last_synced_at = None
                 instance.save(
                     update_fields=[
                         "profile_url",
                         "is_verified",
+                        "handle_validated_at",
+                        "ownership_verified_at",
+                        "last_sync_attempted_at",
                         "last_synced_at",
                         "updated_at",
                     ]
                 )
                 CodeforcesStats.objects.filter(platform_account=instance).delete()
+                AtCoderStats.objects.filter(platform_account=instance).delete()
+                PlatformRatingEvent.objects.filter(platform_account=instance).delete()
                 PlatformStatsSnapshot.objects.filter(platform_account=instance).delete()
+                instance._state.fields_cache.pop("codeforces_stats", None)
+                instance._state.fields_cache.pop("atcoder_stats", None)
+                getattr(instance, "_prefetched_objects_cache", {}).pop(
+                    "rating_events", None
+                )
 
         return instance
 

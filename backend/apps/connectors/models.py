@@ -26,7 +26,12 @@ class PlatformAccount(models.Model):
     platform = models.CharField(max_length=50, choices=Platform.choices)
     handle = models.CharField(max_length=255)
     profile_url = models.URLField(max_length=500, blank=True)
+    # `is_verified` remains the backwards-compatible handle-validity flag.
+    # Ownership is deliberately represented separately and is not inferred from sync.
     is_verified = models.BooleanField(default=False)
+    handle_validated_at = models.DateTimeField(null=True, blank=True)
+    ownership_verified_at = models.DateTimeField(null=True, blank=True)
+    last_sync_attempted_at = models.DateTimeField(null=True, blank=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -90,6 +95,92 @@ class CodeforcesStats(models.Model):
 
     def __str__(self) -> str:
         return f"Codeforces stats for {self.handle}"
+
+
+class AtCoderStats(models.Model):
+    platform_account = models.OneToOneField(
+        PlatformAccount,
+        on_delete=models.CASCADE,
+        related_name="atcoder_stats",
+    )
+    discipline = models.CharField(max_length=32, default="algorithm")
+    current_rating = models.IntegerField(blank=True, null=True)
+    max_rating = models.IntegerField(blank=True, null=True)
+    rated_contest_count = models.PositiveIntegerField(default=0)
+    last_rated_at = models.DateTimeField(blank=True, null=True)
+    last_performance = models.IntegerField(blank=True, null=True)
+    rating_data_updated_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def clean(self):
+        if (
+            self.platform_account_id
+            and self.platform_account.platform != PlatformAccount.Platform.ATCODER
+        ):
+            raise ValidationError(
+                "AtCoder stats can only be attached to AtCoder platform accounts."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"AtCoder stats for {self.platform_account.handle}"
+
+
+class PlatformRatingEvent(models.Model):
+    class Discipline(models.TextChoices):
+        ALGORITHM = "algorithm", "Algorithm"
+
+    platform_account = models.ForeignKey(
+        PlatformAccount,
+        on_delete=models.CASCADE,
+        related_name="rating_events",
+    )
+    discipline = models.CharField(max_length=32, choices=Discipline.choices)
+    external_contest_id = models.CharField(max_length=255)
+    contest_name = models.CharField(max_length=500, blank=True, null=True)
+    rank = models.IntegerField(blank=True, null=True)
+    performance = models.IntegerField(blank=True, null=True)
+    inner_performance = models.IntegerField(blank=True, null=True)
+    old_rating = models.IntegerField(blank=True, null=True)
+    new_rating = models.IntegerField(blank=True, null=True)
+    rating_change = models.IntegerField(blank=True, null=True)
+    is_rated = models.BooleanField()
+    occurred_at = models.DateTimeField()
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["occurred_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "platform_account",
+                    "discipline",
+                    "external_contest_id",
+                ],
+                name="unique_platform_rating_event",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["platform_account", "discipline", "-occurred_at"],
+                name="platform_rating_event_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.platform_account} {self.discipline} "
+            f"rating event {self.external_contest_id}"
+        )
 
 
 class PlatformStatsSnapshot(models.Model):

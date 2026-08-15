@@ -135,3 +135,37 @@ CORS_ALLOWED_ORIGINS = config(
     cast=Csv(),
 )
 CORS_ALLOW_CREDENTIALS = True
+
+
+CODEFORCES_SYNC_COOLDOWN_SECONDS = config(
+    "CODEFORCES_SYNC_COOLDOWN_SECONDS",
+    default=60,
+    cast=int,
+)
+ATCODER_HISTORY_SYNC_ENABLED = config(
+    "ATCODER_HISTORY_SYNC_ENABLED",
+    default=True,
+    cast=bool,
+)
+ATCODER_SYNC_COOLDOWN_SECONDS = config(
+    "ATCODER_SYNC_COOLDOWN_SECONDS",
+    default=3600,
+    cast=int,
+)
+ATCODER_CONNECT_TIMEOUT_SECONDS = config(
+    "ATCODER_CONNECT_TIMEOUT_SECONDS",
+    default=3.05,
+    cast=float,
+)
+ATCODER_READ_TIMEOUT_SECONDS = config(
+    "ATCODER_READ_TIMEOUT_SECONDS",
+    default=10.0,
+    cast=float,
+)
+STALKER_EXTERNAL_USER_AGENT = config(
+    "STALKER_EXTERNAL_USER_AGENT",
+    default=(
+        "STALKER/1.0 "
+        "(+https://github.com/NaimurRahmannn/Stalker-A-Unified-Competitive-Profile)"
+    ),
+)

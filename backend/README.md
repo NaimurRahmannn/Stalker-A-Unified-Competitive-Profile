@@ -57,6 +57,14 @@ Required for Django:
 - `DJANGO_ALLOWED_HOSTS` (comma-separated)
 - `CORS_ALLOWED_ORIGINS` (comma-separated)
 
+AtCoder synchronization safety settings (all optional):
+
+- `ATCODER_HISTORY_SYNC_ENABLED` (default: `True`)
+- `ATCODER_SYNC_COOLDOWN_SECONDS` (default: `3600`)
+- `ATCODER_CONNECT_TIMEOUT_SECONDS` (default: `3.05`)
+- `ATCODER_READ_TIMEOUT_SECONDS` (default: `10`)
+- `STALKER_EXTERNAL_USER_AGENT` (identifies STALKER to external providers)
+
 Optional PostgreSQL variables:
 
 - `DB_NAME`
@@ -133,15 +141,28 @@ Competitive programming analytics:
 - A successful Codeforces sync stores a bounded recent-activity list and creates a historical
   stats snapshot when the tracked values changed.
 
+AtCoder Algorithm rating ingestion:
+
+- AtCoder accounts use the same `POST /api/v1/platform-accounts/<id>/sync/` entry point.
+- Sync reads only `/users/<handle>/history/json?contestType=algo`, validates and normalizes the
+  complete response, and transactionally caches Algorithm rating events and derived stats.
+- AtCoder's configurable cooldown is measured from the latest attempt, including failed
+  provider calls, while `last_synced_at` continues to mean the last successful synchronization.
+- Platform-account responses expose `atcoder_stats`, `atcoder_rating_history`, explicit
+  handle-validation state, and separate ownership-verification state.
+- Dashboard and public-profile reads never contact AtCoder. They continue to read STALKER's
+  database only.
+
 ## Notes
 
-- `PlatformAccount` supports an 11-platform enum; `codeforces` is the only platform with an
-  implemented connector and stats today (`CodeforcesStats`).
+- `PlatformAccount` supports an 11-platform enum; `codeforces` and AtCoder Algorithm rating
+  history have implemented connectors. AtCoder submissions and AtCoderProblems are not part of
+  this phase.
 - The sync action resolves a connector from the provider registry
-  (`apps.connectors.services.get_connector`) keyed by `PlatformAccount.Platform`, calls
-  `CodeforcesConnector.fetch_normalized_profile(handle)`, and `update_or_create`s the
-  `CodeforcesStats` row. Adding a new platform means writing a provider (client → connector →
-  mapper) and registering it — no model or viewset changes.
-- Sync error taxonomy: `InvalidExternalAccountError` → `400`, `ExternalServiceError` → `503`.
+  (`apps.connectors.services.get_connector`) keyed by `PlatformAccount.Platform`. The connector
+  fetches and validates provider data before atomically persisting provider-specific rows,
+  account sync state, and a deduplicated snapshot.
+- Sync error taxonomy: invalid handles return `400`, provider/local throttling returns `429`,
+  and disabled, denied, unavailable, or schema-incompatible providers return `503`.
 - External calls are encapsulated in the connectors provider architecture for future platforms.
-- Unit tests mock external Codeforces API calls and do not hit real network APIs.
+- Unit tests mock external Codeforces and AtCoder calls and do not hit live provider APIs.

@@ -1,4 +1,3 @@
-from django.db import transaction
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -8,6 +7,7 @@ from rest_framework.views import APIView
 from apps.connectors.base.exceptions import (
     ExternalServiceError,
     InvalidExternalAccountError,
+    ProviderRateLimitError,
     UnsupportedSourceError,
 )
 from apps.connectors.models import CodeforcesStats, PlatformAccount, PlatformStatsSnapshot
@@ -22,7 +22,6 @@ from apps.connectors.serializers import (
 from apps.connectors.services import (
     get_connector,
     get_sync_cooldown_seconds,
-    record_platform_stats_snapshot,
 )
 
 
@@ -32,7 +31,11 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def get_queryset(self):
-        return PlatformAccount.objects.filter(user=self.request.user)
+        return (
+            PlatformAccount.objects.filter(user=self.request.user)
+            .select_related("codeforces_stats", "atcoder_stats")
+            .prefetch_related("rating_events")
+        )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -40,10 +43,23 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="sync")
     def sync(self, request, pk=None):
         platform_account = self.get_object()
-        if platform_account.platform != PlatformAccount.Platform.CODEFORCES:
+
+        try:
+            connector = get_connector(platform_account.platform)
+        except UnsupportedSourceError:
             return Response(
                 {"detail": "Sync is not supported for this platform yet."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not connector.is_enabled:
+            return Response(
+                {
+                    "detail": (
+                        f"{connector.display_name} synchronization is currently disabled."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         cooldown_seconds = get_sync_cooldown_seconds(platform_account)
@@ -56,60 +72,30 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
+        if connector.cooldown_uses_attempts:
+            attempted_at = timezone.now()
+            PlatformAccount.objects.filter(pk=platform_account.pk).update(
+                last_sync_attempted_at=attempted_at
+            )
+            platform_account.last_sync_attempted_at = attempted_at
+
         try:
-            connector = get_connector(platform_account.platform)
-            profile = connector.fetch_normalized_profile(platform_account.handle)
+            platform_account = connector.sync(platform_account)
         except InvalidExternalAccountError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except UnsupportedSourceError:
+        except ProviderRateLimitError as exc:
             return Response(
-                {"detail": "Sync is not supported for this platform yet."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"detail": str(exc)},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
         except ExternalServiceError as exc:
             return Response(
                 {
                     "detail": str(exc)
-                    or "Codeforces is temporarily unavailable. Please try again later."
+                    or "The provider is temporarily unavailable. Please try again later."
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-
-        with transaction.atomic():
-            platform_account.handle = profile["handle"]
-            platform_account.profile_url = profile.get("profile_url", platform_account.profile_url)
-            platform_account.is_verified = True
-            platform_account.last_synced_at = timezone.now()
-            platform_account.save(
-                update_fields=[
-                    "handle",
-                    "profile_url",
-                    "is_verified",
-                    "last_synced_at",
-                    "updated_at",
-                ]
-            )
-
-            stats_record, _ = CodeforcesStats.objects.update_or_create(
-                platform_account=platform_account,
-                defaults={
-                    "handle": profile["handle"],
-                    "rating": profile["rating"],
-                    "max_rating": profile["max_rating"],
-                    "rank": profile["rank"],
-                    "max_rank": profile["max_rank"],
-                    "solved_count": profile["solved_count"],
-                    "attempted_count": profile["attempted_count"],
-                    "accepted_submission_count": profile["accepted_submission_count"],
-                    "contest_count": profile["contest_count"],
-                    "last_online_at": profile["last_online_at"],
-                    "registered_at": profile["registered_at"],
-                    "raw_user_info": profile["raw_user_info"],
-                    "raw_rating_history": profile["raw_rating_history"],
-                    "recent_activity": profile.get("recent_activity", []),
-                },
-            )
-            record_platform_stats_snapshot(platform_account, stats_record)
 
         serializer = self.get_serializer(platform_account)
         return Response(serializer.data, status=status.HTTP_200_OK)

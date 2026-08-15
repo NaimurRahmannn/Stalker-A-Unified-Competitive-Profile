@@ -44,6 +44,8 @@ class DashboardCodeforcesStatsSerializer(serializers.ModelSerializer):
 
 class DashboardPlatformSerializer(serializers.ModelSerializer):
     stats = serializers.SerializerMethodField()
+    handle_validated = serializers.SerializerMethodField()
+    ownership_verified = serializers.SerializerMethodField()
     can_sync = serializers.SerializerMethodField()
     sync_cooldown_seconds = serializers.SerializerMethodField()
 
@@ -55,6 +57,10 @@ class DashboardPlatformSerializer(serializers.ModelSerializer):
             "handle",
             "profile_url",
             "is_verified",
+            "handle_validated",
+            "handle_validated_at",
+            "ownership_verified",
+            "ownership_verified_at",
             "last_synced_at",
             "created_at",
             "updated_at",
@@ -74,6 +80,12 @@ class DashboardPlatformSerializer(serializers.ModelSerializer):
             return None
 
         return DashboardCodeforcesStatsSerializer(stats).data
+
+    def get_handle_validated(self, obj: PlatformAccount) -> bool:
+        return obj.handle_validated_at is not None or obj.is_verified
+
+    def get_ownership_verified(self, obj: PlatformAccount) -> bool:
+        return obj.ownership_verified_at is not None
 
     def get_can_sync(self, obj: PlatformAccount) -> bool:
         return can_sync_platform_account(obj)
