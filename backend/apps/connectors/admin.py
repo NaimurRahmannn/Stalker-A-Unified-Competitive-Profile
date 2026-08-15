@@ -2,6 +2,8 @@ from django.contrib import admin
 
 from apps.connectors.models import (
     AtCoderStats,
+    AtCoderSubmission,
+    AtCoderSubmissionSyncState,
     CodeforcesStats,
     PlatformAccount,
     PlatformRatingEvent,
@@ -58,6 +60,10 @@ class AtCoderStatsAdmin(admin.ModelAdmin):
         "current_rating",
         "max_rating",
         "rated_contest_count",
+        "solved_count",
+        "attempted_count",
+        "indexed_submission_count",
+        "submission_backfill_complete",
         "last_rated_at",
         "updated_at",
     )
@@ -84,6 +90,39 @@ class PlatformRatingEventAdmin(admin.ModelAdmin):
         "external_contest_id",
         "contest_name",
         "platform_account__handle",
+    )
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(AtCoderSubmissionSyncState)
+class AtCoderSubmissionSyncStateAdmin(admin.ModelAdmin):
+    list_display = (
+        "platform_account",
+        "last_submission_epoch",
+        "last_submission_id",
+        "backfill_complete",
+        "submission_data_updated_at",
+    )
+    list_filter = ("backfill_complete",)
+    search_fields = ("platform_account__handle",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(AtCoderSubmission)
+class AtCoderSubmissionAdmin(admin.ModelAdmin):
+    list_display = (
+        "external_submission_id",
+        "platform_account",
+        "external_problem_id",
+        "verdict",
+        "language",
+        "submitted_at",
+    )
+    list_filter = ("verdict",)
+    search_fields = (
+        "platform_account__handle",
+        "external_problem_id",
+        "external_contest_id",
     )
     readonly_fields = ("created_at", "updated_at")
 

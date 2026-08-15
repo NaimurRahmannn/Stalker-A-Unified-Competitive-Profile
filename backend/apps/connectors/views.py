@@ -18,10 +18,14 @@ from apps.connectors.serializers import (
     PlatformStatsSnapshotSerializer,
     serialize_codeforces_rating_history,
     serialize_codeforces_recent_activity,
+    serialize_atcoder_submission_overview,
 )
 from apps.connectors.services import (
     get_connector,
     get_sync_cooldown_seconds,
+)
+from apps.connectors.providers.atcoder.submission_service import (
+    AtCoderSubmissionIngestionService,
 )
 
 
@@ -99,6 +103,46 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(platform_account)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="atcoder-submissions")
+    def atcoder_submissions(self, request, pk=None):
+        platform_account = self.get_object()
+        if platform_account.platform != PlatformAccount.Platform.ATCODER:
+            return Response(
+                {"detail": "Submission data is only available for AtCoder accounts."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(serialize_atcoder_submission_overview(platform_account))
+
+    @action(detail=True, methods=["post"], url_path="sync-submissions")
+    def sync_submissions(self, request, pk=None):
+        platform_account = self.get_object()
+        if platform_account.platform != PlatformAccount.Platform.ATCODER:
+            return Response(
+                {"detail": "Submission synchronization is only supported for AtCoder."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = AtCoderSubmissionIngestionService().sync(platform_account)
+        except ProviderRateLimitError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        except ExternalServiceError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        payload = serialize_atcoder_submission_overview(platform_account)
+        payload["sync"] = {
+            "pages_fetched": result.pages_fetched,
+            "indexed_submission_count": result.indexed_submission_count,
+            "backfill_complete": result.backfill_complete,
+        }
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class CodeforcesAnalyticsView(APIView):

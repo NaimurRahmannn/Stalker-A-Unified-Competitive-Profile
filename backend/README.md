@@ -65,6 +65,14 @@ AtCoder synchronization safety settings (all optional):
 - `ATCODER_READ_TIMEOUT_SECONDS` (default: `10`)
 - `STALKER_EXTERNAL_USER_AGENT` (identifies STALKER to external providers)
 
+AtCoderProblems submission-ingestion settings (all optional):
+
+- `ATCODER_PROBLEMS_SYNC_ENABLED` (default: `True`)
+- `ATCODER_PROBLEMS_BASE_URL`
+- `ATCODER_PROBLEMS_TIMEOUT_SECONDS` (default: `10`)
+- `ATCODER_PROBLEMS_MIN_REQUEST_INTERVAL_SECONDS` (default: `1.1`)
+- `ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC` (default: `2`)
+
 Optional PostgreSQL variables:
 
 - `DB_NAME`
@@ -128,6 +136,10 @@ Platform accounts (connectors):
 - `PATCH /api/v1/platform-accounts/<id>/` — update the handle
 - `DELETE /api/v1/platform-accounts/<id>/` — remove it
 - `POST /api/v1/platform-accounts/<id>/sync/` — verify the handle and refresh stats via the platform connector
+- `GET /api/v1/platform-accounts/<id>/atcoder-submissions/` — return cached AtCoder
+  submission stats, source-specific cursor state, and the latest 20 submissions
+- `POST /api/v1/platform-accounts/<id>/sync-submissions/` — incrementally ingest bounded
+  AtCoderProblems submission pages for an owned AtCoder account
 
 Dashboard:
 
@@ -153,11 +165,22 @@ AtCoder Algorithm rating ingestion:
 - Dashboard and public-profile reads never contact AtCoder. They continue to read STALKER's
   database only.
 
+AtCoderProblems submission ingestion:
+
+- Submission ingestion is independent from the official AtCoder rating-history sync.
+- The provider's inclusive timestamp cursor is paired with the last submission ID. STALKER
+  re-fetches the boundary second and relies on a database uniqueness constraint for safe overlap.
+- Each validated page is persisted atomically with cursor advancement and metric recalculation.
+- Backfill is limited by `ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC`; a completion flag distinguishes
+  indexed counts from confirmed lifetime totals.
+- The in-process limiter spaces provider-wide requests by more than one second by default. It
+  does not coordinate across multiple application processes; distributed limiting is deferred.
+
 ## Notes
 
-- `PlatformAccount` supports an 11-platform enum; `codeforces` and AtCoder Algorithm rating
-  history have implemented connectors. AtCoder submissions and AtCoderProblems are not part of
-  this phase.
+- `PlatformAccount` supports an 11-platform enum; `codeforces`, AtCoder Algorithm ratings, and
+  incremental AtCoderProblems submissions are implemented. Problem metadata and difficulty
+  enrichment remain out of scope.
 - The sync action resolves a connector from the provider registry
   (`apps.connectors.services.get_connector`) keyed by `PlatformAccount.Platform`. The connector
   fetches and validates provider data before atomically persisting provider-specific rows,

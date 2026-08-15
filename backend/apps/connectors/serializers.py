@@ -4,6 +4,8 @@ from rest_framework import serializers
 
 from apps.connectors.models import (
     AtCoderStats,
+    AtCoderSubmission,
+    AtCoderSubmissionSyncState,
     CodeforcesStats,
     PlatformAccount,
     PlatformRatingEvent,
@@ -55,6 +57,12 @@ class AtCoderStatsSerializer(serializers.ModelSerializer):
             "last_rated_at",
             "last_performance",
             "rating_data_updated_at",
+            "solved_count",
+            "attempted_count",
+            "accepted_submission_count",
+            "indexed_submission_count",
+            "submission_data_updated_at",
+            "submission_backfill_complete",
             "created_at",
             "updated_at",
         )
@@ -62,6 +70,34 @@ class AtCoderStatsSerializer(serializers.ModelSerializer):
 
     def get_rating_color(self, obj: AtCoderStats) -> str | None:
         return get_atcoder_rating_color(obj.current_rating)
+
+
+class AtCoderSubmissionSyncStateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AtCoderSubmissionSyncState
+        fields = (
+            "last_submission_epoch",
+            "last_submission_id",
+            "backfill_complete",
+            "submission_data_updated_at",
+        )
+        read_only_fields = fields
+
+
+class AtCoderRecentSubmissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AtCoderSubmission
+        fields = (
+            "external_submission_id",
+            "external_contest_id",
+            "external_problem_id",
+            "verdict",
+            "language",
+            "submitted_at",
+            "execution_time_ms",
+            "code_size_bytes",
+        )
+        read_only_fields = fields
 
 
 class PlatformRatingEventSerializer(serializers.ModelSerializer):
@@ -291,15 +327,47 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 )
                 CodeforcesStats.objects.filter(platform_account=instance).delete()
                 AtCoderStats.objects.filter(platform_account=instance).delete()
+                AtCoderSubmissionSyncState.objects.filter(
+                    platform_account=instance
+                ).delete()
+                AtCoderSubmission.objects.filter(platform_account=instance).delete()
                 PlatformRatingEvent.objects.filter(platform_account=instance).delete()
                 PlatformStatsSnapshot.objects.filter(platform_account=instance).delete()
                 instance._state.fields_cache.pop("codeforces_stats", None)
                 instance._state.fields_cache.pop("atcoder_stats", None)
+                instance._state.fields_cache.pop(
+                    "atcoder_submission_sync_state", None
+                )
                 getattr(instance, "_prefetched_objects_cache", {}).pop(
                     "rating_events", None
                 )
 
         return instance
+
+
+def serialize_atcoder_submission_overview(
+    platform_account: PlatformAccount,
+    recent_limit: int = 20,
+) -> dict:
+    stats = AtCoderStats.objects.filter(platform_account=platform_account).first()
+    state = AtCoderSubmissionSyncState.objects.filter(
+        platform_account=platform_account
+    ).first()
+    recent = AtCoderSubmission.objects.filter(
+        platform_account=platform_account
+    ).order_by("-submitted_at", "-external_submission_id")[:recent_limit]
+    return {
+        "platform": PlatformAccount.Platform.ATCODER,
+        "handle": platform_account.handle,
+        "stats": AtCoderStatsSerializer(stats).data if stats else None,
+        "sync_state": (
+            AtCoderSubmissionSyncStateSerializer(state).data if state else None
+        ),
+        "recent_submissions": AtCoderRecentSubmissionSerializer(
+            recent,
+            many=True,
+        ).data,
+    }
 
 
 def serialize_codeforces_rating_history(stats: CodeforcesStats) -> list[dict]:

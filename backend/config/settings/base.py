@@ -169,3 +169,28 @@ STALKER_EXTERNAL_USER_AGENT = config(
         "(+https://github.com/NaimurRahmannn/Stalker-A-Unified-Competitive-Profile)"
     ),
 )
+
+ATCODER_PROBLEMS_SYNC_ENABLED = config(
+    "ATCODER_PROBLEMS_SYNC_ENABLED",
+    default=True,
+    cast=bool,
+)
+ATCODER_PROBLEMS_BASE_URL = config(
+    "ATCODER_PROBLEMS_BASE_URL",
+    default="https://kenkoooo.com/atcoder/atcoder-api/v3",
+)
+ATCODER_PROBLEMS_TIMEOUT_SECONDS = config(
+    "ATCODER_PROBLEMS_TIMEOUT_SECONDS",
+    default=10.0,
+    cast=float,
+)
+ATCODER_PROBLEMS_MIN_REQUEST_INTERVAL_SECONDS = config(
+    "ATCODER_PROBLEMS_MIN_REQUEST_INTERVAL_SECONDS",
+    default=1.1,
+    cast=float,
+)
+ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC = config(
+    "ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC",
+    default=2,
+    cast=int,
+)

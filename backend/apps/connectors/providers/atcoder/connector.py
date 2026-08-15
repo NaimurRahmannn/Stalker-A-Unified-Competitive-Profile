@@ -93,10 +93,14 @@ class AtCoderConnector(BaseConnector):
         )
         return SnapshotValues(
             rating=stats.current_rating,
+            solved_count=(
+                stats.solved_count if stats.submission_backfill_complete else 0
+            ),
             contest_count=stats.rated_contest_count,
             metadata={
                 "discipline": discipline,
                 "max_rating": stats.max_rating,
                 "last_performance": stats.last_performance,
+                "submission_stats_complete": stats.submission_backfill_complete,
             },
         )

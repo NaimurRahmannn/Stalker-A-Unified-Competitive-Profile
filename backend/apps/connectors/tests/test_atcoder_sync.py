@@ -151,6 +151,33 @@ class AtCoderSynchronizationTests(APITestCase):
     @patch(
         "apps.connectors.providers.atcoder.connector.AtCoderConnector.fetch_normalized_profile"
     )
+    def test_rating_sync_preserves_independent_submission_metrics(self, mocked_fetch):
+        AtCoderStats.objects.create(
+            platform_account=self.account,
+            solved_count=428,
+            attempted_count=501,
+            accepted_submission_count=683,
+            indexed_submission_count=941,
+            submission_backfill_complete=True,
+            submission_data_updated_at=timezone.now(),
+        )
+        mocked_fetch.return_value = normalized_profile([self.first_event])
+
+        response = self.client.post(self.sync_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        stats = AtCoderStats.objects.get(platform_account=self.account)
+        self.assertEqual(stats.current_rating, 1200)
+        self.assertEqual(stats.solved_count, 428)
+        self.assertEqual(stats.attempted_count, 501)
+        self.assertEqual(stats.accepted_submission_count, 683)
+        self.assertEqual(stats.indexed_submission_count, 941)
+        snapshot = PlatformStatsSnapshot.objects.get(platform_account=self.account)
+        self.assertEqual(snapshot.solved_count, 428)
+
+    @patch(
+        "apps.connectors.providers.atcoder.connector.AtCoderConnector.fetch_normalized_profile"
+    )
     def test_new_contest_adds_only_one_event_and_updates_derived_stats(self, mocked_fetch):
         mocked_fetch.side_effect = [
             normalized_profile([self.first_event]),
