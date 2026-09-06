@@ -4,14 +4,15 @@ from apps.connectors.models import (
     AtCoderStats,
     AtCoderSubmission,
     CodeforcesStats,
+    LeetCodeStats,
     PlatformAccount,
 )
 from apps.connectors.providers.atcoder.mapper import get_atcoder_rating_color
 
-
 SUPPORTED_PLATFORMS = (
     PlatformAccount.Platform.CODEFORCES,
     PlatformAccount.Platform.ATCODER,
+    PlatformAccount.Platform.LEETCODE,
 )
 RECENT_ACTIVITY_LIMIT = 20
 
@@ -26,7 +27,7 @@ def build_competitive_programming_overview(
         for account in PlatformAccount.objects.filter(
             user=user,
             platform__in=SUPPORTED_PLATFORMS,
-        ).select_related("codeforces_stats", "atcoder_stats")
+        ).select_related("codeforces_stats", "atcoder_stats", "leetcode_stats")
     }
     platforms = [
         _platform_summary(platform, accounts.get(platform))
@@ -88,6 +89,8 @@ def _platform_summary(platform: str, account: PlatformAccount | None) -> dict:
         ),
         "accepted_submission_count": None,
         "accepted_submission_count_complete": account is None,
+        "problem_breakdown": None,
+        "data_updated_at": None,
     }
     if account is None:
         return base
@@ -107,26 +110,58 @@ def _platform_summary(platform: str, account: PlatformAccount | None) -> dict:
                 "contest_count": stats.contest_count,
                 "accepted_submission_count": stats.accepted_submission_count,
                 "accepted_submission_count_complete": True,
+                "data_updated_at": stats.updated_at,
+            }
+        )
+        return base
+
+    if platform == PlatformAccount.Platform.ATCODER:
+        try:
+            stats = account.atcoder_stats
+        except AtCoderStats.DoesNotExist:
+            return base
+        base.update(
+            {
+                "rating": stats.current_rating,
+                "max_rating": stats.max_rating,
+                "rank": get_atcoder_rating_color(stats.current_rating),
+                "solved_count": stats.solved_count,
+                "solved_count_complete": stats.submission_backfill_complete,
+                "contest_count": stats.rated_contest_count,
+                "accepted_submission_count": stats.accepted_submission_count,
+                "accepted_submission_count_complete": (
+                    stats.submission_backfill_complete
+                ),
+                "data_updated_at": max(
+                    filter(
+                        None,
+                        (
+                            stats.rating_data_updated_at,
+                            stats.submission_data_updated_at,
+                        ),
+                    ),
+                    default=None,
+                ),
             }
         )
         return base
 
     try:
-        stats = account.atcoder_stats
-    except AtCoderStats.DoesNotExist:
+        stats = account.leetcode_stats
+    except LeetCodeStats.DoesNotExist:
         return base
     base.update(
         {
-            "rating": stats.current_rating,
-            "max_rating": stats.max_rating,
-            "rank": get_atcoder_rating_color(stats.current_rating),
-            "solved_count": stats.solved_count,
-            "solved_count_complete": stats.submission_backfill_complete,
-            "contest_count": stats.rated_contest_count,
-            "accepted_submission_count": stats.accepted_submission_count,
-            "accepted_submission_count_complete": (
-                stats.submission_backfill_complete
-            ),
+            "rating": stats.current_contest_rating,
+            "solved_count": stats.solved_total,
+            "solved_count_complete": stats.problem_stats_complete,
+            "contest_count": stats.attended_contest_count,
+            "problem_breakdown": {
+                "easy": stats.solved_easy,
+                "medium": stats.solved_medium,
+                "hard": stats.solved_hard,
+            },
+            "data_updated_at": stats.data_updated_at,
         }
     )
     return base

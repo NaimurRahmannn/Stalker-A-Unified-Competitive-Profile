@@ -10,6 +10,8 @@ from apps.connectors.models import (
     AtCoderSubmissionSyncState,
     AtCoderSyncState,
     CodeforcesStats,
+    LeetCodeStats,
+    LeetCodeSyncState,
     PlatformAccount,
     PlatformRatingEvent,
     PlatformStatsSnapshot,
@@ -102,6 +104,45 @@ class AtCoderSyncStateSerializer(serializers.ModelSerializer):
             "submission_status",
             "submission_error_code",
             "submission_sync_attempted_at",
+        )
+        read_only_fields = fields
+
+
+class LeetCodeStatsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeetCodeStats
+        fields = (
+            "display_name",
+            "avatar_url",
+            "country",
+            "organization",
+            "school",
+            "global_problem_ranking",
+            "reputation",
+            "solved_total",
+            "solved_easy",
+            "solved_medium",
+            "solved_hard",
+            "problem_stats_complete",
+            "current_contest_rating",
+            "attended_contest_count",
+            "contest_global_ranking",
+            "contest_total_participants",
+            "contest_top_percentage",
+            "data_updated_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+class LeetCodeSyncStateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeetCodeSyncState
+        fields = (
+            "status",
+            "last_attempted_at",
+            "last_successful_at",
+            "failure_reason",
         )
         read_only_fields = fields
 
@@ -360,10 +401,38 @@ class CodeforcesAnalyticsAccountSerializer(serializers.ModelSerializer):
         return get_sync_cooldown_seconds(obj)
 
 
+class LeetCodeAnalyticsAccountSerializer(CodeforcesAnalyticsAccountSerializer):
+    pass
+
+
+class LeetCodeAnalyticsRatingEventSerializer(serializers.Serializer):
+    platform = serializers.CharField()
+    contest_title = serializers.CharField()
+    occurred_at = serializers.DateTimeField()
+    old_rating = serializers.FloatField(allow_null=True)
+    new_rating = serializers.FloatField()
+    rating_change = serializers.FloatField(allow_null=True)
+    ranking = serializers.IntegerField(allow_null=True)
+    problems_solved = serializers.IntegerField(allow_null=True)
+    total_problems = serializers.IntegerField(allow_null=True)
+    finish_time_seconds = serializers.IntegerField(allow_null=True)
+
+
+class LeetCodeAnalyticsSyncSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    updated_at = serializers.DateTimeField(allow_null=True)
+    attempted_at = serializers.DateTimeField(allow_null=True)
+    successful_at = serializers.DateTimeField(allow_null=True)
+    using_cached_data = serializers.BooleanField()
+    error_code = serializers.CharField(allow_null=True)
+
+
 class PlatformAccountSerializer(serializers.ModelSerializer):
     codeforces_stats = CodeforcesStatsSerializer(read_only=True)
     atcoder_stats = AtCoderStatsSerializer(read_only=True)
     atcoder_sync_state = AtCoderSyncStateSerializer(read_only=True)
+    leetcode_stats = LeetCodeStatsSerializer(read_only=True)
+    leetcode_sync_state = LeetCodeSyncStateSerializer(read_only=True)
     handle_validated = serializers.SerializerMethodField()
     ownership_verified = serializers.SerializerMethodField()
     can_sync = serializers.SerializerMethodField()
@@ -388,6 +457,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "codeforces_stats",
             "atcoder_stats",
             "atcoder_sync_state",
+            "leetcode_stats",
+            "leetcode_sync_state",
             "can_sync",
             "sync_cooldown_seconds",
         )
@@ -405,6 +476,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "codeforces_stats",
             "atcoder_stats",
             "atcoder_sync_state",
+            "leetcode_stats",
+            "leetcode_sync_state",
             "can_sync",
             "sync_cooldown_seconds",
         )
@@ -492,6 +565,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 CodeforcesStats.objects.filter(platform_account=instance).delete()
                 AtCoderStats.objects.filter(platform_account=instance).delete()
                 AtCoderSyncState.objects.filter(platform_account=instance).delete()
+                LeetCodeStats.objects.filter(platform_account=instance).delete()
+                LeetCodeSyncState.objects.filter(platform_account=instance).delete()
                 AtCoderSubmissionSyncState.objects.filter(
                     platform_account=instance
                 ).delete()
@@ -500,6 +575,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 PlatformStatsSnapshot.objects.filter(platform_account=instance).delete()
                 instance._state.fields_cache.pop("codeforces_stats", None)
                 instance._state.fields_cache.pop("atcoder_stats", None)
+                instance._state.fields_cache.pop("leetcode_stats", None)
+                instance._state.fields_cache.pop("leetcode_sync_state", None)
                 instance._state.fields_cache.pop(
                     "atcoder_submission_sync_state", None
                 )

@@ -5,6 +5,7 @@ from apps.connectors.views import (
     AtCoderAnalyticsView,
     CodeforcesAnalyticsView,
     CompetitiveProgrammingOverviewView,
+    LeetCodeAnalyticsView,
     PlatformAccountViewSet,
 )
 
@@ -30,6 +31,11 @@ urlpatterns = [
         "competitive-programming/atcoder/",
         AtCoderAnalyticsView.as_view(),
         name="atcoder-analytics",
+    ),
+    path(
+        "competitive-programming/leetcode/",
+        LeetCodeAnalyticsView.as_view(),
+        name="leetcode-analytics",
     ),
     *router.urls,
 ]

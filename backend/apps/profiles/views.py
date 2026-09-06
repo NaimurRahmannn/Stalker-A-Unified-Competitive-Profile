@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
-from apps.connectors.models import PlatformAccount
 from apps.connectors.competitive import build_competitive_programming_overview
+from apps.connectors.models import PlatformAccount
 from apps.profiles.serializers import (
     PublicProfilePlatformSerializer,
     PublicProfileUserSerializer,
@@ -19,7 +19,7 @@ class PublicProfileView(APIView):
         user = get_object_or_404(User, username=username)
         platforms = (
             PlatformAccount.objects.filter(user=user)
-            .select_related("codeforces_stats", "atcoder_stats")
+            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats")
             .order_by("platform")
         )
 

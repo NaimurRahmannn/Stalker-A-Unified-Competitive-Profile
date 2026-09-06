@@ -17,6 +17,8 @@ from apps.connectors.models import (
     AtCoderSubmissionSyncState,
     AtCoderSyncState,
     CodeforcesStats,
+    LeetCodeStats,
+    LeetCodeSyncState,
     PlatformAccount,
     PlatformRatingEvent,
     PlatformStatsSnapshot,
@@ -32,6 +34,10 @@ from apps.connectors.providers.atcoder.orchestrator import (
     SourceSyncStatus,
     SyncErrorCode,
 )
+from apps.connectors.providers.leetcode.analytics import (
+    build_leetcode_sync_summary,
+    normalize_leetcode_rating_history,
+)
 from apps.connectors.serializers import (
     AtCoderAnalyticsAccountSerializer,
     AtCoderAnalyticsActivitySerializer,
@@ -41,6 +47,10 @@ from apps.connectors.serializers import (
     AtCoderAnalyticsSyncSerializer,
     CodeforcesAnalyticsAccountSerializer,
     CodeforcesStatsSerializer,
+    LeetCodeAnalyticsAccountSerializer,
+    LeetCodeAnalyticsRatingEventSerializer,
+    LeetCodeAnalyticsSyncSerializer,
+    LeetCodeStatsSerializer,
     PlatformAccountSerializer,
     PlatformStatsSnapshotSerializer,
     serialize_atcoder_submission_overview,
@@ -62,6 +72,8 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                 "codeforces_stats",
                 "atcoder_stats",
                 "atcoder_sync_state",
+                "leetcode_stats",
+                "leetcode_sync_state",
             )
         )
 
@@ -345,6 +357,73 @@ class AtCoderAnalyticsView(APIView):
                     many=True,
                 ).data,
                 "snapshots": AtCoderAnalyticsSnapshotSerializer(
+                    snapshots,
+                    many=True,
+                ).data,
+            }
+        )
+
+    @staticmethod
+    def _related_or_none(account, relation_name, model_class):
+        try:
+            return getattr(account, relation_name)
+        except model_class.DoesNotExist:
+            return None
+
+
+class LeetCodeAnalyticsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        account = (
+            PlatformAccount.objects.filter(
+                user=request.user,
+                platform=PlatformAccount.Platform.LEETCODE,
+            )
+            .select_related("leetcode_stats", "leetcode_sync_state")
+            .first()
+        )
+
+        if account is None:
+            return Response(
+                {
+                    "platform": PlatformAccount.Platform.LEETCODE,
+                    "account": None,
+                    "sync": None,
+                    "stats": None,
+                    "rating_history": [],
+                    "recent_activity": [],
+                    "snapshots": [],
+                }
+            )
+
+        stats = self._related_or_none(account, "leetcode_stats", LeetCodeStats)
+        sync_state = self._related_or_none(
+            account,
+            "leetcode_sync_state",
+            LeetCodeSyncState,
+        )
+        sync_summary = build_leetcode_sync_summary(stats, sync_state)
+        rating_history = (
+            normalize_leetcode_rating_history(stats) if stats else []
+        )
+        snapshots = list(
+            PlatformStatsSnapshot.objects.filter(platform_account=account)[:180]
+        )
+        snapshots.reverse()
+
+        return Response(
+            {
+                "platform": PlatformAccount.Platform.LEETCODE,
+                "account": LeetCodeAnalyticsAccountSerializer(account).data,
+                "sync": LeetCodeAnalyticsSyncSerializer(sync_summary).data,
+                "stats": LeetCodeStatsSerializer(stats).data if stats else None,
+                "rating_history": LeetCodeAnalyticsRatingEventSerializer(
+                    rating_history,
+                    many=True,
+                ).data,
+                "recent_activity": [],
+                "snapshots": PlatformStatsSnapshotSerializer(
                     snapshots,
                     many=True,
                 ).data,

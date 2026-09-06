@@ -1,4 +1,5 @@
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime
+from datetime import timezone as datetime_timezone
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -6,8 +7,12 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.connectors.models import AtCoderStats, CodeforcesStats, PlatformAccount
-
+from apps.connectors.models import (
+    AtCoderStats,
+    CodeforcesStats,
+    LeetCodeStats,
+    PlatformAccount,
+)
 
 User = get_user_model()
 
@@ -263,3 +268,34 @@ class DashboardMeEndpointTests(APITestCase):
         summary = response.data["competitive_programming"]["summary"]
         self.assertEqual(summary["solved_count"], 428)
         self.assertFalse(summary["solved_count_complete"])
+
+    def test_dashboard_includes_leetcode_stats_without_history_payload(self):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.LEETCODE,
+            handle="leetcode-user",
+        )
+        LeetCodeStats.objects.create(
+            platform_account=account,
+            solved_total=75,
+            solved_easy=35,
+            solved_medium=30,
+            solved_hard=10,
+            problem_stats_complete=True,
+            current_contest_rating=1600.5,
+            attended_contest_count=8,
+            data_updated_at=timezone.now(),
+            rating_history=[{"internal": "not exposed here"}],
+        )
+        self.authenticate()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        stats = response.data["platforms"][0]["stats"]
+        self.assertEqual(stats["solved_total"], 75)
+        self.assertEqual(stats["current_contest_rating"], 1600.5)
+        self.assertNotIn("rating_history", stats)
+        summary = response.data["competitive_programming"]["summary"]
+        self.assertEqual(summary["solved_count"], 75)
+        self.assertTrue(summary["solved_count_complete"])

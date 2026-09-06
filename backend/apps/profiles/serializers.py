@@ -1,7 +1,12 @@
 from rest_framework import serializers
 
 from apps.accounts.models import User
-from apps.connectors.models import AtCoderStats, CodeforcesStats, PlatformAccount
+from apps.connectors.models import (
+    AtCoderStats,
+    CodeforcesStats,
+    LeetCodeStats,
+    PlatformAccount,
+)
 from apps.connectors.providers.atcoder.mapper import get_atcoder_rating_color
 
 
@@ -83,6 +88,31 @@ class PublicProfileAtCoderStatsSerializer(serializers.ModelSerializer):
         return get_atcoder_rating_color(obj.current_rating)
 
 
+class PublicProfileLeetCodeStatsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeetCodeStats
+        fields = (
+            "display_name",
+            "country",
+            "organization",
+            "school",
+            "global_problem_ranking",
+            "reputation",
+            "solved_total",
+            "solved_easy",
+            "solved_medium",
+            "solved_hard",
+            "problem_stats_complete",
+            "current_contest_rating",
+            "attended_contest_count",
+            "contest_global_ranking",
+            "contest_top_percentage",
+            "data_updated_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
 class PublicProfilePlatformSerializer(serializers.ModelSerializer):
     stats = serializers.SerializerMethodField()
     handle_validated = serializers.SerializerMethodField()
@@ -120,6 +150,12 @@ class PublicProfilePlatformSerializer(serializers.ModelSerializer):
             except AtCoderStats.DoesNotExist:
                 return None
             return PublicProfileAtCoderStatsSerializer(stats).data
+        if obj.platform == PlatformAccount.Platform.LEETCODE:
+            try:
+                stats = obj.leetcode_stats
+            except LeetCodeStats.DoesNotExist:
+                return None
+            return PublicProfileLeetCodeStatsSerializer(stats).data
         return None
 
     def get_handle_validated(self, obj: PlatformAccount) -> bool:

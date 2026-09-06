@@ -9,9 +9,9 @@ from apps.connectors.models import (
     AtCoderStats,
     AtCoderSubmission,
     CodeforcesStats,
+    LeetCodeStats,
     PlatformAccount,
 )
-
 
 User = get_user_model()
 
@@ -42,7 +42,7 @@ class CompetitiveProgrammingOverviewTests(APITestCase):
         self.assertTrue(response.data["summary"]["solved_count_complete"])
         self.assertEqual(
             [item["platform"] for item in response.data["platforms"]],
-            ["codeforces", "atcoder"],
+            ["codeforces", "atcoder", "leetcode"],
         )
         self.assertTrue(
             all(not item["connected"] for item in response.data["platforms"])
@@ -166,3 +166,69 @@ class CompetitiveProgrammingOverviewTests(APITestCase):
         self.assertTrue(summary["solved_count_complete"])
         self.assertEqual(len(response.data["recent_activity"]), 20)
         self.assertEqual(response.data["recent_activity"][0]["id"], "atcoder-1")
+
+    def test_leetcode_contributes_only_comparable_unified_metrics(self):
+        codeforces = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CODEFORCES,
+            handle="cf-user",
+        )
+        CodeforcesStats.objects.create(
+            platform_account=codeforces,
+            handle="cf-user",
+            solved_count=100,
+            accepted_submission_count=120,
+            contest_count=20,
+        )
+        leetcode = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.LEETCODE,
+            handle="lc-user",
+        )
+        LeetCodeStats.objects.create(
+            platform_account=leetcode,
+            solved_total=80,
+            solved_easy=40,
+            solved_medium=30,
+            solved_hard=10,
+            problem_stats_complete=True,
+            current_contest_rating=1842.75,
+            attended_contest_count=12,
+            data_updated_at=timezone.now(),
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(self.url)
+
+        summary = response.data["summary"]
+        self.assertEqual(summary["active_platforms"], 2)
+        self.assertEqual(summary["solved_count"], 180)
+        self.assertTrue(summary["solved_count_complete"])
+        self.assertEqual(summary["contest_count"], 32)
+        self.assertEqual(summary["accepted_submission_count"], 120)
+        self.assertFalse(summary["accepted_submission_count_complete"])
+        leetcode_summary = response.data["platforms"][2]
+        self.assertEqual(leetcode_summary["rating"], 1842.75)
+        self.assertEqual(
+            leetcode_summary["problem_breakdown"],
+            {"easy": 40, "medium": 30, "hard": 10},
+        )
+
+    def test_leetcode_only_incomplete_stats_propagate_completeness(self):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.LEETCODE,
+            handle="lc-only",
+        )
+        LeetCodeStats.objects.create(
+            platform_account=account,
+            solved_total=40,
+            problem_stats_complete=False,
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.data["summary"]["active_platforms"], 1)
+        self.assertEqual(response.data["summary"]["solved_count"], 40)
+        self.assertFalse(response.data["summary"]["solved_count_complete"])
