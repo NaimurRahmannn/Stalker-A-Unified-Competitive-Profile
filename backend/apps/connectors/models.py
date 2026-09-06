@@ -139,6 +139,97 @@ class AtCoderStats(models.Model):
         return f"AtCoder stats for {self.platform_account.handle}"
 
 
+class LeetCodeStats(models.Model):
+    platform_account = models.OneToOneField(
+        PlatformAccount,
+        on_delete=models.CASCADE,
+        related_name="leetcode_stats",
+    )
+    display_name = models.CharField(max_length=255, blank=True, null=True)
+    avatar_url = models.URLField(max_length=500, blank=True, null=True)
+    country = models.CharField(max_length=255, blank=True, null=True)
+    organization = models.CharField(max_length=255, blank=True, null=True)
+    school = models.CharField(max_length=255, blank=True, null=True)
+    global_problem_ranking = models.PositiveIntegerField(blank=True, null=True)
+    reputation = models.PositiveIntegerField(blank=True, null=True)
+
+    solved_total = models.PositiveIntegerField(default=0)
+    solved_easy = models.PositiveIntegerField(default=0)
+    solved_medium = models.PositiveIntegerField(default=0)
+    solved_hard = models.PositiveIntegerField(default=0)
+    problem_stats_complete = models.BooleanField(default=False)
+
+    current_contest_rating = models.FloatField(blank=True, null=True)
+    attended_contest_count = models.PositiveIntegerField(default=0)
+    contest_global_ranking = models.PositiveIntegerField(blank=True, null=True)
+    contest_total_participants = models.PositiveIntegerField(blank=True, null=True)
+    contest_top_percentage = models.FloatField(blank=True, null=True)
+    rating_history = models.JSONField(default=list, blank=True)
+
+    data_updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def clean(self):
+        if (
+            self.platform_account_id
+            and self.platform_account.platform != PlatformAccount.Platform.LEETCODE
+        ):
+            raise ValidationError(
+                "LeetCode stats can only be attached to LeetCode accounts."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"LeetCode stats for {self.platform_account.handle}"
+
+
+class LeetCodeSyncState(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        SUCCESS = "success", "Success"
+        FAILED = "failed", "Failed"
+
+    platform_account = models.OneToOneField(
+        PlatformAccount,
+        on_delete=models.CASCADE,
+        related_name="leetcode_sync_state",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    last_attempted_at = models.DateTimeField(blank=True, null=True)
+    last_successful_at = models.DateTimeField(blank=True, null=True)
+    failure_reason = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if (
+            self.platform_account_id
+            and self.platform_account.platform != PlatformAccount.Platform.LEETCODE
+        ):
+            raise ValidationError(
+                "LeetCode sync state can only be attached to LeetCode accounts."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"LeetCode sync state for {self.platform_account.handle}"
+
+
 class AtCoderSyncState(models.Model):
     class OverallStatus(models.TextChoices):
         NEVER = "never", "Never synchronized"
@@ -355,7 +446,7 @@ class PlatformStatsSnapshot(models.Model):
         related_name="stats_snapshots",
     )
     captured_at = models.DateTimeField(default=timezone.now)
-    rating = models.IntegerField(blank=True, null=True)
+    rating = models.FloatField(blank=True, null=True)
     solved_count = models.PositiveIntegerField(blank=True, null=True)
     contest_count = models.PositiveIntegerField(default=0)
     metadata = models.JSONField(default=dict, blank=True)

@@ -6,6 +6,8 @@ from apps.connectors.models import (
     AtCoderSubmissionSyncState,
     AtCoderSyncState,
     CodeforcesStats,
+    LeetCodeStats,
+    LeetCodeSyncState,
     PlatformAccount,
     PlatformRatingEvent,
     PlatformStatsSnapshot,
@@ -146,3 +148,5 @@ class AtCoderSubmissionAdmin(admin.ModelAdmin):
 
 
 admin.site.register(PlatformStatsSnapshot)
+admin.site.register(LeetCodeStats)
+admin.site.register(LeetCodeSyncState)

@@ -185,6 +185,16 @@ LEETCODE_ALFA_READ_TIMEOUT_SECONDS = config(
     default=10.0,
     cast=float,
 )
+LEETCODE_SYNC_ENABLED = config(
+    "LEETCODE_SYNC_ENABLED",
+    default=False,
+    cast=bool,
+)
+LEETCODE_SYNC_COOLDOWN_SECONDS = config(
+    "LEETCODE_SYNC_COOLDOWN_SECONDS",
+    default=86400,
+    cast=int,
+)
 
 ATCODER_PROBLEMS_SYNC_ENABLED = config(
     "ATCODER_PROBLEMS_SYNC_ENABLED",

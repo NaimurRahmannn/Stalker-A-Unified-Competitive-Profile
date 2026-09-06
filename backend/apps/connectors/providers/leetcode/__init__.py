@@ -6,6 +6,7 @@ from apps.connectors.providers.leetcode.domain import (
     LeetCodeProblemStatsData,
     LeetCodeProfileData,
     LeetCodeRatingEventData,
+    LeetCodeSyncData,
 )
 from apps.connectors.providers.leetcode.provider import LeetCodeProvider
 
@@ -16,4 +17,5 @@ __all__ = [
     "LeetCodeProfileData",
     "LeetCodeProvider",
     "LeetCodeRatingEventData",
+    "LeetCodeSyncData",
 ]

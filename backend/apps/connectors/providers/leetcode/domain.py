@@ -43,3 +43,13 @@ class LeetCodeRatingEventData:
     total_problems: int | None
     finish_time_seconds: int | None
     attended: bool
+
+
+@dataclass(frozen=True, slots=True)
+class LeetCodeSyncData:
+    """Complete provider-independent payload required for one atomic sync."""
+
+    profile: LeetCodeProfileData
+    problem_stats: LeetCodeProblemStatsData
+    contest_stats: LeetCodeContestStatsData
+    rating_history: tuple[LeetCodeRatingEventData, ...]
