@@ -120,4 +120,3 @@ class AlfaLeetCodeMapperTests(SimpleTestCase):
             map_alfa_problem_stats(invalid_count)
         with self.assertRaises(LeetCodeInvalidResponseError):
             map_alfa_contest_stats(invalid_rating)
-

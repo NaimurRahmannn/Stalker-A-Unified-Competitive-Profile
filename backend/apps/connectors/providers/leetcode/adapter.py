@@ -33,4 +33,3 @@ class LeetCodeAlfaAdapter:
         handle: str,
     ) -> tuple[LeetCodeRatingEventData, ...]:
         return map_alfa_rating_history(self.client.get_rating_history(handle))
-

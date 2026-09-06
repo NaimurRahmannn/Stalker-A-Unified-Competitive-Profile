@@ -35,4 +35,3 @@ class LeetCodeProviderAccessError(ProviderAccessDeniedError):
 
 class LeetCodeProviderRateLimitError(ProviderRateLimitError):
     """Raised when the configured LeetCode provider throttles STALKER."""
-

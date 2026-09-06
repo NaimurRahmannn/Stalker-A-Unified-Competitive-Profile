@@ -54,4 +54,3 @@ RATING_HISTORY_PAYLOAD = {
         },
     ]
 }
-

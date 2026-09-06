@@ -43,4 +43,3 @@ class LeetCodeRatingEventData:
     total_problems: int | None
     finish_time_seconds: int | None
     attended: bool
-

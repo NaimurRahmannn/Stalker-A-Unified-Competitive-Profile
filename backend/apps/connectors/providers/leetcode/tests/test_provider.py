@@ -47,4 +47,3 @@ class LeetCodeAlfaAdapterTests(SimpleTestCase):
         self.client.get_problem_stats.assert_called_once_with("user")
         self.client.get_contest_stats.assert_called_once_with("user")
         self.client.get_rating_history.assert_called_once_with("user")
-

@@ -183,4 +183,3 @@ def map_alfa_rating_history(
 
     events.sort(key=lambda event: (event.occurred_at, event.contest_title))
     return tuple(events)
-
