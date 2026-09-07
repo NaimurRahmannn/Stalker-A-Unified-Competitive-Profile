@@ -8,6 +8,7 @@ from apps.connectors.views import (
     LeetCodeAnalyticsView,
     PlatformAccountViewSet,
 )
+from apps.connectors.views_graphql import LeetCodeGraphQLProxyView
 
 router = DefaultRouter()
 router.register(
@@ -17,6 +18,11 @@ router.register(
 )
 
 urlpatterns = [
+    path(
+        "connectors/leetcode/graphql/",
+        LeetCodeGraphQLProxyView.as_view(),
+        name="leetcode-graphql-proxy",
+    ),
     path(
         "competitive-programming/overview/",
         CompetitiveProgrammingOverviewView.as_view(),

@@ -53,6 +53,18 @@ function ProviderStats({ account }: { account: PlatformAccount }) {
     );
   }
 
+  if (account.platform === "leetcode" && account.leetcode_stats) {
+    const stats = account.leetcode_stats;
+    return (
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatTile label="Total solved" value={String(stats.solved_total)} />
+        <StatTile label="Easy / Med / Hard" value={`${stats.solved_easy} / ${stats.solved_medium} / ${stats.solved_hard}`} />
+        <StatTile label="Contest rating" value={stats.current_contest_rating === null ? "Unrated" : String(Math.round(stats.current_contest_rating))} />
+        <StatTile label="Contests" value={String(stats.attended_contest_count)} />
+      </div>
+    );
+  }
+
   return (
     <p className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2.5 text-xs font-medium text-slate-500">
       {formatPlatformName(account.platform)} is connected but has not been synced yet. Run a sync to validate the handle and load real stats.
@@ -93,7 +105,7 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
         ? "Sync unavailable"
         : "Sync";
   const platformName = formatPlatformName(account.platform);
-  const logo = account.platform === "atcoder" ? "/images/atcoder_logo.png" : "/images/codeforces_logo.png";
+  const logo = account.platform === "atcoder" ? "/images/atcoder_logo.png" : account.platform === "leetcode" ? "/images/leetcode_logo.png" : "/images/codeforces_logo.png";
 
   const handleSync = async () => {
     if (isSyncDisabled) return;

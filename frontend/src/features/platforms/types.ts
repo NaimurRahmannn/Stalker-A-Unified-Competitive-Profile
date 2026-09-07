@@ -14,7 +14,36 @@ export type CodeforcesStats = {
   updated_at: string;
 };
 
-export type ImplementedCompetitivePlatform = "codeforces" | "atcoder";
+export type ImplementedCompetitivePlatform = "codeforces" | "atcoder" | "leetcode";
+
+export type LeetCodeStats = {
+  display_name: string | null;
+  avatar_url: string | null;
+  country: string | null;
+  organization: string | null;
+  school: string | null;
+  global_problem_ranking: number | null;
+  reputation: number | null;
+  solved_total: number;
+  solved_easy: number;
+  solved_medium: number;
+  solved_hard: number;
+  problem_stats_complete: boolean;
+  current_contest_rating: number | null;
+  attended_contest_count: number;
+  contest_global_ranking: number | null;
+  contest_total_participants: number | null;
+  contest_top_percentage: number | null;
+  data_updated_at: string | null;
+  updated_at: string;
+};
+
+export type LeetCodeSyncState = {
+  status: "pending" | "running" | "success" | "failed";
+  last_attempted_at: string | null;
+  last_successful_at: string | null;
+  failure_reason: string;
+};
 
 export type AtCoderRatingColor =
   | "gray"
@@ -100,6 +129,8 @@ export type PlatformAccount = {
   codeforces_stats: CodeforcesStats | null;
   atcoder_stats: AtCoderStats | null;
   atcoder_sync_state: AtCoderSyncState | null;
+  leetcode_stats: LeetCodeStats | null;
+  leetcode_sync_state: LeetCodeSyncState | null;
   can_sync: boolean;
   sync_cooldown_seconds: number;
 };

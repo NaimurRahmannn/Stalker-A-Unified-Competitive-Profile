@@ -8,10 +8,12 @@ from apps.connectors.base.exceptions import UnsupportedSourceError
 from apps.connectors.models import AtCoderSyncState, PlatformAccount
 from apps.connectors.providers.atcoder.connector import AtCoderConnector
 from apps.connectors.providers.codeforces.connector import CodeforcesConnector
+from apps.connectors.providers.leetcode.connector import LeetCodeConnector
 
 CONNECTOR_REGISTRY: dict[str, BaseConnector] = {
     PlatformAccount.Platform.CODEFORCES: CodeforcesConnector(),
     PlatformAccount.Platform.ATCODER: AtCoderConnector(),
+    PlatformAccount.Platform.LEETCODE: LeetCodeConnector(),
 }
 
 

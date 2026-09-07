@@ -3,6 +3,7 @@ import type {
   CodeforcesAnalyticsResponse,
   CompetitiveActivity,
   CompetitiveOverviewResponse,
+  LeetCodeAnalyticsResponse,
   RatingChartPoint,
 } from "./types";
 
@@ -49,6 +50,18 @@ export function atcoderRatingPoints(
           occurredAt: event.occurred_at,
         }],
   );
+}
+
+export function leetcodeRatingPoints(
+  analytics: LeetCodeAnalyticsResponse,
+): RatingChartPoint[] {
+  return analytics.rating_history.map((event) => ({
+    contestId: `${event.contest_title}-${event.occurred_at}`,
+    contestName: event.contest_title,
+    rating: event.new_rating,
+    ratingChange: event.rating_change,
+    occurredAt: event.occurred_at,
+  }));
 }
 
 export function codeforcesActivity(

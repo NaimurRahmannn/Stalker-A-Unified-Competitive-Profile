@@ -20,7 +20,7 @@ import { PlatformAccountCard } from "./platform-account-card";
 
 function implementedAccounts(accounts: PlatformAccount[]) {
   return accounts.filter(
-    (account) => account.platform === "codeforces" || account.platform === "atcoder",
+    (account) => account.platform === "codeforces" || account.platform === "atcoder" || account.platform === "leetcode",
   );
 }
 
@@ -154,6 +154,8 @@ export function PlatformsManager() {
         } else {
           toast.success("AtCoder analytics updated.");
         }
+      } else if (updated.platform === "leetcode") {
+        toast.success("LeetCode analytics updated.");
       } else {
         toast.success("Codeforces analytics updated.");
       }
@@ -216,7 +218,7 @@ export function PlatformsManager() {
               No platforms connected yet
             </p>
             <p className="mt-1 text-xs font-medium text-slate-500">
-              Add a Codeforces or AtCoder handle above to get started.
+              Add a Codeforces, AtCoder, or LeetCode handle above to get started.
             </p>
           </div>
         ) : (

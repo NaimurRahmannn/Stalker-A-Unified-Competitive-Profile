@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const connectPlatformSchema = z.object({
-  platform: z.enum(["codeforces", "atcoder"]),
+  platform: z.enum(["codeforces", "atcoder", "leetcode"]),
   handle: z
     .string()
     .trim()

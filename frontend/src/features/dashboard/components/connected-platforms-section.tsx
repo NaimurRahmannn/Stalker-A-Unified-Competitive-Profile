@@ -15,7 +15,7 @@ function PlatformMark({ mark }: { mark: ConnectedPlatform["mark"] }) {
   }
 
   const logoSize =
-    mark === "codeforces" || mark === "github" ? "size-8" : "size-9";
+    mark === "codeforces" || mark === "github" || mark === "leetcode" ? "size-8" : "size-9";
 
   return (
     <span className="grid size-11 place-items-center rounded-2xl bg-slate-50">
@@ -91,7 +91,7 @@ function EmptyPlatformsState() {
         No platforms connected yet
       </p>
       <p className="mt-1 text-xs font-medium text-slate-500">
-        Connect Codeforces or AtCoder to start pulling real dashboard stats.
+        Connect Codeforces, AtCoder, or LeetCode to start pulling real dashboard stats.
       </p>
     </div>
   );

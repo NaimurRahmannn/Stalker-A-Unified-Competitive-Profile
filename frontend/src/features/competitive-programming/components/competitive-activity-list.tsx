@@ -30,7 +30,7 @@ export function CompetitiveActivityList({
             const positive = item.type === "rating_change" ? (item.ratingChange ?? 0) >= 0 : item.accepted;
             return (
               <article key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                {showPlatform ? <span className="mt-1 inline-flex h-6 min-w-7 items-center justify-center rounded-md bg-slate-100 px-1 text-[9px] font-bold text-slate-600">{item.platform === "codeforces" ? "CF" : "AC"}</span> : null}
+                {showPlatform ? <span className="mt-1 inline-flex h-6 min-w-7 items-center justify-center rounded-md bg-slate-100 px-1 text-[9px] font-bold text-slate-600">{item.platform === "codeforces" ? "CF" : item.platform === "leetcode" ? "LC" : "AC"}</span> : null}
                 <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl ${positive ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}><Icon className="size-4" /></span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><h3 className="min-w-0 truncate text-xs font-semibold text-slate-900">{item.title}</h3><time dateTime={item.occurredAt} className="shrink-0 text-[10px] text-slate-500">{formatRelativeTime(item.occurredAt)}</time></div>

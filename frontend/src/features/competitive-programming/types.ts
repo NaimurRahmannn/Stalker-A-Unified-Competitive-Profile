@@ -153,6 +153,81 @@ export type AtCoderAnalyticsResponse = {
   snapshots: AtCoderSnapshot[];
 };
 
+export type LeetCodeAnalyticsAccount = Omit<
+  CodeforcesAnalyticsAccount,
+  "platform"
+> & {
+  platform: "leetcode";
+};
+
+export type LeetCodeStats = {
+  display_name: string | null;
+  avatar_url: string | null;
+  country: string | null;
+  organization: string | null;
+  school: string | null;
+  global_problem_ranking: number | null;
+  reputation: number | null;
+  solved_total: number;
+  solved_easy: number;
+  solved_medium: number;
+  solved_hard: number;
+  problem_stats_complete: boolean;
+  current_contest_rating: number | null;
+  attended_contest_count: number;
+  contest_global_ranking: number | null;
+  contest_total_participants: number | null;
+  contest_top_percentage: number | null;
+  data_updated_at: string | null;
+  updated_at: string;
+};
+
+export type LeetCodeSyncStatus =
+  | "never_synced"
+  | "pending"
+  | "running"
+  | "success"
+  | "failed";
+
+export type LeetCodeAnalyticsSync = {
+  status: LeetCodeSyncStatus;
+  updated_at: string | null;
+  attempted_at: string | null;
+  successful_at: string | null;
+  using_cached_data: boolean;
+  error_code: string | null;
+};
+
+export type LeetCodeRatingEvent = {
+  platform: "leetcode";
+  contest_title: string;
+  occurred_at: string;
+  old_rating: number | null;
+  new_rating: number;
+  rating_change: number | null;
+  ranking: number | null;
+  problems_solved: number | null;
+  total_problems: number | null;
+  finish_time_seconds: number | null;
+};
+
+export type LeetCodeSnapshot = {
+  captured_at: string;
+  rating: number | null;
+  solved_count: number | null;
+  contest_count: number;
+};
+
+export type LeetCodeAnalyticsResponse = {
+  platform: "leetcode";
+  account: LeetCodeAnalyticsAccount | null;
+  sync: LeetCodeAnalyticsSync | null;
+  stats: LeetCodeStats | null;
+  rating_history: LeetCodeRatingEvent[];
+  recent_activity: [];
+  snapshots: LeetCodeSnapshot[];
+};
+
 export type RatingChartPoint = {
   contestId: string;
   contestName: string;
@@ -164,7 +239,7 @@ export type RatingChartPoint = {
 
 export type CompetitiveActivity = {
   id: string;
-  platform: "codeforces" | "atcoder";
+  platform: "codeforces" | "atcoder" | "leetcode";
   type: "submission" | "problem_solved" | "rating_change" | "contest";
   title: string;
   subtitle: string | null;
@@ -185,7 +260,7 @@ export type CompetitiveOverviewSummary = {
 };
 
 export type CompetitivePlatformSummary = {
-  platform: "codeforces" | "atcoder";
+  platform: "codeforces" | "atcoder" | "leetcode";
   connected: boolean;
   account_id: number | null;
   handle: string | null;
@@ -203,7 +278,7 @@ export type CompetitivePlatformSummary = {
 
 export type CompetitiveOverviewActivity = {
   id: string;
-  platform: "codeforces" | "atcoder";
+  platform: "codeforces" | "atcoder" | "leetcode";
   type: CompetitiveActivity["type"];
   title: string;
   subtitle: string | null;

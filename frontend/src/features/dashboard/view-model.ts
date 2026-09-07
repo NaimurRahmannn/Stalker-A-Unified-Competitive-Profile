@@ -53,7 +53,7 @@ function formatNumber(value: number | null, fallback: string): string {
 }
 
 function isSupportedPlatform(platform: DashboardPlatform): boolean {
-  return platform.platform === "codeforces" || platform.platform === "atcoder";
+  return platform.platform === "codeforces" || platform.platform === "atcoder" || platform.platform === "leetcode";
 }
 
 function pluralize(value: number, singular: string, plural = `${singular}s`) {
@@ -214,7 +214,7 @@ function buildCompetitiveProgrammingJourney(
     return {
       ...baseItem,
       value: "Not connected",
-      label: "Connect Codeforces or AtCoder",
+      label: "Connect Codeforces, AtCoder, or LeetCode",
       note: "No competitive platform is connected yet.",
       actionLabel: "Connect Platform",
       actionHref: "/platforms",
@@ -240,8 +240,8 @@ function buildCompetitiveProgrammingJourney(
     label: summary.solved_count_complete ? "Problems Solved" : "Known Problems Solved",
     note: summary.solved_count_complete ? `${connected.length} active ${pluralize(connected.length, "platform")}` : "AtCoder history is still indexing.",
     stats: connected.flatMap((platform) => [
-      { value: formatNumber(platform.rating, "Unrated"), label: `${platform.platform === "codeforces" ? "Codeforces" : "AtCoder"} rating` },
-      { value: platform.rank ?? "Unranked", label: `${platform.platform === "codeforces" ? "CF" : "AC"} rank` },
+      { value: formatNumber(platform.rating, "Unrated"), label: `${platform.platform === "codeforces" ? "Codeforces" : platform.platform === "leetcode" ? "LeetCode" : "AtCoder"} rating` },
+      { value: platform.rank ?? "Unranked", label: `${platform.platform === "codeforces" ? "CF" : platform.platform === "leetcode" ? "LC" : "AC"} rank` },
     ]),
     actionLabel: "View Details",
     actionHref: "/competitive-programming",
@@ -303,7 +303,7 @@ function buildNextSteps(
   if (competitiveAccounts.length === 0) {
     steps.push({
       title: "Connect a competitive platform",
-      subtitle: "Add Codeforces or AtCoder progress to the dashboard.",
+      subtitle: "Add Codeforces, AtCoder, or LeetCode progress to the dashboard.",
       icon: Code2,
       accent: "green",
     });

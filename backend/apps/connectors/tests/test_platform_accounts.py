@@ -299,10 +299,10 @@ class PlatformAccountAPITests(APITestCase):
         self.assertEqual(stats.rating, 3900)
         self.assertEqual(stats.solved_count, 2000)
 
-    def test_sync_fails_if_platform_is_not_codeforces(self):
+    def test_sync_fails_if_platform_is_not_supported(self):
         account = PlatformAccount.objects.create(
             user=self.user,
-            platform=PlatformAccount.Platform.LEETCODE,
+            platform=PlatformAccount.Platform.GITHUB,
             handle="niamur",
         )
         self.authenticate()

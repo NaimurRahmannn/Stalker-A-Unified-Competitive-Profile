@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { formatDashboardPlatformName, getPlatformMark } from "@/features/dashboard/data";
 import type { MetricAccent, PlatformMark } from "@/features/dashboard/types";
 import { formatRelativeTime } from "@/lib/utils";
-import type { PublicAtCoderStats, PublicCodeforcesStats, PublicProfilePlatform, PublicProfileResponse, PublicProfileUser } from "./types";
+import type { PublicAtCoderStats, PublicCodeforcesStats, PublicLeetCodeStats, PublicProfilePlatform, PublicProfileResponse, PublicProfileUser } from "./types";
 
 export type ProfileSocialLink = { label: string; href: string; kind: "github" | "linkedin" };
 export type ProfileHeroView = { displayName: string; username: string; initials: string; avatarUrl: string | null; bio: string | null; country: string | null; institution: string | null; socialLinks: ProfileSocialLink[] };
@@ -15,7 +15,7 @@ export type DomainCardView = { key: "ctf" | "hackathon" | "datathon"; title: str
 export type PerformanceSummaryView = { lastActive: string; memberSince: string };
 export type PublicProfileViewModel = { hero: ProfileHeroView; summaryMetrics: ProfileMetricView[]; platforms: PublicPlatformView[]; competitivePlatforms: PublicPlatformView[]; competitiveMetrics: CompetitiveMetricView[]; domainCards: DomainCardView[]; performance: PerformanceSummaryView };
 
-const competitiveSlugs = new Set(["codeforces", "atcoder"]);
+const competitiveSlugs = new Set(["codeforces", "atcoder", "leetcode"]);
 function hasText(value: string | null | undefined): value is string { return typeof value === "string" && value.trim().length > 0; }
 function text(value: string | null | undefined): string | null { return hasText(value) ? value.trim() : null; }
 function formatNumber(value: number | null | undefined, fallback = "—") { return value == null ? fallback : new Intl.NumberFormat("en").format(value); }
@@ -28,6 +28,7 @@ function oldestDate(values: Array<string | null | undefined>) { return values.re
 function initialsFor(user: PublicProfileUser) { const source = text(user.full_name) ?? user.username; const parts = source.split(/\s+/).filter(Boolean); return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : source.slice(0, 2)).toUpperCase(); }
 function isCodeforcesStats(stats: PublicProfilePlatform["stats"]): stats is PublicCodeforcesStats { return stats !== null && "rating" in stats; }
 function isAtCoderStats(stats: PublicProfilePlatform["stats"]): stats is PublicAtCoderStats { return stats !== null && "current_rating" in stats; }
+function isLeetCodeStats(stats: PublicProfilePlatform["stats"]): stats is PublicLeetCodeStats { return stats !== null && "solved_total" in stats; }
 
 function buildHero(user: PublicProfileUser): ProfileHeroView {
   const socialLinks: ProfileSocialLink[] = [];
@@ -40,13 +41,14 @@ function buildPlatform(platform: PublicProfilePlatform): PublicPlatformView {
   const stats = platform.stats;
   const codeforces = isCodeforcesStats(stats) ? stats : null;
   const atcoder = isAtCoderStats(stats) ? stats : null;
-  const solved = codeforces ? formatNumber(codeforces.solved_count) : atcoder ? `${formatNumber(atcoder.solved_count)}${atcoder.submission_stats_complete ? "" : " indexed"}` : "—";
+  const leetcode = isLeetCodeStats(stats) ? stats : null;
+  const solved = codeforces ? formatNumber(codeforces.solved_count) : atcoder ? `${formatNumber(atcoder.solved_count)}${atcoder.submission_stats_complete ? "" : " indexed"}` : leetcode ? formatNumber(leetcode.solved_total) : "—";
   return {
     id: platform.id, slug: platform.platform.toLowerCase(), name: formatDashboardPlatformName(platform.platform), handle: formatHandle(platform.handle), handleValid: platform.handle_validated, mark: getPlatformMark(platform.platform), profileUrl: text(platform.profile_url), lastSyncedLabel: relativeDate(platform.last_synced_at),
-    rating: codeforces ? formatNumber(codeforces.rating, "Unrated") : atcoder ? formatNumber(atcoder.current_rating, "Unrated") : "—",
-    maxRating: codeforces ? formatNumber(codeforces.max_rating, "Unrated") : atcoder ? formatNumber(atcoder.max_rating, "Unrated") : "—",
-    rank: codeforces ? text(codeforces.rank) ?? "Unranked" : atcoder ? atcoder.rating_color ?? "Unrated" : "—",
-    solved, contests: codeforces ? formatNumber(codeforces.contest_count) : atcoder ? formatNumber(atcoder.rated_contest_count) : "—", hasDetailedStats: Boolean(stats),
+    rating: codeforces ? formatNumber(codeforces.rating, "Unrated") : atcoder ? formatNumber(atcoder.current_rating, "Unrated") : leetcode ? (leetcode.current_contest_rating === null ? "Unrated" : formatNumber(Math.round(leetcode.current_contest_rating))) : "—",
+    maxRating: codeforces ? formatNumber(codeforces.max_rating, "Unrated") : atcoder ? formatNumber(atcoder.max_rating, "Unrated") : leetcode ? (leetcode.current_contest_rating === null ? "Unrated" : formatNumber(Math.round(leetcode.current_contest_rating))) : "—",
+    rank: codeforces ? text(codeforces.rank) ?? "Unranked" : atcoder ? atcoder.rating_color ?? "Unrated" : leetcode ? (leetcode.contest_top_percentage !== null ? `Top ${leetcode.contest_top_percentage.toFixed(1)}%` : "—") : "—",
+    solved, contests: codeforces ? formatNumber(codeforces.contest_count) : atcoder ? formatNumber(atcoder.rated_contest_count) : leetcode ? formatNumber(leetcode.attended_contest_count) : "—", hasDetailedStats: Boolean(stats),
   };
 }
 

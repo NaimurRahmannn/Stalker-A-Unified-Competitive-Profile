@@ -19,6 +19,18 @@ export type PublicAtCoderStats = {
   updated_at: string;
 };
 
+export type PublicLeetCodeStats = {
+  solved_total: number;
+  solved_easy: number;
+  solved_medium: number;
+  solved_hard: number;
+  current_contest_rating: number | null;
+  attended_contest_count: number;
+  global_problem_ranking: number | null;
+  contest_top_percentage: number | null;
+  updated_at: string;
+};
+
 export interface PublicProfileUser {
   id: number;
   username: string;
@@ -44,7 +56,7 @@ export interface PublicProfilePlatform {
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
-  stats: PublicCodeforcesStats | PublicAtCoderStats | null;
+  stats: PublicCodeforcesStats | PublicAtCoderStats | PublicLeetCodeStats | null;
 }
 
 export interface PublicProfileResponse {

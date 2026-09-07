@@ -8,7 +8,7 @@ import { PerformanceSummary } from "./performance-summary";
 
 const tabs = [
   { label: "All Platforms", value: "all" }, { label: "Codeforces", value: "codeforces" },
-  { label: "AtCoder", value: "atcoder" },
+  { label: "AtCoder", value: "atcoder" }, { label: "LeetCode", value: "leetcode" },
 ];
 const metricIcons = [CheckCircle2, ClipboardList, ShieldCheck, Trophy, Box];
 const metricStyles = ["bg-emerald-50 text-emerald-600", "bg-blue-50 text-blue-600", "bg-violet-50 text-violet-600", "bg-orange-50 text-orange-600", "bg-sky-50 text-sky-600"];

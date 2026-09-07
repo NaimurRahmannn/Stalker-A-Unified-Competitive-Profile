@@ -113,17 +113,23 @@ class AlfaLeetCodeClient:
             raise LeetCodeProviderAccessError(
                 "The LeetCode provider rejected access. Check provider configuration."
             )
-        if response.status_code == 429:
-            self._log_failure(operation, "rate_limited", response.status_code)
-            raise LeetCodeProviderRateLimitError(
-                "The LeetCode provider rate limit was reached."
-            )
-        if response.status_code >= 500:
+        if response.status_code in (429, 500, 502, 503, 504):
+            fallback = self._fetch_fallback_graphql(normalized_handle, operation)
+            if fallback is not None:
+                return fallback
+            if response.status_code == 429:
+                self._log_failure(operation, "rate_limited", response.status_code)
+                raise LeetCodeProviderRateLimitError(
+                    "The LeetCode provider rate limit was reached."
+                )
             self._log_failure(operation, "server_error", response.status_code)
             raise LeetCodeProviderUnavailableError(
                 "The LeetCode provider is temporarily unavailable."
             )
         if response.status_code != 200:
+            fallback = self._fetch_fallback_graphql(normalized_handle, operation)
+            if fallback is not None:
+                return fallback
             self._log_failure(operation, "unexpected_status", response.status_code)
             raise LeetCodeProviderUnavailableError(
                 f"The LeetCode provider returned HTTP {response.status_code}."
@@ -229,3 +235,120 @@ class AlfaLeetCodeClient:
                 "error_category": error_category,
             },
         )
+
+    def _fetch_fallback_graphql(self, handle: str, operation: str) -> dict[str, Any] | None:
+        url = getattr(settings, "LEETCODE_GRAPHQL_URL", "https://leetcode.com/graphql")
+        headers = {
+            "User-Agent": self.user_agent,
+            "Content-Type": "application/json",
+            "Referer": "https://leetcode.com",
+        }
+        api_key = getattr(settings, "LEETCODE_GRAPHQL_API_KEY", "")
+        if api_key:
+            headers["X-API-Key"] = api_key
+            headers["Authorization"] = f"Bearer {api_key}"
+        query = """
+        query getUserProfile($username: String!) {
+          matchedUser(username: $username) {
+            username
+            profile {
+              realName
+              userAvatar
+              ranking
+              reputation
+            }
+            submitStatsGlobal {
+              acSubmissionNum {
+                difficulty
+                count
+              }
+            }
+          }
+          userContestRanking(username: $username) {
+            attendedContestsCount
+            rating
+            globalRanking
+            totalParticipants
+            topPercentage
+          }
+          userContestRankingHistory(username: $username) {
+            attended
+            rating
+            ranking
+            contest {
+              title
+              startTime
+            }
+          }
+        }
+        """
+        try:
+            resp = self.session.post(
+                url,
+                json={"query": query, "variables": {"username": handle}},
+                headers=headers,
+                timeout=self.timeout,
+            )
+            if resp.status_code != 200:
+                return None
+            data = resp.json().get("data", {})
+            matched = data.get("matchedUser")
+            if not matched:
+                raise LeetCodeUserNotFoundError("LeetCode user not found.")
+
+            if operation == "profile":
+                profile_data = matched.get("profile", {})
+                return {
+                    "username": matched.get("username", handle),
+                    "name": profile_data.get("realName"),
+                    "avatar": profile_data.get("userAvatar"),
+                    "ranking": profile_data.get("ranking"),
+                    "reputation": profile_data.get("reputation"),
+                }
+
+            if operation == "problem_stats":
+                submit_stats = matched.get("submitStatsGlobal", {}).get("acSubmissionNum", [])
+                stats_map = {
+                    item.get("difficulty"): item.get("count", 0)
+                    for item in submit_stats
+                    if isinstance(item, dict)
+                }
+                return {
+                    "solvedProblem": stats_map.get("All", 0),
+                    "easySolved": stats_map.get("Easy", 0),
+                    "mediumSolved": stats_map.get("Medium", 0),
+                    "hardSolved": stats_map.get("Hard", 0),
+                }
+
+            if operation == "contest_stats":
+                contest_data = data.get("userContestRanking") or {}
+                return {
+                    "contestRating": contest_data.get("rating"),
+                    "contestAttend": contest_data.get("attendedContestsCount", 0),
+                    "contestGlobalRanking": contest_data.get("globalRanking"),
+                    "totalParticipants": contest_data.get("totalParticipants"),
+                    "contestTopPercentage": contest_data.get("topPercentage"),
+                }
+
+            if operation == "rating_history":
+                contest_history = data.get("userContestRankingHistory") or []
+                return {
+                    "contestHistory": [
+                        {
+                            "attended": item.get("attended", True),
+                            "rating": item.get("rating"),
+                            "ranking": item.get("ranking"),
+                            "contest": {
+                                "title": item.get("contest", {}).get("title"),
+                                "startTime": item.get("contest", {}).get("startTime"),
+                            },
+                        }
+                        for item in contest_history
+                        if isinstance(item, dict) and item.get("attended")
+                    ]
+                }
+        except LeetCodeUserNotFoundError:
+            raise
+        except Exception:
+            pass
+        return None

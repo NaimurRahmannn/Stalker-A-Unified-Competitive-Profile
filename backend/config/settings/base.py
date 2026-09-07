@@ -174,7 +174,18 @@ STALKER_EXTERNAL_USER_AGENT = config(
     ),
 )
 
-LEETCODE_ALFA_BASE_URL = config("LEETCODE_ALFA_BASE_URL", default="")
+LEETCODE_ALFA_BASE_URL = config(
+    "LEETCODE_ALFA_BASE_URL",
+    default="https://alfa-leetcode-api.onrender.com",
+)
+LEETCODE_GRAPHQL_URL = config(
+    "LEETCODE_GRAPHQL_URL",
+    default="https://leetcode.com/graphql",
+)
+LEETCODE_GRAPHQL_API_KEY = config(
+    "LEETCODE_GRAPHQL_API_KEY",
+    default="",
+)
 LEETCODE_ALFA_CONNECT_TIMEOUT_SECONDS = config(
     "LEETCODE_ALFA_CONNECT_TIMEOUT_SECONDS",
     default=3.05,
@@ -187,7 +198,7 @@ LEETCODE_ALFA_READ_TIMEOUT_SECONDS = config(
 )
 LEETCODE_SYNC_ENABLED = config(
     "LEETCODE_SYNC_ENABLED",
-    default=False,
+    default=True,
     cast=bool,
 )
 LEETCODE_SYNC_COOLDOWN_SECONDS = config(

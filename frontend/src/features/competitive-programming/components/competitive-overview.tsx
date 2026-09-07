@@ -11,9 +11,23 @@ function SummaryMetric({ label, value, note, icon: Icon, style }: { label: strin
   return <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.035)]"><div className="flex min-h-16 items-center gap-4"><span className={`grid size-12 shrink-0 place-items-center rounded-2xl ${style}`}><Icon className="size-5" /></span><div className="min-w-0"><strong className="block truncate text-2xl font-semibold text-slate-950">{value}</strong><span className="mt-1 block text-xs font-medium text-slate-600">{label}</span>{note ? <span className="mt-0.5 block text-[9px] text-amber-700">{note}</span> : null}</div></div></article>;
 }
 
+function platformDisplayName(slug: string) {
+  if (slug === "codeforces") return "Codeforces";
+  if (slug === "atcoder") return "AtCoder";
+  if (slug === "leetcode") return "LeetCode";
+  return slug;
+}
+
+function platformLogo(slug: string) {
+  if (slug === "codeforces") return "/images/codeforces_logo.png";
+  if (slug === "atcoder") return "/images/atcoder_logo.png";
+  if (slug === "leetcode") return "/images/leetcode_logo.png";
+  return "/images/codeforces_logo.png";
+}
+
 function PlatformCard({ platform, onView }: { platform: CompetitivePlatformSummary; onView: () => void }) {
-  const name = platform.platform === "codeforces" ? "Codeforces" : "AtCoder";
-  const logo = platform.platform === "codeforces" ? "/images/codeforces_logo.png" : "/images/atcoder_logo.png";
+  const name = platformDisplayName(platform.platform);
+  const logo = platformLogo(platform.platform);
   if (!platform.connected) {
     return <article className="flex min-h-54 flex-col rounded-2xl border border-dashed border-slate-300 bg-white p-5"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-slate-50"><Image src={logo} alt={`${name} logo`} width={32} height={32} className="size-8 object-contain" /></span><h3 className="font-semibold text-slate-950">{name}</h3></div><p className="mt-5 text-sm font-medium text-slate-700">Not connected</p><p className="mt-1 text-xs leading-5 text-slate-500">Connect {name} to include it in your competitive profile.</p><Link href="/platforms" className="mt-auto inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">Connect {name}<ArrowRight className="size-3.5" /></Link></article>;
   }
@@ -21,7 +35,7 @@ function PlatformCard({ platform, onView }: { platform: CompetitivePlatformSumma
   return <article className="flex min-h-54 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.035)]"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-slate-50"><Image src={logo} alt={`${name} logo`} width={32} height={32} className="size-8 object-contain" /></span><div><h3 className="font-semibold text-slate-950">{name}</h3><p className="text-[10px] text-slate-500">@{platform.handle}</p></div></div><div className="mt-5"><p className="text-2xl font-semibold capitalize text-slate-950">{platform.rating === null ? "Unrated" : number.format(platform.rating)}{platform.rank ? <span className="text-sm font-medium text-slate-500"> · {platform.rank}</span> : null}</p><p className="mt-2 text-xs font-medium text-slate-600">{solved}</p><p className="mt-1 text-xs text-slate-500">{platform.contest_count ?? "—"} {platform.contest_label.toLowerCase()}</p></div><button type="button" onClick={onView} className="mt-auto inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">View analytics<ArrowRight className="size-3.5" /></button></article>;
 }
 
-export function CompetitiveOverview({ overview, onSelectPlatform }: { overview: CompetitiveOverviewResponse; onSelectPlatform: (platform: "codeforces" | "atcoder") => void }) {
+export function CompetitiveOverview({ overview, onSelectPlatform }: { overview: CompetitiveOverviewResponse; onSelectPlatform: (platform: "codeforces" | "atcoder" | "leetcode") => void }) {
   const summary = overview.summary;
   const hasIncompleteSolved = !summary.solved_count_complete;
   return <>

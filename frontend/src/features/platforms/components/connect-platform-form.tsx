@@ -38,7 +38,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
         Connect a platform
       </h2>
       <p className="mt-1 text-xs font-medium text-slate-500">
-        Add a Codeforces or AtCoder handle, then sync to validate it and load real stats.
+        Add a Codeforces, AtCoder, or LeetCode handle, then sync to validate it and load real stats.
       </p>
 
       <form
@@ -61,6 +61,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
           >
             <option value="codeforces">Codeforces</option>
             <option value="atcoder">AtCoder</option>
+            <option value="leetcode">LeetCode</option>
           </select>
         </div>
 
