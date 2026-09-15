@@ -1,0 +1,32 @@
+{
+  "academic": false,
+  "primary_alias": "More Smoked Leet Chicken",
+  "name": "More Smoked Leet Chicken",
+  "rating": {
+    "2023": {
+      "rating_place": 14,
+      "organizer_points": 0,
+      "rating_points": 670.814407817,
+      "country_place": 2
+    },
+    "2024": {
+      "rating_place": 39,
+      "organizer_points": 0,
+      "rating_points": 470.921289521,
+      "country_place": 4
+    },
+    "2025": {
+      "rating_place": 41,
+      "organizer_points": 0,
+      "rating_points": 530.243981957,
+      "country_place": 3
+    }
+  },
+  "logo": "https://ctftime.org//media/team/mslc_150x150_ctftime.png",
+  "country": "RU",
+  "id": 1005,
+  "aliases": [
+    "LeetChicken",
+    "MSLC"
+  ]
+}
