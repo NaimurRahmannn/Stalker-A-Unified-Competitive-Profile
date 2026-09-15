@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   Award,
@@ -13,6 +15,7 @@ import {
   Globe2,
   LayoutGrid,
   Link2,
+  LogOut,
   Settings,
   ShieldCheck,
   Target,
@@ -210,7 +213,11 @@ export function DashboardSidebar({
 }: {
   activeItem?: DashboardSidebarActiveItem;
 }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const displayName = user?.full_name.trim() || user?.username || "";
   const initialsSource = displayName || "ST";
   const nameParts = initialsSource.split(/\s+/).filter(Boolean);
@@ -223,6 +230,34 @@ export function DashboardSidebar({
       ? { ...item, href: `/profile/${encodeURIComponent(user.username)}` }
       : item,
   );
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [menuOpen]);
+
+  function handleLogout() {
+    setMenuOpen(false);
+    logout();
+    router.push("/login");
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col lg:min-h-[calc(100vh-3rem)]">
@@ -263,26 +298,50 @@ export function DashboardSidebar({
         />
       </nav>
 
-      <div className="mt-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center gap-3">
-          <div
-            role={user?.avatar ? "img" : undefined}
-            aria-label={user?.avatar ? `${displayName || user.username} avatar` : undefined}
-            style={user?.avatar ? { backgroundImage: `url(${JSON.stringify(user.avatar)})` } : undefined}
-            className="grid size-12 shrink-0 place-items-center rounded-full bg-emerald-50 bg-cover bg-center text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100"
-          >
-            {!user?.avatar ? initials : null}
+      <div className="relative mt-auto" ref={menuRef}>
+        {/* Logout dropdown menu */}
+        {menuOpen && (
+          <div className="absolute bottom-full left-0 right-0 mb-2 animate-[slideUp_150ms_ease-out] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+            <button
+              type="button"
+              id="sidebar-logout-button"
+              onClick={handleLogout}
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+            >
+              <LogOut className="size-4" />
+              Log out
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-950">
-              {isLoading ? "Loading profile..." : displayName || "Signed out"}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-slate-500">
-              {user ? `@${user.username}` : ""}
-            </p>
+        )}
+
+        <button
+          type="button"
+          id="sidebar-user-menu-toggle"
+          onClick={() => setMenuOpen((prev) => !prev)}
+          className="w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)]"
+        >
+          <div className="flex items-center gap-3">
+            <div
+              role={user?.avatar ? "img" : undefined}
+              aria-label={user?.avatar ? `${displayName || user.username} avatar` : undefined}
+              style={user?.avatar ? { backgroundImage: `url(${JSON.stringify(user.avatar)})` } : undefined}
+              className="grid size-12 shrink-0 place-items-center rounded-full bg-emerald-50 bg-cover bg-center text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100"
+            >
+              {!user?.avatar ? initials : null}
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-sm font-semibold text-slate-950">
+                {isLoading ? "Loading profile..." : displayName || "Signed out"}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-slate-500">
+                {user ? `@${user.username}` : ""}
+              </p>
+            </div>
+            <ChevronDown
+              className={`size-4 shrink-0 text-slate-400 transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
+            />
           </div>
-          <ChevronDown className="size-4 shrink-0 text-slate-400" />
-        </div>
+        </button>
       </div>
     </div>
   );
