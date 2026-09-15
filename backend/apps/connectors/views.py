@@ -38,6 +38,10 @@ from apps.connectors.providers.leetcode.analytics import (
     build_leetcode_sync_summary,
     normalize_leetcode_rating_history,
 )
+from apps.connectors.providers.leetcode.sync_service import (
+    LeetCodeSyncErrorCode,
+    LeetCodeSyncService,
+)
 from apps.connectors.serializers import (
     AtCoderAnalyticsAccountSerializer,
     AtCoderAnalyticsActivitySerializer,
@@ -94,6 +98,9 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                 payload,
                 status=self._atcoder_result_http_status(result),
             )
+
+        if platform_account.platform == PlatformAccount.Platform.LEETCODE:
+            return self._sync_leetcode(platform_account)
 
         try:
             connector = get_connector(platform_account.platform)
@@ -156,6 +163,61 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
             )
 
         serializer = self.get_serializer(platform_account)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _sync_leetcode(self, platform_account):
+        """Route LeetCode syncs through LeetCodeSyncService for full state
+        machine support (concurrency guard, structured logging, consecutive
+        failure tracking, and catch-all error handling)."""
+        cooldown_seconds = get_sync_cooldown_seconds(platform_account)
+        if cooldown_seconds > 0:
+            return Response(
+                {
+                    "detail": "Please wait before syncing this account again.",
+                    "retry_after_seconds": cooldown_seconds,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        result = LeetCodeSyncService().sync(platform_account)
+
+        if result.error_code == LeetCodeSyncErrorCode.SYNC_ALREADY_RUNNING:
+            return Response(
+                {"detail": "A sync is already in progress for this account."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        if result.error_code == LeetCodeSyncErrorCode.INVALID_USERNAME:
+            return Response(
+                {"detail": "The LeetCode username was not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if result.error_code == LeetCodeSyncErrorCode.PROVIDER_DISABLED:
+            return Response(
+                {
+                    "detail": (
+                        "LeetCode synchronization is currently disabled."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if result.error_code == LeetCodeSyncErrorCode.RATE_LIMITED:
+            return Response(
+                {"detail": "The provider rate limit was reached."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        if result.error_code is not None:
+            return Response(
+                {
+                    "detail": (
+                        "The provider is temporarily unavailable. "
+                        "Please try again later."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        refreshed_account = self.get_queryset().get(pk=platform_account.pk)
+        serializer = self.get_serializer(refreshed_account)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"], url_path="atcoder-submissions")

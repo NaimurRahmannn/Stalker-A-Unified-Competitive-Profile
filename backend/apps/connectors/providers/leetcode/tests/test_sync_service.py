@@ -229,3 +229,95 @@ class LeetCodeSyncServiceTests(TestCase):
             LeetCodeSyncService(provider=configured_provider()).sync(self.account)
 
         self.assertFalse(LeetCodeSyncState.objects.exists())
+
+    def test_unexpected_exception_does_not_leave_stuck_running_state(self):
+        provider = configured_provider()
+        provider.get_profile.side_effect = RuntimeError("unexpected crash")
+
+        result = LeetCodeSyncService(provider=provider).sync(self.account)
+
+        self.assertEqual(result.status, LeetCodeSyncState.Status.FAILED)
+        self.assertEqual(result.error_code, LeetCodeSyncErrorCode.PROVIDER_ERROR)
+        state = LeetCodeSyncState.objects.get(platform_account=self.account)
+        self.assertEqual(state.status, LeetCodeSyncState.Status.FAILED)
+        self.assertEqual(state.failure_reason, "provider_error")
+
+    def test_concurrent_sync_returns_already_running(self):
+        from django.utils import timezone
+        
+        LeetCodeSyncState.objects.create(
+            platform_account=self.account,
+            status=LeetCodeSyncState.Status.RUNNING,
+            last_attempted_at=timezone.now(),
+        )
+
+        result = LeetCodeSyncService(provider=configured_provider()).sync(
+            self.account
+        )
+
+        self.assertEqual(result.status, LeetCodeSyncState.Status.RUNNING)
+        self.assertEqual(
+            result.error_code, LeetCodeSyncErrorCode.SYNC_ALREADY_RUNNING
+        )
+
+    def test_stale_running_state_is_recovered(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        stale_time = timezone.now() - timedelta(minutes=6)
+        LeetCodeSyncState.objects.create(
+            platform_account=self.account,
+            status=LeetCodeSyncState.Status.RUNNING,
+            last_attempted_at=stale_time,
+        )
+
+        result = LeetCodeSyncService(provider=configured_provider()).sync(
+            self.account
+        )
+
+        self.assertEqual(result.status, LeetCodeSyncState.Status.SUCCESS)
+
+    def test_consecutive_failure_count_increments_on_failure_and_resets(self):
+        provider = configured_provider()
+        provider.get_profile.side_effect = LeetCodeProviderTimeoutError("timeout")
+        service = LeetCodeSyncService(provider=provider)
+
+        r1 = service.sync(self.account)
+        r2 = service.sync(self.account)
+
+        self.assertEqual(r1.consecutive_failure_count, 1)
+        self.assertEqual(r2.consecutive_failure_count, 2)
+        state = LeetCodeSyncState.objects.get(platform_account=self.account)
+        self.assertEqual(state.consecutive_failure_count, 2)
+
+        provider.get_profile.side_effect = None
+        r3 = service.sync(self.account)
+
+        self.assertEqual(r3.consecutive_failure_count, 0)
+        state.refresh_from_db()
+        self.assertEqual(state.consecutive_failure_count, 0)
+
+    @override_settings(LEETCODE_SYNC_ENABLED=False)
+    def test_disabled_provider_returns_error_without_external_call(self):
+        provider = configured_provider()
+
+        result = LeetCodeSyncService(provider=provider).sync(self.account)
+
+        self.assertEqual(result.status, LeetCodeSyncState.Status.FAILED)
+        self.assertEqual(
+            result.error_code, LeetCodeSyncErrorCode.PROVIDER_DISABLED
+        )
+        provider.get_profile.assert_not_called()
+
+    def test_sync_logs_structured_events(self):
+        with self.assertLogs(
+            "apps.connectors.providers.leetcode.sync_service", level="INFO"
+        ) as cm:
+            LeetCodeSyncService(provider=configured_provider()).sync(self.account)
+
+        self.assertTrue(
+            any("LeetCode sync started" in msg for msg in cm.output)
+        )
+        self.assertTrue(
+            any("LeetCode sync completed" in msg for msg in cm.output)
+        )

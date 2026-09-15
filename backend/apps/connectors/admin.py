@@ -147,6 +147,37 @@ class AtCoderSubmissionAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
 
+@admin.register(LeetCodeStats)
+class LeetCodeStatsAdmin(admin.ModelAdmin):
+    list_display = (
+        "platform_account",
+        "display_name",
+        "solved_total",
+        "problem_stats_complete",
+        "current_contest_rating",
+        "attended_contest_count",
+        "data_updated_at",
+    )
+    list_filter = ("problem_stats_complete",)
+    search_fields = (
+        "platform_account__handle",
+        "platform_account__user__username",
+    )
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(LeetCodeSyncState)
+class LeetCodeSyncStateAdmin(admin.ModelAdmin):
+    list_display = (
+        "platform_account",
+        "status",
+        "consecutive_failure_count",
+        "last_attempted_at",
+        "last_successful_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("platform_account__handle",)
+    readonly_fields = ("created_at", "updated_at")
+
+
 admin.site.register(PlatformStatsSnapshot)
-admin.site.register(LeetCodeStats)
-admin.site.register(LeetCodeSyncState)

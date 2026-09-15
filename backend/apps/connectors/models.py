@@ -210,6 +210,7 @@ class LeetCodeSyncState(models.Model):
     last_attempted_at = models.DateTimeField(blank=True, null=True)
     last_successful_at = models.DateTimeField(blank=True, null=True)
     failure_reason = models.CharField(max_length=64, blank=True)
+    consecutive_failure_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
