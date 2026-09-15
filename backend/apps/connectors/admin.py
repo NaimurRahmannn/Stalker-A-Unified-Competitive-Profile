@@ -8,6 +8,9 @@ from apps.connectors.models import (
     CodeforcesStats,
     LeetCodeStats,
     LeetCodeSyncState,
+    CTFTeamProfile,
+    CTFtimeSyncState,
+    CTFYearlyRanking,
     PlatformAccount,
     PlatformRatingEvent,
     PlatformStatsSnapshot,
@@ -181,3 +184,48 @@ class LeetCodeSyncStateAdmin(admin.ModelAdmin):
 
 
 admin.site.register(PlatformStatsSnapshot)
+
+
+@admin.register(CTFTeamProfile)
+class CTFTeamProfileAdmin(admin.ModelAdmin):
+    list_display = (
+        "platform_account",
+        "external_team_id",
+        "name",
+        "country",
+        "data_updated_at",
+    )
+    search_fields = (
+        "platform_account__handle",
+        "external_team_id",
+        "name",
+    )
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(CTFYearlyRanking)
+class CTFYearlyRankingAdmin(admin.ModelAdmin):
+    list_display = (
+        "team_profile",
+        "year",
+        "global_rank",
+        "country_rank",
+        "rating_points",
+    )
+    list_filter = ("year",)
+    search_fields = ("team_profile__name", "team_profile__external_team_id")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(CTFtimeSyncState)
+class CTFtimeSyncStateAdmin(admin.ModelAdmin):
+    list_display = (
+        "platform_account",
+        "status",
+        "consecutive_failure_count",
+        "last_attempted_at",
+        "last_successful_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("platform_account__handle",)
+    readonly_fields = ("created_at", "updated_at")

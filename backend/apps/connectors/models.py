@@ -463,3 +463,107 @@ class PlatformStatsSnapshot(models.Model):
 
     def __str__(self) -> str:
         return f"{self.platform_account} snapshot at {self.captured_at.isoformat()}"
+
+
+class CTFTeamProfile(models.Model):
+    platform_account = models.OneToOneField(
+        PlatformAccount,
+        on_delete=models.CASCADE,
+        related_name="ctf_team_profile",
+    )
+    external_team_id = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
+    country = models.CharField(max_length=255, blank=True, null=True)
+    logo_url = models.URLField(max_length=500, blank=True, null=True)
+    data_updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if (
+            self.platform_account_id
+            and self.platform_account.platform != PlatformAccount.Platform.CTFTIME
+        ):
+            raise ValidationError(
+                "CTF team profiles can only be attached to CTF platform accounts."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"CTF Profile {self.external_team_id} ({self.name})"
+
+
+class CTFYearlyRanking(models.Model):
+    team_profile = models.ForeignKey(
+        CTFTeamProfile,
+        on_delete=models.CASCADE,
+        related_name="yearly_rankings",
+    )
+    year = models.IntegerField()
+    global_rank = models.IntegerField(blank=True, null=True)
+    country_rank = models.IntegerField(blank=True, null=True)
+    rating_points = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-year"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["team_profile", "year"],
+                name="unique_ctf_team_year",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["team_profile", "year"],
+                name="ctf_ranking_team_year_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.team_profile.name} - {self.year}"
+
+
+class CTFtimeSyncState(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        SUCCESS = "success", "Success"
+        FAILED = "failed", "Failed"
+
+    platform_account = models.OneToOneField(
+        PlatformAccount,
+        on_delete=models.CASCADE,
+        related_name="ctftime_sync_state",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    last_attempted_at = models.DateTimeField(blank=True, null=True)
+    last_successful_at = models.DateTimeField(blank=True, null=True)
+    failure_reason = models.CharField(max_length=64, blank=True)
+    consecutive_failure_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if (
+            self.platform_account_id
+            and self.platform_account.platform != PlatformAccount.Platform.CTFTIME
+        ):
+            raise ValidationError(
+                "CTFtime sync state can only be attached to CTFtime accounts."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"CTFtime sync state for {self.platform_account.handle}"
