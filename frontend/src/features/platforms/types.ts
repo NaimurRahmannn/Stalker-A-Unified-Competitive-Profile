@@ -15,6 +15,33 @@ export type CodeforcesStats = {
 };
 
 export type ImplementedCompetitivePlatform = "codeforces" | "atcoder" | "leetcode";
+export type ConnectablePlatform = ImplementedCompetitivePlatform | "ctftime";
+
+export type CTFYearlyRanking = {
+  year: number;
+  global_rank: number | null;
+  country_rank: number | null;
+  rating_points: number;
+  organizer_points: number;
+};
+
+export type CTFTeamProfile = {
+  external_team_id: string;
+  name: string;
+  country: string | null;
+  logo_url: string | null;
+  data_updated_at: string | null;
+  updated_at: string;
+  yearly_rankings: CTFYearlyRanking[];
+};
+
+export type CTFtimeSyncState = {
+  status: "pending" | "running" | "success" | "failed";
+  last_attempted_at: string | null;
+  last_successful_at: string | null;
+  failure_reason: string;
+  consecutive_failure_count: number;
+};
 
 export type LeetCodeStats = {
   display_name: string | null;
@@ -114,7 +141,7 @@ export type AtCoderSyncState = {
 
 export type PlatformAccount = {
   id: number;
-  platform: ImplementedCompetitivePlatform | string;
+  platform: ConnectablePlatform | string;
   handle: string;
   profile_url: string;
   is_verified: boolean;
@@ -131,12 +158,14 @@ export type PlatformAccount = {
   atcoder_sync_state: AtCoderSyncState | null;
   leetcode_stats: LeetCodeStats | null;
   leetcode_sync_state: LeetCodeSyncState | null;
+  ctf_team_profile: CTFTeamProfile | null;
+  ctftime_sync_state: CTFtimeSyncState | null;
   can_sync: boolean;
   sync_cooldown_seconds: number;
 };
 
 export type ConnectPlatformPayload = {
-  platform: ImplementedCompetitivePlatform;
+  platform: ConnectablePlatform;
   handle: string;
 };
 

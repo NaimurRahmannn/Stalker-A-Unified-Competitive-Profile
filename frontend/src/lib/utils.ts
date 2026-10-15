@@ -62,6 +62,10 @@ export function formatPlatformName(platform: string): string {
     return platform;
   }
 
+  if (platform.toLowerCase() === "ctftime") {
+    return "CTFtime";
+  }
+
   return platform.charAt(0).toUpperCase() + platform.slice(1);
 }
 

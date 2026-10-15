@@ -18,9 +18,9 @@ import { formatPlatformName, getApiErrorMessage } from "@/lib/utils";
 import { ConnectPlatformForm } from "./connect-platform-form";
 import { PlatformAccountCard } from "./platform-account-card";
 
-function implementedAccounts(accounts: PlatformAccount[]) {
+function managedAccounts(accounts: PlatformAccount[]) {
   return accounts.filter(
-    (account) => account.platform === "codeforces" || account.platform === "atcoder" || account.platform === "leetcode",
+    (account) => account.platform === "codeforces" || account.platform === "atcoder" || account.platform === "leetcode" || account.platform === "ctftime",
   );
 }
 
@@ -41,7 +41,7 @@ export function PlatformsManager() {
 
     try {
       const data = await listPlatformAccounts();
-      setAccounts(implementedAccounts(data));
+      setAccounts(managedAccounts(data));
       setError(null);
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to load your platforms."));
@@ -68,7 +68,7 @@ export function PlatformsManager() {
       try {
         const data = await listPlatformAccounts();
         if (cancelled) return;
-        setAccounts(implementedAccounts(data));
+        setAccounts(managedAccounts(data));
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -113,9 +113,9 @@ export function PlatformsManager() {
         });
 
         setAccounts((prev) => [account, ...prev]);
-        toast.success(
-          `Connected @${account.handle} on ${formatPlatformName(account.platform)}.`,
-        );
+        toast.success(account.platform === "ctftime"
+          ? `Added CTFtime team #${account.handle}. Sync to load rankings.`
+          : `Connected @${account.handle} on ${formatPlatformName(account.platform)}.`);
 
         return true;
       } catch (err) {
@@ -156,6 +156,8 @@ export function PlatformsManager() {
         }
       } else if (updated.platform === "leetcode") {
         toast.success("LeetCode analytics updated.");
+      } else if (updated.platform === "ctftime") {
+        toast.success("CTFtime team rankings updated.");
       } else {
         toast.success("Codeforces analytics updated.");
       }
@@ -218,7 +220,7 @@ export function PlatformsManager() {
               No platforms connected yet
             </p>
             <p className="mt-1 text-xs font-medium text-slate-500">
-              Add a Codeforces, AtCoder, or LeetCode handle above to get started.
+              Add a Codeforces, AtCoder, or LeetCode handle or a CTFtime team ID above to get started.
             </p>
           </div>
         ) : (

@@ -65,9 +65,56 @@ function ProviderStats({ account }: { account: PlatformAccount }) {
     );
   }
 
+  if (account.platform === "ctftime" && account.ctf_team_profile) {
+    const profile = account.ctf_team_profile;
+    const latest = profile.yearly_rankings[0];
+    return (
+      <div className="mt-4">
+        <p className="text-sm font-semibold text-slate-900">
+          {profile.name}{profile.country ? ` · ${profile.country}` : ""}
+        </p>
+        {latest ? (
+          <>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatTile label={`${latest.year} rating`} value={latest.rating_points.toFixed(2)} />
+              <StatTile label="Global rank" value={latest.global_rank === null ? "Unranked" : `#${latest.global_rank}`} />
+              <StatTile label="Country rank" value={latest.country_rank === null ? "Unranked" : `#${latest.country_rank}`} />
+              <StatTile label="Ranked years" value={String(profile.yearly_rankings.length)} />
+            </div>
+            <details className="mt-3 rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700">
+              <summary className="cursor-pointer font-semibold">Yearly rankings</summary>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-105 text-left">
+                  <thead className="text-[10px] uppercase text-slate-500">
+                    <tr><th className="pb-2">Year</th><th className="pb-2">Global</th><th className="pb-2">Country</th><th className="pb-2">Rating</th><th className="pb-2">Organizer</th></tr>
+                  </thead>
+                  <tbody>
+                    {profile.yearly_rankings.map((ranking) => (
+                      <tr key={ranking.year} className="border-t border-slate-100">
+                        <td className="py-2 font-medium">{ranking.year}</td>
+                        <td className="py-2">{ranking.global_rank === null ? "—" : `#${ranking.global_rank}`}</td>
+                        <td className="py-2">{ranking.country_rank === null ? "—" : `#${ranking.country_rank}`}</td>
+                        <td className="py-2">{ranking.rating_points.toFixed(2)}</td>
+                        <td className="py-2">{ranking.organizer_points.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </>
+        ) : (
+          <p className="mt-2 text-xs text-slate-500">No yearly ranking is available for this team yet.</p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <p className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2.5 text-xs font-medium text-slate-500">
-      {formatPlatformName(account.platform)} is connected but has not been synced yet. Run a sync to validate the handle and load real stats.
+      {account.platform === "ctftime"
+        ? "This team has not been synced yet. Run a sync to load its profile and rankings."
+        : `${formatPlatformName(account.platform)} is connected but has not been synced yet. Run a sync to validate the handle and load real stats.`}
     </p>
   );
 }
@@ -105,7 +152,8 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
         ? "Sync unavailable"
         : "Sync";
   const platformName = formatPlatformName(account.platform);
-  const logo = account.platform === "atcoder" ? "/images/atcoder_logo.png" : account.platform === "leetcode" ? "/images/leetcode_logo.png" : "/images/codeforces_logo.png";
+  const logo = account.platform === "atcoder" ? "/images/atcoder_logo.png" : account.platform === "leetcode" ? "/images/leetcode_logo.png" : account.platform === "ctftime" ? "/images/ctf_time.png" : "/images/codeforces_logo.png";
+  const displayHandle = account.platform === "ctftime" ? `Team #${account.handle}` : `@${account.handle}`;
 
   const handleSync = async () => {
     if (isSyncDisabled) return;
@@ -114,7 +162,7 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Remove @${account.handle} from ${platformName}?`)) return;
+    if (!window.confirm(`Remove ${displayHandle} from ${platformName}?`)) return;
     setIsDeleting(true);
     try { await onDelete(account.id); } finally { setIsDeleting(false); }
   };
@@ -130,14 +178,14 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
             <p className="truncate text-sm font-semibold text-slate-950">{platformName}</p>
             {account.profile_url ? (
               <a href={account.profile_url} target="_blank" rel="noreferrer" className="mt-0.5 inline-flex items-center gap-1 truncate text-xs font-medium text-blue-700 hover:text-blue-800">
-                @{account.handle}<ExternalLink className="size-3" />
+                {displayHandle}<ExternalLink className="size-3" />
               </a>
-            ) : <p className="mt-0.5 truncate text-xs font-medium text-slate-500">@{account.handle}</p>}
+            ) : <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{displayHandle}</p>}
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          <StatusBadge valid={account.handle_validated}>{account.handle_validated ? "Handle valid" : "Handle not validated"}</StatusBadge>
-          <StatusBadge valid={account.ownership_verified}>{account.ownership_verified ? "Ownership verified" : "Ownership not verified"}</StatusBadge>
+          <StatusBadge valid={account.handle_validated}>{account.platform === "ctftime" ? (account.handle_validated ? "Team found" : "Team not validated") : (account.handle_validated ? "Handle valid" : "Handle not validated")}</StatusBadge>
+          {account.platform !== "ctftime" ? <StatusBadge valid={account.ownership_verified}>{account.ownership_verified ? "Ownership verified" : "Ownership not verified"}</StatusBadge> : null}
         </div>
       </div>
 
@@ -145,6 +193,11 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
         {account.last_synced_at ? `Last synced ${formatRelativeTime(account.last_synced_at)}` : "Never synced"}
       </p>
       <ProviderStats account={account} />
+      {account.platform === "ctftime" && account.ctftime_sync_state?.status === "failed" ? (
+        <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
+          Last sync failed: {account.ctftime_sync_state.failure_reason.replaceAll("_", " ")}.
+        </p>
+      ) : null}
 
       <div className="mt-4 flex items-center gap-2">
         <button type="button" onClick={handleSync} disabled={isSyncDisabled} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Loader2, Plus } from "lucide-react";
 import {
   connectPlatformSchema,
@@ -18,11 +18,14 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<ConnectPlatformFormValues>({
     resolver: zodResolver(connectPlatformSchema),
     defaultValues: { platform: "codeforces", handle: "" },
   });
+  const selectedPlatform = useWatch({ control, name: "platform" });
+  const isCTFtime = selectedPlatform === "ctftime";
 
   const submit = handleSubmit(async (values) => {
     const connected = await onConnect(values);
@@ -38,7 +41,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
         Connect a platform
       </h2>
       <p className="mt-1 text-xs font-medium text-slate-500">
-        Add a Codeforces, AtCoder, or LeetCode handle, then sync to validate it and load real stats.
+        Add a platform handle or CTFtime team ID, then sync to load its public stats.
       </p>
 
       <form
@@ -62,6 +65,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
             <option value="codeforces">Codeforces</option>
             <option value="atcoder">AtCoder</option>
             <option value="leetcode">LeetCode</option>
+            <option value="ctftime">CTFtime</option>
           </select>
         </div>
 
@@ -70,14 +74,15 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
             htmlFor="handle"
             className="mb-1 block text-xs font-semibold text-slate-600"
           >
-            Handle
+            {isCTFtime ? "Team ID" : "Handle"}
           </label>
           <input
             id="handle"
             type="text"
+            inputMode={isCTFtime ? "numeric" : "text"}
             autoComplete="off"
             spellCheck={false}
-            placeholder="e.g. tourist"
+            placeholder={isCTFtime ? "e.g. 1005" : "e.g. tourist"}
             aria-invalid={errors.handle ? "true" : "false"}
             className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
             {...register("handle")}
