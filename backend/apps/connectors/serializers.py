@@ -1,3 +1,5 @@
+import re
+
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
@@ -10,6 +12,9 @@ from apps.connectors.models import (
     AtCoderSubmissionSyncState,
     AtCoderSyncState,
     CodeforcesStats,
+    CTFTeamProfile,
+    CTFtimeSyncState,
+    CTFYearlyRanking,
     LeetCodeStats,
     LeetCodeSyncState,
     PlatformAccount,
@@ -27,6 +32,48 @@ from apps.connectors.services import (
 
 class ConnectorHealthSerializer(serializers.Serializer):
     status = serializers.CharField()
+
+
+class CTFYearlyRankingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CTFYearlyRanking
+        fields = (
+            "year",
+            "global_rank",
+            "country_rank",
+            "rating_points",
+            "organizer_points",
+        )
+        read_only_fields = fields
+
+
+class CTFTeamProfileSerializer(serializers.ModelSerializer):
+    yearly_rankings = CTFYearlyRankingSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = CTFTeamProfile
+        fields = (
+            "external_team_id",
+            "name",
+            "country",
+            "logo_url",
+            "data_updated_at",
+            "yearly_rankings",
+        )
+        read_only_fields = fields
+
+
+class CTFtimeSyncStateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CTFtimeSyncState
+        fields = (
+            "status",
+            "last_attempted_at",
+            "last_successful_at",
+            "failure_reason",
+            "consecutive_failure_count",
+        )
+        read_only_fields = fields
 
 
 class CodeforcesStatsSerializer(serializers.ModelSerializer):
@@ -433,6 +480,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
     atcoder_sync_state = AtCoderSyncStateSerializer(read_only=True)
     leetcode_stats = LeetCodeStatsSerializer(read_only=True)
     leetcode_sync_state = LeetCodeSyncStateSerializer(read_only=True)
+    ctf_team_profile = CTFTeamProfileSerializer(read_only=True)
+    ctftime_sync_state = CTFtimeSyncStateSerializer(read_only=True)
     handle_validated = serializers.SerializerMethodField()
     ownership_verified = serializers.SerializerMethodField()
     can_sync = serializers.SerializerMethodField()
@@ -459,6 +508,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "atcoder_sync_state",
             "leetcode_stats",
             "leetcode_sync_state",
+            "ctf_team_profile",
+            "ctftime_sync_state",
             "can_sync",
             "sync_cooldown_seconds",
         )
@@ -478,6 +529,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             "atcoder_sync_state",
             "leetcode_stats",
             "leetcode_sync_state",
+            "ctf_team_profile",
+            "ctftime_sync_state",
             "can_sync",
             "sync_cooldown_seconds",
         )
@@ -526,6 +579,13 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             except InvalidExternalAccountError as exc:
                 raise serializers.ValidationError({"handle": str(exc)}) from exc
 
+        if platform == PlatformAccount.Platform.CTFTIME:
+            handle = attrs.get("handle", self.instance.handle if self.instance else "")
+            if not re.fullmatch(r"[1-9][0-9]*", handle):
+                raise serializers.ValidationError(
+                    {"handle": "Enter a numeric CTFtime team ID."}
+                )
+
         return attrs
 
     def update(
@@ -567,6 +627,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 AtCoderSyncState.objects.filter(platform_account=instance).delete()
                 LeetCodeStats.objects.filter(platform_account=instance).delete()
                 LeetCodeSyncState.objects.filter(platform_account=instance).delete()
+                CTFTeamProfile.objects.filter(platform_account=instance).delete()
+                CTFtimeSyncState.objects.filter(platform_account=instance).delete()
                 AtCoderSubmissionSyncState.objects.filter(
                     platform_account=instance
                 ).delete()
@@ -577,6 +639,8 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 instance._state.fields_cache.pop("atcoder_stats", None)
                 instance._state.fields_cache.pop("leetcode_stats", None)
                 instance._state.fields_cache.pop("leetcode_sync_state", None)
+                instance._state.fields_cache.pop("ctf_team_profile", None)
+                instance._state.fields_cache.pop("ctftime_sync_state", None)
                 instance._state.fields_cache.pop(
                     "atcoder_submission_sync_state", None
                 )

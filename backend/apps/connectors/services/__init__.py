@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from apps.connectors.base.connector import BaseConnector
 from apps.connectors.base.exceptions import UnsupportedSourceError
-from apps.connectors.models import AtCoderSyncState, PlatformAccount
+from apps.connectors.models import AtCoderSyncState, CTFtimeSyncState, PlatformAccount
 from apps.connectors.providers.atcoder.connector import AtCoderConnector
 from apps.connectors.providers.codeforces.connector import CodeforcesConnector
 from apps.connectors.providers.leetcode.connector import LeetCodeConnector
@@ -27,6 +27,17 @@ def get_connector(source: str) -> BaseConnector:
 def get_sync_cooldown_seconds(platform_account: PlatformAccount) -> int:
     if platform_account.platform == PlatformAccount.Platform.ATCODER:
         return get_atcoder_sync_cooldown_seconds(platform_account)
+    if platform_account.platform == PlatformAccount.Platform.CTFTIME:
+        try:
+            state = platform_account.ctftime_sync_state
+        except CTFtimeSyncState.DoesNotExist:
+            return 0
+        if state.last_attempted_at is None:
+            return 0
+        elapsed = (timezone.now() - state.last_attempted_at).total_seconds()
+        if state.status == CTFtimeSyncState.Status.RUNNING and elapsed >= 300:
+            return 0
+        return max(0, math.ceil(settings.CTFTIME_SYNC_COOLDOWN_SECONDS - elapsed))
     connector = CONNECTOR_REGISTRY.get(platform_account.platform)
     if connector is None:
         return 0
@@ -58,6 +69,11 @@ def can_sync_platform_account(platform_account: PlatformAccount) -> bool:
         ):
             return False
         return get_atcoder_sync_cooldown_seconds(platform_account) == 0
+    if platform_account.platform == PlatformAccount.Platform.CTFTIME:
+        return (
+            settings.CTFTIME_SYNC_ENABLED
+            and get_sync_cooldown_seconds(platform_account) == 0
+        )
     connector = CONNECTOR_REGISTRY.get(platform_account.platform)
     return (
         connector is not None

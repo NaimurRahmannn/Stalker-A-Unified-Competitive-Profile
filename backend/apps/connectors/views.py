@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.connectors.base.exceptions import (
+    ConnectorError,
     ExternalServiceError,
     InvalidExternalAccountError,
     ProviderRateLimitError,
@@ -42,6 +43,8 @@ from apps.connectors.providers.leetcode.sync_service import (
     LeetCodeSyncErrorCode,
     LeetCodeSyncService,
 )
+from apps.connectors.providers.ctftime.exceptions import CTFtimeSyncAlreadyRunningError
+from apps.connectors.providers.ctftime.sync_service import CTFtimeSyncService
 from apps.connectors.serializers import (
     AtCoderAnalyticsAccountSerializer,
     AtCoderAnalyticsActivitySerializer,
@@ -78,7 +81,10 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
                 "atcoder_sync_state",
                 "leetcode_stats",
                 "leetcode_sync_state",
+                "ctf_team_profile",
+                "ctftime_sync_state",
             )
+            .prefetch_related("ctf_team_profile__yearly_rankings")
         )
 
     def perform_create(self, serializer):
@@ -101,6 +107,9 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
 
         if platform_account.platform == PlatformAccount.Platform.LEETCODE:
             return self._sync_leetcode(platform_account)
+
+        if platform_account.platform == PlatformAccount.Platform.CTFTIME:
+            return self._sync_ctftime(platform_account)
 
         try:
             connector = get_connector(platform_account.platform)
@@ -164,6 +173,44 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(platform_account)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _sync_ctftime(self, platform_account):
+        if not CTFtimeSyncService.is_enabled():
+            return Response(
+                {"detail": "CTFtime synchronization is disabled."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        cooldown_seconds = get_sync_cooldown_seconds(platform_account)
+        if cooldown_seconds > 0:
+            return Response(
+                {
+                    "detail": "Please wait before syncing this account again.",
+                    "retry_after_seconds": cooldown_seconds,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        try:
+            CTFtimeSyncService().sync(platform_account)
+        except CTFtimeSyncAlreadyRunningError as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        except InvalidExternalAccountError as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except ProviderRateLimitError as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        except (ExternalServiceError, ConnectorError) as exc:
+            return Response(
+                {"detail": str(exc) or "CTFtime synchronization failed."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        refreshed_account = self.get_queryset().get(pk=platform_account.pk)
+        return Response(self.get_serializer(refreshed_account).data)
 
     def _sync_leetcode(self, platform_account):
         """Route LeetCode syncs through LeetCodeSyncService for full state
