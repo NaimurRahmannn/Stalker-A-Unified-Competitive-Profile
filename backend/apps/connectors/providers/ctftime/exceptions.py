@@ -35,3 +35,7 @@ class CTFtimeProviderAccessError(ProviderAccessDeniedError):
 
 class CTFtimeProviderRateLimitError(ProviderRateLimitError):
     """Raised when the configured CTFtime provider throttles STALKER."""
+
+
+class CTFtimeSyncAlreadyRunningError(ConnectorError):
+    """Raised when this account already has an active CTFtime sync."""

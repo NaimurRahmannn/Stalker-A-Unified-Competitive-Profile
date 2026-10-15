@@ -141,6 +141,15 @@ CODEFORCES_SYNC_COOLDOWN_SECONDS = config(
     default=60,
     cast=int,
 )
+CTFTIME_BASE_URL = config(
+    "CTFTIME_BASE_URL",
+    default="https://ctftime.org/api/v1/",
+)
+CTFTIME_TIMEOUT_SECONDS = config("CTFTIME_TIMEOUT_SECONDS", default=10.0, cast=float)
+CTFTIME_SYNC_ENABLED = config("CTFTIME_SYNC_ENABLED", default=True, cast=bool)
+CTFTIME_SYNC_COOLDOWN_SECONDS = config(
+    "CTFTIME_SYNC_COOLDOWN_SECONDS", default=3600, cast=int
+)
 ATCODER_HISTORY_SYNC_ENABLED = config(
     "ATCODER_HISTORY_SYNC_ENABLED",
     default=True,
