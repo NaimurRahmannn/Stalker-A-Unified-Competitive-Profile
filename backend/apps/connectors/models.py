@@ -506,6 +506,7 @@ class CTFYearlyRanking(models.Model):
     global_rank = models.IntegerField(blank=True, null=True)
     country_rank = models.IntegerField(blank=True, null=True)
     rating_points = models.FloatField(default=0.0)
+    organizer_points = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

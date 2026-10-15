@@ -211,6 +211,7 @@ class CTFYearlyRankingAdmin(admin.ModelAdmin):
         "global_rank",
         "country_rank",
         "rating_points",
+        "organizer_points",
     )
     list_filter = ("year",)
     search_fields = ("team_profile__name", "team_profile__external_team_id")

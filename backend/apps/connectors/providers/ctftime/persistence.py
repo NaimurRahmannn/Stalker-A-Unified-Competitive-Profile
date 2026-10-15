@@ -39,5 +39,6 @@ class CTFtimePersistenceMapper:
                         "global_rank": ranking_data.global_rank,
                         "country_rank": ranking_data.country_rank,
                         "rating_points": ranking_data.rating_points,
+                        "organizer_points": ranking_data.organizer_points,
                     },
                 )

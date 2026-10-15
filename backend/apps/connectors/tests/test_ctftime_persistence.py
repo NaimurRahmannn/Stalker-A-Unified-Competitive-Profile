@@ -39,7 +39,7 @@ class CTFtimePersistenceMapperTests(TestCase):
                     global_rank=41,
                     country_rank=3,
                     rating_points=530.24,
-                    organizer_points=0.0,
+                    organizer_points=7.5,
                 ),
                 CTFYearlyRankingData(
                     year=2024,
@@ -65,6 +65,7 @@ class CTFtimePersistenceMapperTests(TestCase):
         
         self.assertEqual(rankings[0].year, 2025)
         self.assertEqual(rankings[0].global_rank, 41)
+        self.assertEqual(rankings[0].organizer_points, 7.5)
         
         self.assertEqual(rankings[1].year, 2024)
         self.assertEqual(rankings[1].global_rank, 39)
