@@ -85,7 +85,7 @@ const domainItems: SidebarItem[] = [
   {
     id: "ctf",
     label: "CTF / Cybersecurity",
-    href: "#",
+    href: "/ctf",
     icon: ShieldCheck,
     accent: "blue",
     chevron: true,
