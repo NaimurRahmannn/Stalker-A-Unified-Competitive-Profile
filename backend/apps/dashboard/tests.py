@@ -10,6 +10,8 @@ from rest_framework.test import APITestCase
 from apps.connectors.models import (
     AtCoderStats,
     CodeforcesStats,
+    CTFTeamProfile,
+    CTFYearlyRanking,
     LeetCodeStats,
     PlatformAccount,
 )
@@ -42,6 +44,35 @@ class DashboardMeEndpointTests(APITestCase):
 
     def authenticate(self):
         self.client.force_authenticate(user=self.user)
+
+    def test_dashboard_includes_ctftime_team_rankings(self):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CTFTIME,
+            handle="1005",
+        )
+        profile = CTFTeamProfile.objects.create(
+            platform_account=account,
+            external_team_id="1005",
+            name="Example CTF Team",
+            country="BD",
+        )
+        CTFYearlyRanking.objects.create(
+            team_profile=profile,
+            year=2026,
+            global_rank=42,
+            rating_points=315.5,
+            organizer_points=12.0,
+        )
+        self.authenticate()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        stats = response.data["platforms"][0]["stats"]
+        self.assertEqual(stats["name"], "Example CTF Team")
+        self.assertEqual(stats["yearly_rankings"][0]["global_rank"], 42)
+        self.assertEqual(stats["yearly_rankings"][0]["organizer_points"], 12.0)
 
     def test_unauthenticated_user_cannot_access_dashboard(self):
         response = self.client.get(self.url)

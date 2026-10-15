@@ -16,7 +16,8 @@ class DashboardMeView(APIView):
     def get(self, request):
         platforms = (
             PlatformAccount.objects.filter(user=request.user)
-            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats")
+            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats", "ctf_team_profile", "ctftime_sync_state")
+            .prefetch_related("ctf_team_profile__yearly_rankings")
             .order_by("platform")
         )
 

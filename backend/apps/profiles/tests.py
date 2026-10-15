@@ -10,6 +10,8 @@ from rest_framework.test import APITestCase
 from apps.connectors.models import (
     AtCoderStats,
     CodeforcesStats,
+    CTFTeamProfile,
+    CTFYearlyRanking,
     LeetCodeStats,
     PlatformAccount,
 )
@@ -43,6 +45,31 @@ class PublicProfileEndpointTests(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_public_profile_includes_ctftime_team_rankings(self):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.CTFTIME,
+            handle="1005",
+        )
+        profile = CTFTeamProfile.objects.create(
+            platform_account=account,
+            external_team_id="1005",
+            name="Example CTF Team",
+        )
+        CTFYearlyRanking.objects.create(
+            team_profile=profile,
+            year=2026,
+            global_rank=42,
+            rating_points=315.5,
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        stats = response.data["platforms"][0]["stats"]
+        self.assertEqual(stats["external_team_id"], "1005")
+        self.assertEqual(stats["yearly_rankings"][0]["rating_points"], 315.5)
 
     def test_unknown_username_returns_404(self):
         response = self.client.get("/api/v1/profile/missing-user/")

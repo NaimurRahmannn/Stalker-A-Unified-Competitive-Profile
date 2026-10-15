@@ -4,10 +4,12 @@ from apps.accounts.models import User
 from apps.connectors.models import (
     AtCoderStats,
     CodeforcesStats,
+    CTFTeamProfile,
     LeetCodeStats,
     PlatformAccount,
 )
 from apps.connectors.providers.atcoder.mapper import get_atcoder_rating_color
+from apps.connectors.serializers import CTFTeamProfileSerializer
 
 
 class PublicProfileUserSerializer(serializers.ModelSerializer):
@@ -156,6 +158,12 @@ class PublicProfilePlatformSerializer(serializers.ModelSerializer):
             except LeetCodeStats.DoesNotExist:
                 return None
             return PublicProfileLeetCodeStatsSerializer(stats).data
+        if obj.platform == PlatformAccount.Platform.CTFTIME:
+            try:
+                stats = obj.ctf_team_profile
+            except CTFTeamProfile.DoesNotExist:
+                return None
+            return CTFTeamProfileSerializer(stats).data
         return None
 
     def get_handle_validated(self, obj: PlatformAccount) -> bool:

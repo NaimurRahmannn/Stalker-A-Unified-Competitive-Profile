@@ -19,7 +19,8 @@ class PublicProfileView(APIView):
         user = get_object_or_404(User, username=username)
         platforms = (
             PlatformAccount.objects.filter(user=user)
-            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats")
+            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats", "ctf_team_profile")
+            .prefetch_related("ctf_team_profile__yearly_rankings")
             .order_by("platform")
         )
 

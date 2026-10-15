@@ -58,6 +58,7 @@ class CTFTeamProfileSerializer(serializers.ModelSerializer):
             "country",
             "logo_url",
             "data_updated_at",
+            "updated_at",
             "yearly_rankings",
         )
         read_only_fields = fields
