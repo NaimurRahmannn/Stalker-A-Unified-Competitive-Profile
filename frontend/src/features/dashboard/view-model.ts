@@ -56,6 +56,10 @@ function isSupportedPlatform(platform: DashboardPlatform): boolean {
   return platform.platform === "codeforces" || platform.platform === "atcoder" || platform.platform === "leetcode";
 }
 
+function isManagedPlatform(platform: DashboardPlatform): boolean {
+  return isSupportedPlatform(platform) || platform.platform === "ctftime";
+}
+
 function pluralize(value: number, singular: string, plural = `${singular}s`) {
   return value === 1 ? singular : plural;
 }
@@ -184,11 +188,13 @@ function buildMetrics(
 function buildConnectedPlatforms(
   platforms: DashboardPlatform[],
 ): ConnectedPlatform[] {
-  return platforms.filter(isSupportedPlatform).map((platform) => ({
+  return platforms.filter(isManagedPlatform).map((platform) => ({
     id: platform.id,
     name: formatDashboardPlatformName(platform.platform),
-    handle: formatHandle(platform.handle),
-    status: platform.handle_validated ? "Handle valid" : "Handle not validated",
+    handle: platform.platform === "ctftime" ? `Team #${platform.handle}` : formatHandle(platform.handle),
+    status: platform.platform === "ctftime"
+      ? (platform.handle_validated ? "Team found" : "Team not validated")
+      : (platform.handle_validated ? "Handle valid" : "Handle not validated"),
     mark: getPlatformMark(platform.platform),
     profileUrl: platform.profile_url,
   }));
@@ -335,7 +341,7 @@ function buildNextSteps(
 }
 
 function buildPlatformSummary(platforms: DashboardPlatform[]): string {
-  const supported = platforms.filter(isSupportedPlatform);
+  const supported = platforms.filter(isManagedPlatform);
   if (supported.length === 0) {
     return "Connect a platform to start tracking real progress.";
   }
@@ -345,7 +351,7 @@ function buildPlatformSummary(platforms: DashboardPlatform[]): string {
   return `Tracking ${supported.length} connected ${pluralize(
     supported.length,
     "platform",
-  )} with ${validCount} valid ${pluralize(validCount, "handle")}.`;
+  )} with ${validCount} validated ${pluralize(validCount, "account")}.`;
 }
 
 export function buildDashboardViewModel(

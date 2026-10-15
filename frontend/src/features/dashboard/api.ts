@@ -1,4 +1,4 @@
-import type { AtCoderRatingColor, CodeforcesStats } from "@/features/platforms/types";
+import type { AtCoderRatingColor, CodeforcesStats, CTFTeamProfile } from "@/features/platforms/types";
 import type { CompetitiveOverviewSummary, CompetitivePlatformSummary } from "@/features/competitive-programming/types";
 import api from "@/lib/api";
 
@@ -48,7 +48,7 @@ export type DashboardPlatform = {
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
-  stats: DashboardCodeforcesStats | DashboardAtCoderStats | null;
+  stats: DashboardCodeforcesStats | DashboardAtCoderStats | CTFTeamProfile | null;
   can_sync: boolean;
   sync_cooldown_seconds: number;
 };

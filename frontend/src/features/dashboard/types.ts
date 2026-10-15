@@ -29,10 +29,11 @@ export type JourneyItem = {
   isPlaceholder?: boolean;
 };
 
-export type PlatformStatus = "Handle valid" | "Handle not validated";
+export type PlatformStatus = "Handle valid" | "Handle not validated" | "Team found" | "Team not validated";
 
 export type PlatformMark =
   | "codeforces"
+  | "ctftime"
   | "leetcode"
   | "atcoder"
   | "codechef"

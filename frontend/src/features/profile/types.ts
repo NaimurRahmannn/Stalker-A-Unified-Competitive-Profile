@@ -1,4 +1,4 @@
-import type { AtCoderRatingColor, CodeforcesStats } from "@/features/platforms/types";
+import type { AtCoderRatingColor, CodeforcesStats, CTFTeamProfile } from "@/features/platforms/types";
 import type { CompetitiveOverviewSummary, CompetitivePlatformSummary } from "@/features/competitive-programming/types";
 
 export type PublicCodeforcesStats = Omit<
@@ -56,7 +56,7 @@ export interface PublicProfilePlatform {
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
-  stats: PublicCodeforcesStats | PublicAtCoderStats | PublicLeetCodeStats | null;
+  stats: PublicCodeforcesStats | PublicAtCoderStats | PublicLeetCodeStats | CTFTeamProfile | null;
 }
 
 export interface PublicProfileResponse {

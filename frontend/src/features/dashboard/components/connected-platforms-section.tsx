@@ -32,7 +32,7 @@ function PlatformMark({ mark }: { mark: ConnectedPlatform["mark"] }) {
 
 function PlatformMiniCard({ platform }: { platform: ConnectedPlatform }) {
   const badgeClass =
-    platform.status === "Handle valid"
+    platform.status === "Handle valid" || platform.status === "Team found"
       ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
       : "bg-orange-50 text-orange-700 ring-1 ring-orange-200";
 
@@ -91,7 +91,7 @@ function EmptyPlatformsState() {
         No platforms connected yet
       </p>
       <p className="mt-1 text-xs font-medium text-slate-500">
-        Connect Codeforces, AtCoder, or LeetCode to start pulling real dashboard stats.
+        Connect Codeforces, AtCoder, LeetCode, or CTFtime to start tracking your progress.
       </p>
     </div>
   );

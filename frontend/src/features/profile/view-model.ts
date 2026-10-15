@@ -2,6 +2,7 @@ import { Activity, CheckCircle2, CircleDot, RefreshCw } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { formatDashboardPlatformName, getPlatformMark } from "@/features/dashboard/data";
 import type { MetricAccent, PlatformMark } from "@/features/dashboard/types";
+import type { CTFTeamProfile } from "@/features/platforms/types";
 import { formatRelativeTime } from "@/lib/utils";
 import type { PublicAtCoderStats, PublicCodeforcesStats, PublicLeetCodeStats, PublicProfilePlatform, PublicProfileResponse, PublicProfileUser } from "./types";
 
@@ -10,7 +11,7 @@ export type ProfileHeroView = { displayName: string; username: string; initials:
 export type ProfileMetricView = { label: string; value: string; icon: LucideIcon; accent: MetricAccent };
 export type PublicPlatformView = { id: number; slug: string; name: string; handle: string; handleValid: boolean; mark: PlatformMark | null; profileUrl: string | null; lastSyncedLabel: string; rating: string; maxRating: string; rank: string; solved: string; contests: string; hasDetailedStats: boolean };
 export type CompetitiveMetricView = { label: string; value: string };
-export type DomainAccountView = Pick<PublicPlatformView, "id" | "name" | "handle" | "handleValid" | "mark" | "profileUrl">;
+export type DomainAccountView = Pick<PublicPlatformView, "id" | "name" | "handle" | "handleValid" | "mark" | "profileUrl" | "rating" | "rank" | "contests">;
 export type DomainCardView = { key: "ctf" | "hackathon" | "datathon"; title: string; subtitle: string; accounts: DomainAccountView[] };
 export type PerformanceSummaryView = { lastActive: string; memberSince: string };
 export type PublicProfileViewModel = { hero: ProfileHeroView; summaryMetrics: ProfileMetricView[]; platforms: PublicPlatformView[]; competitivePlatforms: PublicPlatformView[]; competitiveMetrics: CompetitiveMetricView[]; domainCards: DomainCardView[]; performance: PerformanceSummaryView };
@@ -29,6 +30,7 @@ function initialsFor(user: PublicProfileUser) { const source = text(user.full_na
 function isCodeforcesStats(stats: PublicProfilePlatform["stats"]): stats is PublicCodeforcesStats { return stats !== null && "rating" in stats; }
 function isAtCoderStats(stats: PublicProfilePlatform["stats"]): stats is PublicAtCoderStats { return stats !== null && "current_rating" in stats; }
 function isLeetCodeStats(stats: PublicProfilePlatform["stats"]): stats is PublicLeetCodeStats { return stats !== null && "solved_total" in stats; }
+function isCTFTeamProfile(stats: PublicProfilePlatform["stats"]): stats is CTFTeamProfile { return stats !== null && "yearly_rankings" in stats; }
 
 function buildHero(user: PublicProfileUser): ProfileHeroView {
   const socialLinks: ProfileSocialLink[] = [];
@@ -42,18 +44,20 @@ function buildPlatform(platform: PublicProfilePlatform): PublicPlatformView {
   const codeforces = isCodeforcesStats(stats) ? stats : null;
   const atcoder = isAtCoderStats(stats) ? stats : null;
   const leetcode = isLeetCodeStats(stats) ? stats : null;
-  const solved = codeforces ? formatNumber(codeforces.solved_count) : atcoder ? `${formatNumber(atcoder.solved_count)}${atcoder.submission_stats_complete ? "" : " indexed"}` : leetcode ? formatNumber(leetcode.solved_total) : "—";
+  const ctftime = isCTFTeamProfile(stats) ? stats : null;
+  const latestCTFRanking = ctftime?.yearly_rankings[0];
+  const solved = codeforces ? formatNumber(codeforces.solved_count) : atcoder ? `${formatNumber(atcoder.solved_count)}${atcoder.submission_stats_complete ? "" : " indexed"}` : leetcode ? formatNumber(leetcode.solved_total) : ctftime ? `${ctftime.yearly_rankings.length} ranked ${ctftime.yearly_rankings.length === 1 ? "year" : "years"}` : "—";
   return {
-    id: platform.id, slug: platform.platform.toLowerCase(), name: formatDashboardPlatformName(platform.platform), handle: formatHandle(platform.handle), handleValid: platform.handle_validated, mark: getPlatformMark(platform.platform), profileUrl: text(platform.profile_url), lastSyncedLabel: relativeDate(platform.last_synced_at),
-    rating: codeforces ? formatNumber(codeforces.rating, "Unrated") : atcoder ? formatNumber(atcoder.current_rating, "Unrated") : leetcode ? (leetcode.current_contest_rating === null ? "Unrated" : formatNumber(Math.round(leetcode.current_contest_rating))) : "—",
+    id: platform.id, slug: platform.platform.toLowerCase(), name: formatDashboardPlatformName(platform.platform), handle: platform.platform === "ctftime" ? `Team #${platform.handle}` : formatHandle(platform.handle), handleValid: platform.handle_validated, mark: getPlatformMark(platform.platform), profileUrl: text(platform.profile_url), lastSyncedLabel: relativeDate(platform.last_synced_at),
+    rating: codeforces ? formatNumber(codeforces.rating, "Unrated") : atcoder ? formatNumber(atcoder.current_rating, "Unrated") : leetcode ? (leetcode.current_contest_rating === null ? "Unrated" : formatNumber(Math.round(leetcode.current_contest_rating))) : latestCTFRanking ? formatNumber(latestCTFRanking.rating_points) : "—",
     maxRating: codeforces ? formatNumber(codeforces.max_rating, "Unrated") : atcoder ? formatNumber(atcoder.max_rating, "Unrated") : leetcode ? (leetcode.current_contest_rating === null ? "Unrated" : formatNumber(Math.round(leetcode.current_contest_rating))) : "—",
-    rank: codeforces ? text(codeforces.rank) ?? "Unranked" : atcoder ? atcoder.rating_color ?? "Unrated" : leetcode ? (leetcode.contest_top_percentage !== null ? `Top ${leetcode.contest_top_percentage.toFixed(1)}%` : "—") : "—",
-    solved, contests: codeforces ? formatNumber(codeforces.contest_count) : atcoder ? formatNumber(atcoder.rated_contest_count) : leetcode ? formatNumber(leetcode.attended_contest_count) : "—", hasDetailedStats: Boolean(stats),
+    rank: codeforces ? text(codeforces.rank) ?? "Unranked" : atcoder ? atcoder.rating_color ?? "Unrated" : leetcode ? (leetcode.contest_top_percentage !== null ? `Top ${leetcode.contest_top_percentage.toFixed(1)}%` : "—") : latestCTFRanking ? (latestCTFRanking.global_rank === null ? "Unranked" : `#${latestCTFRanking.global_rank} global`) : "—",
+    solved, contests: codeforces ? formatNumber(codeforces.contest_count) : atcoder ? formatNumber(atcoder.rated_contest_count) : leetcode ? formatNumber(leetcode.attended_contest_count) : ctftime ? String(ctftime.yearly_rankings.length) : "—", hasDetailedStats: Boolean(stats),
   };
 }
 
 function buildDomains(platforms: PublicPlatformView[]): DomainCardView[] {
-  const select = (slugs: string[]) => platforms.filter((platform) => slugs.includes(platform.slug)).map(({ id, name, handle, handleValid, mark, profileUrl }) => ({ id, name, handle, handleValid, mark, profileUrl }));
+  const select = (slugs: string[]) => platforms.filter((platform) => slugs.includes(platform.slug)).map(({ id, name, handle, handleValid, mark, profileUrl, rating, rank, contests }) => ({ id, name, handle, handleValid, mark, profileUrl, rating, rank, contests }));
   return [
     { key: "ctf", title: "CTF / Cybersecurity", subtitle: "Security platforms and capture-the-flag profiles", accounts: select(["ctftime", "tryhackme", "hackthebox"]) },
     { key: "hackathon", title: "Hackathon", subtitle: "Hackathon profiles and project showcases", accounts: select(["devpost", "dorahacks"]) },
@@ -62,7 +66,7 @@ function buildDomains(platforms: PublicPlatformView[]): DomainCardView[] {
 }
 
 export function buildPublicProfileViewModel(profile: PublicProfileResponse): PublicProfileViewModel {
-  const supportedPlatforms = profile.platforms.filter((item) => competitiveSlugs.has(item.platform));
+  const supportedPlatforms = profile.platforms.filter((item) => competitiveSlugs.has(item.platform) || item.platform === "ctftime");
   const platformViews = supportedPlatforms.map(buildPlatform);
   const summary = profile.competitive_programming.summary;
   const latestSync = newestDate(supportedPlatforms.map((item) => item.last_synced_at));
@@ -74,7 +78,7 @@ export function buildPublicProfileViewModel(profile: PublicProfileResponse): Pub
     hero: buildHero(profile.user),
     summaryMetrics: [
       { label: "Platforms Connected", value: String(supportedPlatforms.length), icon: CircleDot, accent: "green" },
-      { label: "Valid Handles", value: String(supportedPlatforms.filter((item) => item.handle_validated).length), icon: CheckCircle2, accent: "blue" },
+      { label: "Validated Accounts", value: String(supportedPlatforms.filter((item) => item.handle_validated).length), icon: CheckCircle2, accent: "blue" },
       { label: solvedLabel, value: `${formatNumber(summary.solved_count)}${summary.solved_count_complete ? "" : "+"}`, icon: Activity, accent: "purple" },
       { label: "Last Synced", value: relativeDate(latestSync), icon: RefreshCw, accent: "orange" },
     ],
