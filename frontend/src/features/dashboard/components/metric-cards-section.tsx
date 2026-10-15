@@ -1,4 +1,4 @@
-import { metricAccentStyles } from "../styles";
+import { dashboardCardSurface, metricAccentStyles } from "../styles";
 import type { MetricItem } from "../types";
 
 function MetricCard({ metric }: { metric: MetricItem }) {
@@ -6,10 +6,10 @@ function MetricCard({ metric }: { metric: MetricItem }) {
   const accent = metricAccentStyles[metric.accent];
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.035)]">
+    <article className={`${dashboardCardSurface} overflow-hidden px-4 py-4 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(15,23,42,0.09)]`}>
       <div className="flex min-h-14 items-center gap-3">
         <span
-          className={`grid size-10 shrink-0 place-items-center rounded-xl ${accent.iconBg} ${accent.icon}`}
+          className={`grid size-11 shrink-0 place-items-center rounded-2xl border border-white shadow-[0_5px_12px_rgba(15,23,42,0.07)] ${accent.iconBg} ${accent.icon}`}
         >
           <Icon className="size-5" />
         </span>
@@ -22,7 +22,7 @@ function MetricCard({ metric }: { metric: MetricItem }) {
           </p>
         </div>
       </div>
-      <div className={`mt-2.5 h-0.5 rounded-full ${accent.barBg}`} />
+      <div className={`mt-3 h-0.5 rounded-full ${accent.barBg}`} />
     </article>
   );
 }

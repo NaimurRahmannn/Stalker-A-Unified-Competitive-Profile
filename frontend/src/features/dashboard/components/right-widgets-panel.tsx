@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { ArrowRight, Check, RefreshCw } from "lucide-react";
 import type { CSSProperties } from "react";
-import { widgetAccentStyles } from "../styles";
+import { dashboardCardSurface, widgetAccentStyles } from "../styles";
 import type { ChecklistItem, NextStep } from "../types";
 import { WidgetCard } from "./widget-card";
 
@@ -140,13 +140,13 @@ function StreakSummaryCard() {
 
 function QuoteCard() {
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_34px_rgba(15,23,42,0.04)]">
+    <article className={`${dashboardCardSurface} overflow-hidden p-1`}>
       <Image
         src="/images/stalker_right_bg.png"
         alt="Stalker quote"
         width={2140}
         height={634}
-        className="h-25 w-full object-cover"
+        className="h-25 w-full rounded-[18px] object-cover"
       />
     </article>
   );

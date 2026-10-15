@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { dashboardCardSurface } from "../styles";
 
 export function SectionCard({
   title,
@@ -16,8 +17,8 @@ export function SectionCard({
   showAction?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between gap-4">
+    <section className={`${dashboardCardSurface} p-5`}>
+      <div className="flex items-center justify-between gap-4 border-b border-slate-200/70 pb-3">
         <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
         {showAction ? (
           actionHref ? (

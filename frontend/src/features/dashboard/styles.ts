@@ -8,6 +8,7 @@ type MetricAccentStyle = {
 
 type JourneyAccentStyle = {
   border: string;
+  rail: string;
   icon: string;
   iconBg: string;
   value: string;
@@ -54,6 +55,7 @@ export const metricAccentStyles: Record<MetricAccent, MetricAccentStyle> = {
 export const journeyAccentStyles: Record<MetricAccent, JourneyAccentStyle> = {
   green: {
     border: "border-emerald-100",
+    rail: "bg-emerald-500",
     icon: "text-emerald-600",
     iconBg: "bg-emerald-50",
     value: "text-emerald-600",
@@ -63,6 +65,7 @@ export const journeyAccentStyles: Record<MetricAccent, JourneyAccentStyle> = {
   },
   blue: {
     border: "border-blue-100",
+    rail: "bg-blue-500",
     icon: "text-blue-600",
     iconBg: "bg-blue-50",
     value: "text-blue-600",
@@ -72,6 +75,7 @@ export const journeyAccentStyles: Record<MetricAccent, JourneyAccentStyle> = {
   },
   purple: {
     border: "border-violet-100",
+    rail: "bg-violet-500",
     icon: "text-violet-600",
     iconBg: "bg-violet-50",
     value: "text-violet-600",
@@ -81,6 +85,7 @@ export const journeyAccentStyles: Record<MetricAccent, JourneyAccentStyle> = {
   },
   orange: {
     border: "border-orange-100",
+    rail: "bg-orange-500",
     icon: "text-orange-600",
     iconBg: "bg-orange-50",
     value: "text-orange-600",
@@ -89,6 +94,9 @@ export const journeyAccentStyles: Record<MetricAccent, JourneyAccentStyle> = {
     stroke: "#f97316",
   },
 };
+
+export const dashboardCardSurface =
+  "rounded-[22px] border border-slate-200/80 bg-[linear-gradient(155deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_16px_42px_rgba(15,23,42,0.055)]";
 
 export const achievementAccentStyles: Record<
   MetricAccent,
