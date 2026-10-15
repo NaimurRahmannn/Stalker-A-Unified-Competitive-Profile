@@ -1,3 +1,5 @@
+import math
+import re
 from typing import Any
 
 from apps.connectors.providers.ctftime.domain import (
@@ -16,8 +18,14 @@ class CTFtimeMapper:
     @staticmethod
     def map_profile(payload: dict[str, Any]) -> CTFProfileData:
         try:
-            team_id = str(payload["id"])
-            name = str(payload["name"])
+            raw_id = payload["id"]
+            raw_name = payload["name"]
+            if isinstance(raw_id, bool) or not re.fullmatch(r"[1-9][0-9]*", str(raw_id)):
+                raise ValueError("id must be a positive team ID")
+            if not isinstance(raw_name, str) or not raw_name.strip():
+                raise ValueError("name must be nonempty text")
+            team_id = str(raw_id)
+            name = raw_name.strip()
         except (KeyError, ValueError, TypeError) as e:
             raise CTFtimeInvalidResponseError(
                 f"Missing or invalid required profile fields: {e}"
@@ -57,19 +65,34 @@ class CTFtimeMapper:
                 continue
 
             # CTFtime sometimes omits rating_place or country_place if unranked
-            global_rank = year_stats.get("rating_place")
-            global_rank = int(global_rank) if global_rank is not None else None
-
-            country_rank = year_stats.get("country_place")
-            country_rank = int(country_rank) if country_rank is not None else None
+            try:
+                global_rank = (
+                    int(year_stats["rating_place"])
+                    if year_stats.get("rating_place") is not None
+                    else None
+                )
+                country_rank = (
+                    int(year_stats["country_place"])
+                    if year_stats.get("country_place") is not None
+                    else None
+                )
+                if any(rank is not None and rank < 0 for rank in (global_rank, country_rank)):
+                    raise ValueError("rank cannot be negative")
+            except (TypeError, ValueError) as e:
+                raise CTFtimeInvalidResponseError(
+                    f"Invalid ranking position for {year}"
+                ) from e
 
             # Sometimes points are 0 or missing, but we expect them to be floats
             try:
-                rating_points = float(year_stats.get("rating_points", 0.0))
-                organizer_points = float(year_stats.get("organizer_points", 0.0))
-            except (ValueError, TypeError):
-                rating_points = 0.0
-                organizer_points = 0.0
+                rating_points = float(year_stats.get("rating_points") or 0.0)
+                organizer_points = float(year_stats.get("organizer_points") or 0.0)
+                if not math.isfinite(rating_points) or not math.isfinite(organizer_points):
+                    raise ValueError("points must be finite")
+            except (ValueError, TypeError) as e:
+                raise CTFtimeInvalidResponseError(
+                    f"Invalid ranking points for {year}"
+                ) from e
 
             rankings.append(
                 CTFYearlyRankingData(

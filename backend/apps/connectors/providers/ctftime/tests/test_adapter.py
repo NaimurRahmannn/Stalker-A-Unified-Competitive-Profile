@@ -42,3 +42,10 @@ class CTFtimeAdapterTests(SimpleTestCase):
         self.assertTrue(len(rankings) > 0)
         self.assertIsInstance(rankings[0], CTFYearlyRankingData)
         self.assertEqual(rankings[0].year, 2025)
+
+    def test_get_sync_data_fetches_once(self):
+        data = self.adapter.get_sync_data("1005")
+
+        self.mock_client.get_team_info.assert_called_once_with("1005")
+        self.assertEqual(data.profile.team_id, "1005")
+        self.assertEqual(len(data.yearly_rankings), 3)

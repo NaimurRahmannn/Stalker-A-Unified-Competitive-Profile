@@ -32,6 +32,10 @@ class CTFtimeMapperTests(SimpleTestCase):
         with self.assertRaises(CTFtimeInvalidResponseError):
             CTFtimeMapper.map_profile(invalid_payload)
 
+    def test_map_profile_rejects_null_name(self):
+        with self.assertRaises(CTFtimeInvalidResponseError):
+            CTFtimeMapper.map_profile({"id": 1005, "name": None})
+
     def test_map_rankings_extracts_and_sorts_yearly_data(self):
         rankings = CTFtimeMapper.map_rankings(self.valid_payload)
 
@@ -75,3 +79,13 @@ class CTFtimeMapperTests(SimpleTestCase):
         rankings = CTFtimeMapper.map_rankings(payload)
         self.assertEqual(len(rankings), 1)
         self.assertEqual(rankings[0].year, 2023)
+
+    def test_map_rankings_wraps_invalid_positions_and_points(self):
+        for stats in (
+            {"rating_place": "not-a-rank"},
+            {"rating_points": "not-a-number"},
+            {"rating_points": float("nan")},
+        ):
+            with self.subTest(stats=stats):
+                with self.assertRaises(CTFtimeInvalidResponseError):
+                    CTFtimeMapper.map_rankings({"rating": {"2025": stats}})

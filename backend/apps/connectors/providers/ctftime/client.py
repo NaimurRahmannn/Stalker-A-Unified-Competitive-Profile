@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Any
 from urllib.parse import urljoin
 
@@ -41,7 +42,7 @@ class CTFtimeClient:
         Fetch the complete team profile and ratings payload.
         """
         # Ensure team_id is valid for URL construction
-        if not team_id or not str(team_id).isdigit():
+        if not re.fullmatch(r"[1-9][0-9]*", str(team_id)):
             raise CTFtimeTeamNotFoundError(f"Invalid team ID format: {team_id}")
 
         url = urljoin(self.base_url, f"teams/{team_id}/")
