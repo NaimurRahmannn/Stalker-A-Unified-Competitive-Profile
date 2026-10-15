@@ -75,6 +75,18 @@ AtCoderProblems submission-ingestion settings (all optional):
 - `ATCODER_PROBLEMS_MAX_PAGES_PER_SYNC` (default: `2`)
 - `ATCODER_PROBLEMS_SYNC_COOLDOWN_SECONDS` (default: `300`)
 
+CTFtime team synchronization settings (all optional):
+
+- `CTFTIME_BASE_URL` (default: `https://ctftime.org/api/v1/`)
+- `CTFTIME_TIMEOUT_SECONDS` (default: `10`)
+- `CTFTIME_SYNC_ENABLED` (default: `True`)
+- `CTFTIME_SYNC_COOLDOWN_SECONDS` (default: `3600`)
+
+Connect a CTFtime account with its numeric team ID as the handle. The existing
+`POST /api/v1/platform-accounts/{id}/sync/` action fetches the team profile and
+yearly rankings. The account response includes `ctf_team_profile` and
+`ctftime_sync_state` after synchronization.
+
 Optional PostgreSQL variables:
 
 - `DB_NAME`
