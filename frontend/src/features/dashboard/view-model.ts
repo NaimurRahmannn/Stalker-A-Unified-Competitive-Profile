@@ -209,10 +209,11 @@ function buildCompetitiveProgrammingJourney(
     icon: Code2,
     accent: "green",
     stats: [],
+    platformMarks: ["codeforces", "atcoder", "leetcode"],
     trendLabel: "Trend history endpoint not available yet.",
   } satisfies Pick<
     JourneyItem,
-    "accent" | "icon" | "stats" | "title" | "trendLabel"
+    "accent" | "icon" | "stats" | "title" | "platformMarks" | "trendLabel"
   >;
 
   const connected = platforms.filter((platform) => platform.connected);
@@ -275,15 +276,79 @@ function buildComingSoonJourneyItem(
   };
 }
 
+function buildCTFJourneyItem(platforms: DashboardPlatform[]): JourneyItem {
+  const baseItem = {
+    title: "CTF / Cybersecurity",
+    icon: ShieldCheck,
+    accent: "blue",
+    stats: [],
+    platformMarks: ["ctftime"],
+    actionHref: "/ctf",
+  } satisfies Pick<JourneyItem, "title" | "icon" | "accent" | "stats" | "platformMarks" | "actionHref">;
+  const account = platforms.find((platform) => platform.platform === "ctftime");
+
+  if (!account) {
+    return {
+      ...baseItem,
+      value: "Not connected",
+      label: "Connect a CTFtime team",
+      note: "No CTF platform is connected yet.",
+      trendLabel: "Yearly ratings will appear after your first sync.",
+      actionLabel: "Connect Team",
+      actionHref: "/platforms",
+      isPlaceholder: true,
+    };
+  }
+
+  const profile = account.stats && "yearly_rankings" in account.stats
+    ? account.stats
+    : null;
+  if (!profile) {
+    return {
+      ...baseItem,
+      value: "Not synced",
+      label: "Sync CTFtime to show real stats",
+      note: `Team #${account.handle} is connected`,
+      trendLabel: "Sync the team to load its profile and yearly rankings.",
+      actionLabel: "View Details",
+      isPlaceholder: true,
+    };
+  }
+
+  const rankings = [...profile.yearly_rankings].sort((a, b) => b.year - a.year);
+  const latest = rankings[0];
+  if (!latest) {
+    return {
+      ...baseItem,
+      value: "Team found",
+      label: profile.name,
+      note: "No yearly ranking is available for this team yet.",
+      trendLabel: "Yearly ratings will appear when CTFtime publishes them.",
+      actionLabel: "View Details",
+      isPlaceholder: true,
+    };
+  }
+
+  return {
+    ...baseItem,
+    value: latest.rating_points.toFixed(2),
+    label: `${latest.year} Rating Points`,
+    note: profile.name,
+    stats: [
+      { value: latest.global_rank === null ? "Unranked" : `#${latest.global_rank}`, label: "Global rank" },
+      { value: latest.country_rank === null ? "Unranked" : `#${latest.country_rank}`, label: "Country rank" },
+      { value: String(rankings.length), label: "Ranked years" },
+      { value: latest.organizer_points.toFixed(2), label: "Organizer points" },
+    ],
+    trendLabel: "View yearly rating history in CTFtime analytics.",
+    actionLabel: "View Details",
+  };
+}
+
 function buildJourneyItems(platforms: DashboardPlatform[], competitivePlatforms: CompetitivePlatformSummary[], summary: CompetitiveOverviewSummary): JourneyItem[] {
   return [
     buildCompetitiveProgrammingJourney(competitivePlatforms, summary),
-    buildComingSoonJourneyItem(
-      "CTF / Cybersecurity",
-      "Connector not available yet",
-      ShieldCheck,
-      "blue",
-    ),
+    buildCTFJourneyItem(platforms),
     buildComingSoonJourneyItem(
       "Hackathon",
       "Backend support pending",
@@ -322,7 +387,7 @@ function buildNextSteps(
     });
   }
 
-  if (platforms.some((platform) => !platform.is_verified)) {
+  if (competitiveAccounts.some((platform) => !platform.is_verified)) {
     steps.push({
       title: "Verify connected handles",
       subtitle: "Mark your linked platform accounts as trusted.",

@@ -20,6 +20,7 @@ export type JourneyItem = {
     value: string;
     label: string;
   }>;
+  platformMarks?: PlatformMark[];
   sparkline?: number[];
   trendLabel?: string;
   note?: string;
