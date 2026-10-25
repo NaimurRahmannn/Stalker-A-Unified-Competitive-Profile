@@ -395,15 +395,47 @@ class HackathonSubmissionModelTests(APITestCase):
         sub.refresh_from_db()
         self.assertEqual(sub.project, self.project)
 
-    def test_imported_submission_deduplication_per_event_and_user(self):
-        """Section 2: Deduplicating imported submissions per (event, source, external_id)."""
+    def test_changing_submission_owner_rejected(self):
+        """Blocker 1: Changing a submission's owner after creation must be rejected."""
+        sub = _create_submission(self.project, self.event)
+        user2 = _create_user("bob", "bob@example.com")
+
+        sub.owner = user2
+        with self.assertRaises(ValidationError) as ctx:
+            sub.save()
+        self.assertIn("owner", ctx.exception.message_dict)
+
+        sub.refresh_from_db()
+        self.assertEqual(sub.owner, self.user)
+
+    def test_mismatched_submission_owner_rejected(self):
+        """Submission owner must match project and event owner."""
+        user2 = _create_user("bob", "bob@example.com")
+        sub = HackathonSubmission(
+            owner=user2,
+            project=self.project,
+            event=self.event,
+        )
+        with self.assertRaises(ValidationError):
+            sub.save()
+
+    def test_submission_owner_auto_populated_if_omitted(self):
+        """If owner is omitted, it is automatically derived from the project/event."""
+        sub = HackathonSubmission(
+            project=self.project,
+            event=self.event,
+        )
+        sub.save()
+        self.assertEqual(sub.owner, self.user)
+
+    def test_same_user_same_imported_external_id_same_event_rejected(self):
+        """Same user, same imported external ID, same event: duplicate rejected."""
         _create_submission(
             self.project,
             self.event,
             source=HackathonSubmission.Source.DEVPOST,
             external_id="devpost-sub-101",
         )
-        # Same event, same external_id, different project is rejected
         proj2 = _create_project(self.user, title="Alt Project")
         sub2 = HackathonSubmission(
             project=proj2,
@@ -414,33 +446,52 @@ class HackathonSubmissionModelTests(APITestCase):
         with self.assertRaises((ValidationError, IntegrityError)):
             sub2.save()
 
-    def test_imported_submission_deduplication_database_constraint(self):
-        """Section 2: Database UniqueConstraint rejects duplicate (event, source, external_id)."""
+    def test_same_user_same_imported_external_id_different_events_rejected(self):
+        """Same user, same imported external ID, different events: duplicate rejected."""
         _create_submission(
             self.project,
             self.event,
             source=HackathonSubmission.Source.DEVPOST,
             external_id="devpost-sub-101",
         )
+        event2 = _create_event(self.user, name="Event 2")
         proj2 = _create_project(self.user, title="Alt Project")
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                HackathonSubmission.objects.bulk_create([
-                    HackathonSubmission(
-                        project=proj2,
-                        event=self.event,
-                        source=HackathonSubmission.Source.DEVPOST,
-                        external_id="devpost-sub-101",
-                    )
-                ])
+        sub2 = HackathonSubmission(
+            project=proj2,
+            event=event2,
+            source=HackathonSubmission.Source.DEVPOST,
+            external_id="devpost-sub-101",
+        )
+        with self.assertRaises((ValidationError, IntegrityError)):
+            sub2.save()
 
-    def test_imported_submission_different_users_allowed(self):
-        """Different users can record the same external submission ID in their own events."""
+    def test_same_user_different_imported_external_ids_allowed(self):
+        """Same user, different imported external IDs: allowed."""
+        event2 = _create_event(self.user, name="Event 2")
+        proj2 = _create_project(self.user, title="Alt Project")
+
+        sub1 = _create_submission(
+            self.project,
+            self.event,
+            source=HackathonSubmission.Source.DEVPOST,
+            external_id="devpost-sub-101",
+        )
+        sub2 = _create_submission(
+            proj2,
+            event2,
+            source=HackathonSubmission.Source.DEVPOST,
+            external_id="devpost-sub-102",
+        )
+        self.assertIsNotNone(sub1.pk)
+        self.assertIsNotNone(sub2.pk)
+
+    def test_different_users_same_imported_external_id_allowed(self):
+        """Different users can record the same external submission ID without collision."""
         user2 = _create_user("bob", "bob@example.com")
         event2 = _create_event(user2, name="Bob's Event")
         proj2 = _create_project(user2, title="Bob's Project")
 
-        _create_submission(
+        sub1 = _create_submission(
             self.project,
             self.event,
             source=HackathonSubmission.Source.DEVPOST,
@@ -452,7 +503,42 @@ class HackathonSubmissionModelTests(APITestCase):
             source=HackathonSubmission.Source.DEVPOST,
             external_id="devpost-sub-shared",
         )
+        self.assertIsNotNone(sub1.pk)
         self.assertIsNotNone(sub2.pk)
+
+    def test_manual_records_without_external_ids_allowed(self):
+        """Manual submissions without external IDs are unrestricted."""
+        event2 = _create_event(self.user, name="Event 2")
+        proj2 = _create_project(self.user, title="Project 2")
+
+        sub1 = _create_submission(self.project, self.event, external_id="")
+        sub2 = _create_submission(proj2, event2, external_id="")
+        sub3 = _create_submission(proj2, self.event, external_id="")
+        self.assertIsNotNone(sub1.pk)
+        self.assertIsNotNone(sub2.pk)
+        self.assertIsNotNone(sub3.pk)
+
+    def test_duplicate_import_bulk_create_rejected_by_database_constraint(self):
+        """Database constraint rejects duplicate (owner, source, external_id) across different events even on bulk_create."""
+        _create_submission(
+            self.project,
+            self.event,
+            source=HackathonSubmission.Source.DEVPOST,
+            external_id="devpost-sub-bulk",
+        )
+        event2 = _create_event(self.user, name="Event 2")
+        proj2 = _create_project(self.user, title="Alt Project")
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                HackathonSubmission.objects.bulk_create([
+                    HackathonSubmission(
+                        owner=self.user,
+                        project=proj2,
+                        event=event2,
+                        source=HackathonSubmission.Source.DEVPOST,
+                        external_id="devpost-sub-bulk",
+                    )
+                ])
 
     def test_str_representation(self):
         sub = _create_submission(self.project, self.event)
@@ -900,6 +986,7 @@ class HackathonAdminReadonlyTests(APITestCase):
     def test_submission_admin_relationships_readonly_on_edit(self):
         ma = HackathonSubmissionAdmin(HackathonSubmission, self.site)
         readonly_edit = ma.get_readonly_fields(None, obj=self.submission)
+        self.assertIn("owner", readonly_edit)
         self.assertIn("project", readonly_edit)
         self.assertIn("event", readonly_edit)
 
