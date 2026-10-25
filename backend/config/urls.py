@@ -8,4 +8,5 @@ urlpatterns = [
     path("api/v1/dashboard/", include("apps.dashboard.urls")),
     path("api/v1/profile/", include("apps.profiles.urls")),
     path("api/v1/", include("apps.connectors.urls")),
+    path("api/v1/hackathons/", include("apps.hackathons.urls")),
 ]
