@@ -9,6 +9,9 @@ class HackathonEvent(models.Model):
 
     Events are owner-scoped: different users may independently record the same
     real-world hackathon without merging.  Global canonicalization is deferred.
+
+    Ownership is immutable after creation to prevent orphaning or misattributing
+    existing participations and submissions.
     """
 
     class Format(models.TextChoices):
@@ -57,6 +60,12 @@ class HackathonEvent(models.Model):
                 name="unique_hackathon_event_external_id",
                 condition=~models.Q(external_id=""),
             ),
+            models.CheckConstraint(
+                condition=models.Q(start_date__isnull=True)
+                | models.Q(end_date__isnull=True)
+                | models.Q(end_date__gte=models.F("start_date")),
+                name="hack_event_date_order_chk",
+            ),
         ]
         indexes = [
             models.Index(
@@ -70,13 +79,35 @@ class HackathonEvent(models.Model):
         ]
 
     def clean(self):
-        if self.start_date and self.end_date and self.end_date < self.start_date:
+        # Name cannot be empty or pure whitespace
+        if self.name is not None:
+            self.name = self.name.strip()
+        if not self.name:
+            raise ValidationError({"name": "Event name cannot be blank."})
+
+        # Ownership immutability: owner cannot be changed once created.
+        if self.pk:
+            orig = (
+                HackathonEvent.objects.filter(pk=self.pk)
+                .values("owner_id")
+                .first()
+            )
+            if orig and orig["owner_id"] != self.owner_id:
+                raise ValidationError(
+                    {"owner": "Event owner cannot be changed once created."}
+                )
+
+        if (
+            self.start_date
+            and self.end_date
+            and self.end_date < self.start_date
+        ):
             raise ValidationError(
                 {"end_date": "End date cannot precede start date."}
             )
 
     def save(self, *args, **kwargs):
-        self.clean()
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -89,6 +120,8 @@ class HackathonProject(models.Model):
     A project is not tied directly to an event; the relationship is expressed
     through ``HackathonSubmission``.  A project can be submitted to multiple
     events.
+
+    Ownership is immutable after creation to preserve submission integrity.
     """
 
     class Source(models.TextChoices):
@@ -138,6 +171,24 @@ class HackathonProject(models.Model):
         ]
 
     def clean(self):
+        # Title cannot be empty or pure whitespace
+        if self.title is not None:
+            self.title = self.title.strip()
+        if not self.title:
+            raise ValidationError({"title": "Project title cannot be blank."})
+
+        # Ownership immutability: owner cannot be changed once created.
+        if self.pk:
+            orig = (
+                HackathonProject.objects.filter(pk=self.pk)
+                .values("owner_id")
+                .first()
+            )
+            if orig and orig["owner_id"] != self.owner_id:
+                raise ValidationError(
+                    {"owner": "Project owner cannot be changed once created."}
+                )
+
         if not isinstance(self.technologies, list):
             raise ValidationError(
                 {"technologies": "Technologies must be a list of strings."}
@@ -148,7 +199,7 @@ class HackathonProject(models.Model):
             )
 
     def save(self, *args, **kwargs):
-        self.clean()
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -159,8 +210,11 @@ class HackathonSubmission(models.Model):
     """Represent a specific project being submitted to a particular hackathon.
 
     Ownership invariant: ``project.owner`` and ``event.owner`` must be the same
-    user.  This is enforced at the application level via ``clean()`` because
-    cross-table checks cannot be expressed as a single-table DB constraint.
+    user.  Both project and event references are immutable after creation.
+
+    External deduplication: For imported records (e.g. Devpost), external_id
+    is unique per (event, source) at the database level, and unique per user
+    at the model validation level.
     """
 
     class Status(models.TextChoices):
@@ -205,6 +259,12 @@ class HackathonSubmission(models.Model):
                 fields=["project", "event"],
                 name="unique_hackathon_submission_project_event",
             ),
+            # Deduplicate imported submissions per event+source
+            models.UniqueConstraint(
+                fields=["event", "source", "external_id"],
+                name="unique_hack_sub_event_ext_id",
+                condition=~models.Q(external_id=""),
+            ),
         ]
         indexes = [
             models.Index(
@@ -214,8 +274,25 @@ class HackathonSubmission(models.Model):
         ]
 
     def clean(self):
+        # Relationship immutability: project and event cannot change once created.
+        if self.pk:
+            orig = (
+                HackathonSubmission.objects.filter(pk=self.pk)
+                .values("project_id", "event_id")
+                .first()
+            )
+            if orig:
+                if orig["project_id"] != self.project_id:
+                    raise ValidationError(
+                        {"project": "Submission project cannot be changed once created."}
+                    )
+                if orig["event_id"] != self.event_id:
+                    raise ValidationError(
+                        {"event": "Submission event cannot be changed once created."}
+                    )
+
         # Cross-table ownership check: project and event must belong to the
-        # same user.  This cannot be represented as a database constraint.
+        # same user.
         if self.project_id and self.event_id:
             project_owner_id = (
                 self.project.owner_id
@@ -238,8 +315,38 @@ class HackathonSubmission(models.Model):
                     "Project and event must belong to the same user."
                 )
 
+        # Deduplicate imported submission identity across the user's scope
+        if (
+            self.source != self.Source.MANUAL
+            and self.external_id
+            and self.event_id
+        ):
+            event_owner_id = (
+                self.event.owner_id
+                if hasattr(self, "_event_cache")
+                or HackathonEvent.objects.filter(pk=self.event_id).exists()
+                else None
+            )
+            if event_owner_id is not None:
+                existing = HackathonSubmission.objects.filter(
+                    event__owner_id=event_owner_id,
+                    source=self.source,
+                    external_id=self.external_id,
+                )
+                if self.pk:
+                    existing = existing.exclude(pk=self.pk)
+                if existing.exists():
+                    raise ValidationError(
+                        {
+                            "external_id": (
+                                "An imported submission with this external ID "
+                                "already exists for this user."
+                            )
+                        }
+                    )
+
     def save(self, *args, **kwargs):
-        self.clean()
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -249,8 +356,8 @@ class HackathonSubmission(models.Model):
 class HackathonParticipation(models.Model):
     """Represent a user's participation in a hackathon.
 
-    Ownership invariant: ``event.owner`` must equal ``user``.  Enforced at the
-    application level via ``clean()``.
+    Ownership invariant: ``event.owner`` must equal ``user``.
+    Both user and event references are immutable after creation.
     """
 
     class Status(models.TextChoices):
@@ -295,6 +402,23 @@ class HackathonParticipation(models.Model):
         ]
 
     def clean(self):
+        # Relationship immutability: user and event cannot change once created.
+        if self.pk:
+            orig = (
+                HackathonParticipation.objects.filter(pk=self.pk)
+                .values("user_id", "event_id")
+                .first()
+            )
+            if orig:
+                if orig["user_id"] != self.user_id:
+                    raise ValidationError(
+                        {"user": "Participation user cannot be changed once created."}
+                    )
+                if orig["event_id"] != self.event_id:
+                    raise ValidationError(
+                        {"event": "Participation event cannot be changed once created."}
+                    )
+
         if self.event_id and self.user_id:
             event_owner_id = (
                 self.event.owner_id
@@ -311,7 +435,7 @@ class HackathonParticipation(models.Model):
                 )
 
     def save(self, *args, **kwargs):
-        self.clean()
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -325,9 +449,10 @@ class HackathonAchievement(models.Model):
     set their own achievements to ``verified`` through public APIs; that
     transition is reserved for admin or a future verification workflow.
 
+    Participation reference is immutable after creation.
+
     If a ``submission`` is linked, its event must match the participation
-    event and the submission must belong to the same user.  These cross-table
-    invariants are enforced at the application level via ``clean()``.
+    event and the submission must belong to the same user.
     """
 
     class AchievementType(models.TextChoices):
@@ -381,6 +506,23 @@ class HackathonAchievement(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(rank__isnull=True) | models.Q(rank__gte=1),
+                name="hack_achieve_rank_gte_1_chk",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(total_participants__isnull=True)
+                | models.Q(total_participants__gte=1),
+                name="hack_achieve_total_gte_1_chk",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rank__isnull=True)
+                | models.Q(total_participants__isnull=True)
+                | models.Q(rank__lte=models.F("total_participants")),
+                name="hack_achieve_rank_lte_total_chk",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["participation", "-created_at"],
@@ -389,8 +531,25 @@ class HackathonAchievement(models.Model):
         ]
 
     def clean(self):
-        # Rank must be ≥ 1 (covered by validator, but explicit here for
-        # ``full_clean`` consistency).
+        # Title cannot be empty or pure whitespace
+        if self.title is not None:
+            self.title = self.title.strip()
+        if not self.title:
+            raise ValidationError({"title": "Achievement title cannot be blank."})
+
+        # Participation reference is immutable after creation
+        if self.pk:
+            orig = (
+                HackathonAchievement.objects.filter(pk=self.pk)
+                .values("participation_id")
+                .first()
+            )
+            if orig and orig["participation_id"] != self.participation_id:
+                raise ValidationError(
+                    {"participation": "Achievement participation cannot be changed once created."}
+                )
+
+        # Rank must be ≥ 1
         if self.rank is not None and self.rank < 1:
             raise ValidationError(
                 {"rank": "Rank must be at least 1."}
@@ -444,7 +603,7 @@ class HackathonAchievement(models.Model):
                 )
 
     def save(self, *args, **kwargs):
-        self.clean()
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
