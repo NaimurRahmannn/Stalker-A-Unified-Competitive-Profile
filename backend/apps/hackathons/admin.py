@@ -59,6 +59,7 @@ class HackathonSubmissionAdmin(admin.ModelAdmin):
     list_display = [
         "project",
         "event",
+        "owner",
         "status",
         "source",
         "submitted_at",
@@ -68,15 +69,15 @@ class HackathonSubmissionAdmin(admin.ModelAdmin):
     search_fields = [
         "project__title",
         "event__name",
-        "project__owner__username",
+        "owner__username",
     ]
-    raw_id_fields = ["project", "event"]
+    raw_id_fields = ["owner", "project", "event"]
     readonly_fields = ["created_at", "updated_at"]
 
     def get_readonly_fields(self, request, obj=None):
         readonly = list(super().get_readonly_fields(request, obj))
         if obj:
-            readonly.extend(["project", "event"])
+            readonly.extend(["owner", "project", "event"])
         return readonly
 
 
