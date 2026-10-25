@@ -19,7 +19,7 @@ backend/
 │   ├── common/
 │   ├── connectors/
 │   ├── dashboard/
-│   └── hackathons/          # untouched for future milestones
+│   └── hackathons/          # Phase 1: database design & backend foundation
 ├── config/
 │   ├── urls.py
 │   ├── asgi.py
@@ -159,6 +159,11 @@ Platform accounts (connectors):
 Dashboard:
 
 - `GET /api/v1/dashboard/me/` — returns `{ user, platforms: [{ ..., stats }] }`
+
+Hackathons:
+
+- `GET /api/v1/hackathons/overview/` — returns the authenticated user's hackathon activity summary:
+  `{ hackathons_attended, projects_submitted, achievements_recorded, placements_recorded }`
 
 Competitive programming analytics:
 
