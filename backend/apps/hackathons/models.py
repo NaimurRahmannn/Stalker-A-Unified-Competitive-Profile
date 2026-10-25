@@ -209,12 +209,14 @@ class HackathonProject(models.Model):
 class HackathonSubmission(models.Model):
     """Represent a specific project being submitted to a particular hackathon.
 
-    Ownership invariant: ``project.owner`` and ``event.owner`` must be the same
-    user.  Both project and event references are immutable after creation.
+    Ownership invariant: ``owner``, ``project.owner``, and ``event.owner`` must
+    all be the same user.  Owner, project, and event references are immutable
+    after creation.
 
     External deduplication: For imported records (e.g. Devpost), external_id
-    is unique per (event, source) at the database level, and unique per user
-    at the model validation level.
+    is unique per (owner, source) at the database level across all events,
+    preventing duplicate imported submissions even across concurrent writes or
+    bulk inserts, while allowing distinct users to record shared submissions.
     """
 
     class Status(models.TextChoices):
@@ -226,6 +228,11 @@ class HackathonSubmission(models.Model):
         MANUAL = "manual", "Manual"
         DEVPOST = "devpost", "Devpost"
 
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="hackathon_submissions",
+    )
     project = models.ForeignKey(
         "hackathons.HackathonProject",
         on_delete=models.CASCADE,
@@ -259,29 +266,59 @@ class HackathonSubmission(models.Model):
                 fields=["project", "event"],
                 name="unique_hackathon_submission_project_event",
             ),
-            # Deduplicate imported submissions per event+source
+            # Database-enforced uniqueness: an imported submission is unique
+            # per owner, source, and external_id (scoped to the user, not global)
             models.UniqueConstraint(
-                fields=["event", "source", "external_id"],
-                name="unique_hack_sub_event_ext_id",
+                fields=["owner", "source", "external_id"],
+                name="unique_hack_sub_owner_ext_id",
                 condition=~models.Q(external_id=""),
             ),
         ]
         indexes = [
             models.Index(
+                fields=["owner", "-created_at"],
+                name="hack_sub_owner_idx",
+            ),
+            models.Index(
                 fields=["event", "-created_at"],
                 name="hack_submission_event_idx",
+            ),
+            models.Index(
+                fields=["owner", "source", "external_id"],
+                name="hack_sub_owner_ext_idx",
             ),
         ]
 
     def clean(self):
-        # Relationship immutability: project and event cannot change once created.
+        # Auto-populate owner from project or event if not set
+        if not self.owner_id:
+            if self.project_id:
+                self.owner_id = (
+                    self.project.owner_id
+                    if hasattr(self, "_project_cache")
+                    or HackathonProject.objects.filter(pk=self.project_id).exists()
+                    else None
+                )
+            elif self.event_id:
+                self.owner_id = (
+                    self.event.owner_id
+                    if hasattr(self, "_event_cache")
+                    or HackathonEvent.objects.filter(pk=self.event_id).exists()
+                    else None
+                )
+
+        # Relationship immutability: owner, project, and event cannot change once created.
         if self.pk:
             orig = (
                 HackathonSubmission.objects.filter(pk=self.pk)
-                .values("project_id", "event_id")
+                .values("owner_id", "project_id", "event_id")
                 .first()
             )
             if orig:
+                if orig["owner_id"] != self.owner_id:
+                    raise ValidationError(
+                        {"owner": "Submission owner cannot be changed once created."}
+                    )
                 if orig["project_id"] != self.project_id:
                     raise ValidationError(
                         {"project": "Submission project cannot be changed once created."}
@@ -291,61 +328,60 @@ class HackathonSubmission(models.Model):
                         {"event": "Submission event cannot be changed once created."}
                     )
 
-        # Cross-table ownership check: project and event must belong to the
-        # same user.
-        if self.project_id and self.event_id:
+        # Cross-table ownership check: project and event must belong to the same user.
+        project_owner_id = None
+        event_owner_id = None
+        if self.project_id:
             project_owner_id = (
                 self.project.owner_id
                 if hasattr(self, "_project_cache")
                 or HackathonProject.objects.filter(pk=self.project_id).exists()
                 else None
             )
+        if self.event_id:
             event_owner_id = (
                 self.event.owner_id
                 if hasattr(self, "_event_cache")
                 or HackathonEvent.objects.filter(pk=self.event_id).exists()
                 else None
             )
-            if (
-                project_owner_id is not None
-                and event_owner_id is not None
-                and project_owner_id != event_owner_id
-            ):
-                raise ValidationError(
-                    "Project and event must belong to the same user."
-                )
 
-        # Deduplicate imported submission identity across the user's scope
         if (
-            self.source != self.Source.MANUAL
-            and self.external_id
-            and self.event_id
+            project_owner_id is not None
+            and event_owner_id is not None
+            and project_owner_id != event_owner_id
         ):
-            event_owner_id = (
-                self.event.owner_id
-                if hasattr(self, "_event_cache")
-                or HackathonEvent.objects.filter(pk=self.event_id).exists()
-                else None
+            raise ValidationError(
+                "Project and event must belong to the same user."
             )
-            if event_owner_id is not None:
-                existing = HackathonSubmission.objects.filter(
-                    event__owner_id=event_owner_id,
-                    source=self.source,
-                    external_id=self.external_id,
+
+        if self.owner_id:
+            if project_owner_id is not None and self.owner_id != project_owner_id:
+                raise ValidationError(
+                    {"owner": "Submission owner must match project owner."}
                 )
-                if self.pk:
-                    existing = existing.exclude(pk=self.pk)
-                if existing.exists():
-                    raise ValidationError(
-                        {
-                            "external_id": (
-                                "An imported submission with this external ID "
-                                "already exists for this user."
-                            )
-                        }
-                    )
+            if event_owner_id is not None and self.owner_id != event_owner_id:
+                raise ValidationError(
+                    {"owner": "Submission owner must match event owner."}
+                )
 
     def save(self, *args, **kwargs):
+        # Ensure owner is populated before full_clean runs
+        if not self.owner_id:
+            if self.project_id:
+                self.owner_id = (
+                    self.project.owner_id
+                    if hasattr(self, "_project_cache")
+                    or HackathonProject.objects.filter(pk=self.project_id).exists()
+                    else None
+                )
+            elif self.event_id:
+                self.owner_id = (
+                    self.event.owner_id
+                    if hasattr(self, "_event_cache")
+                    or HackathonEvent.objects.filter(pk=self.event_id).exists()
+                    else None
+                )
         self.full_clean()
         super().save(*args, **kwargs)
 
