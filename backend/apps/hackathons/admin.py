@@ -26,6 +26,12 @@ class HackathonEventAdmin(admin.ModelAdmin):
     raw_id_fields = ["owner"]
     readonly_fields = ["created_at", "updated_at"]
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:
+            readonly.append("owner")
+        return readonly
+
 
 @admin.register(HackathonProject)
 class HackathonProjectAdmin(admin.ModelAdmin):
@@ -40,6 +46,12 @@ class HackathonProjectAdmin(admin.ModelAdmin):
     search_fields = ["title", "owner__username"]
     raw_id_fields = ["owner"]
     readonly_fields = ["created_at", "updated_at"]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:
+            readonly.append("owner")
+        return readonly
 
 
 @admin.register(HackathonSubmission)
@@ -61,6 +73,12 @@ class HackathonSubmissionAdmin(admin.ModelAdmin):
     raw_id_fields = ["project", "event"]
     readonly_fields = ["created_at", "updated_at"]
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:
+            readonly.extend(["project", "event"])
+        return readonly
+
 
 @admin.register(HackathonParticipation)
 class HackathonParticipationAdmin(admin.ModelAdmin):
@@ -76,6 +94,12 @@ class HackathonParticipationAdmin(admin.ModelAdmin):
     search_fields = ["user__username", "event__name", "team_name"]
     raw_id_fields = ["user", "event"]
     readonly_fields = ["created_at", "updated_at"]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:
+            readonly.extend(["user", "event"])
+        return readonly
 
 
 @admin.register(HackathonAchievement)
@@ -96,3 +120,9 @@ class HackathonAchievementAdmin(admin.ModelAdmin):
     ]
     raw_id_fields = ["participation", "submission"]
     readonly_fields = ["created_at", "updated_at"]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:
+            readonly.append("participation")
+        return readonly
