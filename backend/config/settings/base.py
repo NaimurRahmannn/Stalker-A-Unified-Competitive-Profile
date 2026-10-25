@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "apps.connectors",
     "apps.dashboard",
     "apps.profiles",
+    "apps.hackathons",
 ]
 
 MIDDLEWARE = [
