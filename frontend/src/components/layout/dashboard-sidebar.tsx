@@ -93,7 +93,7 @@ const domainItems: SidebarItem[] = [
   {
     id: "hackathon",
     label: "Hackathon",
-    href: "#",
+    href: "/hackathon",
     icon: Trophy,
     accent: "purple",
     chevron: true,

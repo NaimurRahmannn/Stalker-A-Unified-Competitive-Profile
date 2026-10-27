@@ -1,0 +1,12 @@
+export type Page<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+export type EventFormat = "online" | "in_person" | "hybrid" | "unknown";
+export type ParticipationStatus = "registered" | "attended" | "submitted";
+export type SubmissionStatus = "draft" | "submitted" | "withdrawn";
+export type AchievementType = "placement" | "award" | "finalist" | "participation" | "other";
+export type Overview = { hackathons_attended: number; projects_submitted: number; achievements_recorded: number; placements_recorded: number };
+export type Participation = { id: number; event: number; status: ParticipationStatus; team_name: string; role: string; is_public: boolean };
+export type Project = { id: number; title: string; description: string; repository_url: string; demo_url: string; video_url: string; image_url: string; technologies: string[]; is_public: boolean; source: string };
+export type Submission = { id: number; event: number; project: number; project_title: string; status: SubmissionStatus; submission_url: string; submitted_at: string | null; source: string };
+export type Achievement = { id: number; participation: number; submission: number | null; achievement_type: AchievementType; title: string; rank: number | null; total_participants: number | null; description: string; evidence_url: string; verification_status: "self_reported" | "evidence_provided" | "verified" };
+export type Event = { id: number; name: string; organizer: string; description: string; event_url: string; start_date: string | null; end_date: string | null; format: EventFormat; source: string; participation: Participation | null; submissions: Submission[]; achievements: Achievement[] };
+export type EntryResponse = { event_id: number; participation_id: number; project_id: number | null; submission_id: number | null; achievement_ids: number[] };
