@@ -34,6 +34,15 @@ class ManualViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
+        verified = HackathonAchievement.VerificationStatus.VERIFIED
+        if (
+            isinstance(instance, HackathonAchievement) and instance.verification_status == verified
+            or isinstance(instance, HackathonEvent) and HackathonAchievement.objects.filter(participation__event=instance, verification_status=verified).exists()
+            or isinstance(instance, HackathonParticipation) and instance.achievements.filter(verification_status=verified).exists()
+            or isinstance(instance, HackathonSubmission) and instance.achievements.filter(verification_status=verified).exists()
+            or isinstance(instance, HackathonProject) and HackathonAchievement.objects.filter(submission__project=instance, verification_status=verified).exists()
+        ):
+            raise PermissionDenied("Verified achievements are read-only in manual management.")
         if hasattr(instance, "source") and instance.source != "manual":
             raise PermissionDenied("Imported records cannot be deleted here.")
         if isinstance(instance, HackathonEvent) and (
@@ -69,6 +78,9 @@ class EventViewSet(ManualViewSet):
             if not year.isdigit() or not (1 <= int(year) <= 9999):
                 raise ValidationError({"year": "Enter a valid year."})
             qs = qs.filter(start_date__year=int(year))
+        name = self.request.query_params.get("name")
+        if name:
+            qs = qs.filter(name__icontains=name[:100])
         return qs
 
     def perform_create(self, serializer):
@@ -109,6 +121,22 @@ class SubmissionViewSet(ManualViewSet):
 
 class AchievementViewSet(ManualViewSet):
     serializer_class = AchievementSerializer
+
+    def update(self, request, *args, **kwargs):
+        with transaction.atomic():
+            instance = self.get_object()
+            locked = HackathonAchievement.objects.select_for_update().get(pk=instance.pk)
+            if locked.verification_status == HackathonAchievement.VerificationStatus.VERIFIED:
+                raise PermissionDenied("Verified achievements are read-only in manual management.")
+            return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        with transaction.atomic():
+            instance = self.get_object()
+            locked = HackathonAchievement.objects.select_for_update().get(pk=instance.pk)
+            if locked.verification_status == HackathonAchievement.VerificationStatus.VERIFIED:
+                raise PermissionDenied("Verified achievements are read-only in manual management.")
+            return super().destroy(request, *args, **kwargs)
 
     def get_queryset(self):
         qs = HackathonAchievement.objects.filter(participation__user=self.request.user).select_related("participation", "submission").order_by("-created_at", "-pk")

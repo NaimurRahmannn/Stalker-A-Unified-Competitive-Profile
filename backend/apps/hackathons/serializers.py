@@ -2,6 +2,7 @@
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from urllib.parse import urlsplit
 from rest_framework import serializers
 
 from apps.hackathons.models import (
@@ -14,6 +15,16 @@ def model_errors(exc):
     if hasattr(exc, "message_dict"):
         return exc.message_dict
     return {"non_field_errors": exc.messages}
+
+
+class HttpUrlField(serializers.URLField):
+    """Accept only web URLs in user-managed manual records."""
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        if value and urlsplit(value).scheme.lower() not in {"http", "https"}:
+            raise serializers.ValidationError("Enter an HTTP(S) URL.")
+        return value
 
 
 class OwnedRelatedField(serializers.PrimaryKeyRelatedField):
@@ -66,6 +77,7 @@ class ManualSerializer(serializers.ModelSerializer):
 
 class EventSerializer(ManualSerializer):
     writable = ("name", "organizer", "description", "event_url", "start_date", "end_date", "format")
+    event_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
     participation = serializers.SerializerMethodField()
     submissions = serializers.SerializerMethodField()
     achievements = serializers.SerializerMethodField()
@@ -98,6 +110,10 @@ class EventSerializer(ManualSerializer):
 class ProjectSerializer(ManualSerializer):
     writable = ("title", "description", "repository_url", "demo_url", "video_url", "image_url", "technologies", "is_public")
     technologies = serializers.ListField(child=serializers.CharField(), required=False)
+    repository_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
+    demo_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
+    video_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
+    image_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
 
     class Meta:
         model = HackathonProject
@@ -128,6 +144,7 @@ class SubmissionSerializer(ManualSerializer):
     event = OwnedRelatedField(queryset=HackathonEvent.objects.all())
     project = OwnedRelatedField(queryset=HackathonProject.objects.all())
     project_title = serializers.CharField(source="project.title", read_only=True)
+    submission_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
 
     class Meta:
         model = HackathonSubmission
@@ -146,6 +163,7 @@ class AchievementSerializer(ManualSerializer):
     immutable = ("participation",)
     participation = OwnedRelatedField(queryset=HackathonParticipation.objects.all())
     submission = OwnedRelatedField(queryset=HackathonSubmission.objects.all(), required=False, allow_null=True)
+    evidence_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
 
     class Meta:
         model = HackathonAchievement
@@ -174,7 +192,7 @@ class EntryParticipationSerializer(serializers.Serializer):
 
 class EntrySubmissionSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=HackathonSubmission.Status.choices, required=False)
-    submission_url = serializers.URLField(max_length=500, allow_blank=True, required=False)
+    submission_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
     submitted_at = serializers.DateTimeField(allow_null=True, required=False)
 
 
@@ -184,7 +202,7 @@ class EntryAchievementSerializer(serializers.Serializer):
     rank = serializers.IntegerField(min_value=1, allow_null=True, required=False)
     total_participants = serializers.IntegerField(min_value=1, allow_null=True, required=False)
     description = serializers.CharField(allow_blank=True, required=False)
-    evidence_url = serializers.URLField(max_length=500, allow_blank=True, required=False)
+    evidence_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
     link_submission = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs):
