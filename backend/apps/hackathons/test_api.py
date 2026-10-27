@@ -1,10 +1,13 @@
 """Phase 2 API integration and isolation tests."""
 
 from django.contrib.auth import get_user_model
+from django.contrib.admin.sites import AdminSite
 from django.db import connection
+from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase
 
+from apps.hackathons.admin import HackathonAchievementAdmin
 from apps.hackathons.models import (
     HackathonAchievement, HackathonEvent, HackathonParticipation,
     HackathonProject, HackathonSubmission,
@@ -143,3 +146,118 @@ class ManualAPITests(APITestCase):
         self.assertEqual(self.client.delete(ROOT + f"events/{self.event.pk}/").status_code, 403)
         self.assertEqual(self.client.delete(ROOT + f"projects/{imported_project.pk}/").status_code, 403)
         self.assertTrue(HackathonSubmission.objects.filter(pk=imported_submission.pk).exists())
+
+    def test_verified_achievement_is_read_only_but_self_reported_is_editable(self):
+        url = ROOT + f"achievements/{self.achievement.pk}/"
+        self.assertEqual(self.client.patch(url, {"title": "Updated award"}, format="json").status_code, 200)
+        self.achievement.refresh_from_db()
+        self.assertEqual(self.achievement.title, "Updated award")
+        self.achievement.verification_status = HackathonAchievement.VerificationStatus.VERIFIED
+        self.achievement.save()
+        for method, payload in (
+            ("patch", {"title": "Forged title"}),
+            ("patch", {"rank": 1}),
+            ("patch", {"achievement_type": "placement"}),
+            ("patch", {"evidence_url": "https://example.com/fake"}),
+            ("put", {"achievement_type": "placement", "title": "Forged title", "rank": 1}),
+        ):
+            with self.subTest(method=method, payload=payload):
+                response = getattr(self.client, method)(url, payload, format="json")
+                self.assertEqual(response.status_code, 403, response.data)
+                self.achievement.refresh_from_db()
+                self.assertEqual(self.achievement.title, "Updated award")
+                self.assertIsNone(self.achievement.rank)
+                self.assertEqual(self.achievement.achievement_type, "award")
+                self.assertEqual(self.achievement.evidence_url, "")
+                self.assertEqual(self.achievement.verification_status, "verified")
+        self.assertEqual(self.client.patch(url, {"verification_status": "verified"}, format="json").status_code, 403)
+        self.assertEqual(self.client.delete(url).status_code, 403)
+        other_url = ROOT + f"achievements/{self.other_achievement.pk}/"
+        self.assertEqual(self.client.patch(other_url, {"title": "Hidden"}, format="json").status_code, 404)
+
+    def test_admin_can_still_verify_achievement(self):
+        admin_user = get_user_model().objects.create_superuser(username="review-admin", email="admin@example.com", password="test12345")
+        request = RequestFactory().get("/admin/")
+        request.user = admin_user
+        admin = HackathonAchievementAdmin(HackathonAchievement, AdminSite())
+        self.assertNotIn("verification_status", admin.get_readonly_fields(request, self.achievement))
+        self.client.force_authenticate(user=None)
+        self.client.force_login(admin_user)
+        response = self.client.post(
+            f"/admin/hackathons/hackathonachievement/{self.achievement.pk}/change/",
+            {
+                "achievement_type": "award", "title": self.achievement.title,
+                "rank": "", "total_participants": "", "description": "",
+                "evidence_url": "", "submission": "",
+                "verification_status": "verified", "_save": "Save",
+            },
+        )
+        self.assertEqual(response.status_code, 302, response.context)
+        self.achievement.refresh_from_db()
+        self.assertEqual(self.achievement.verification_status, "verified")
+
+    def test_related_deletes_cannot_remove_or_unlink_verified_achievement(self):
+        self.achievement.submission = self.submission
+        self.achievement.verification_status = HackathonAchievement.VerificationStatus.VERIFIED
+        self.achievement.save()
+        for resource, record in (
+            ("events", self.event),
+            ("projects", self.project),
+            ("participations", self.participation),
+            ("submissions", self.submission),
+            ("achievements", self.achievement),
+        ):
+            with self.subTest(resource=resource):
+                response = self.client.delete(ROOT + f"{resource}/{record.pk}/")
+                self.assertEqual(response.status_code, 403, response.data)
+                self.achievement.refresh_from_db()
+                self.assertEqual(self.achievement.verification_status, "verified")
+                self.assertEqual(self.achievement.submission_id, self.submission.pk)
+
+    def test_owner_scoped_event_name_search_is_paginated(self):
+        for index in range(25):
+            HackathonEvent.objects.create(owner=self.alice, name=f"Long running hack {index}")
+        HackathonEvent.objects.create(owner=self.bob, name="Long running hack private")
+        first = self.client.get(ROOT + "events/?name=running&page=1")
+        second = self.client.get(ROOT + "events/?name=running&page=2")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.data["count"], 25)
+        self.assertEqual(len(first.data["results"]), 20)
+        self.assertEqual(len(second.data["results"]), 5)
+        self.assertTrue(all("running" in item["name"] for item in first.data["results"] + second.data["results"]))
+        self.assertEqual(self.client.get(ROOT + "events/?name=private").data["count"], 0)
+
+    def test_http_only_url_fields_in_crud_and_composite(self):
+        cases = (
+            ("events", self.event.pk, "event_url"),
+            ("projects", self.project.pk, "repository_url"),
+            ("projects", self.project.pk, "demo_url"),
+            ("projects", self.project.pk, "video_url"),
+            ("projects", self.project.pk, "image_url"),
+            ("submissions", self.submission.pk, "submission_url"),
+            ("achievements", self.achievement.pk, "evidence_url"),
+        )
+        for resource, record_id, field in cases:
+            url = ROOT + f"{resource}/{record_id}/"
+            for value in ("https://example.com", "http://example.com", ""):
+                with self.subTest(resource=resource, field=field, value=value):
+                    self.assertEqual(self.client.patch(url, {field: value}, format="json").status_code, 200)
+            for value in ("ftp://example.com", "javascript:alert(1)", "file:///etc/passwd"):
+                with self.subTest(resource=resource, field=field, value=value):
+                    response = self.client.patch(url, {field: value}, format="json")
+                    self.assertEqual(response.status_code, 400, response.data)
+                    self.assertIn(field, response.data)
+        self.assertEqual(self.client.post(ROOT + "events/", {"name": "New", "event_url": "ftp://example.com"}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(ROOT + "projects/", {"title": "New", "repository_url": "ftp://example.com"}, format="json").status_code, 400)
+        new_event = HackathonEvent.objects.create(owner=self.alice, name="New submission")
+        self.assertEqual(self.client.post(ROOT + "submissions/", {"event": new_event.pk, "project": self.project.pk, "submission_url": "ftp://example.com"}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(ROOT + "achievements/", {"participation": self.participation.pk, "achievement_type": "award", "title": "New", "evidence_url": "ftp://example.com"}, format="json").status_code, 400)
+        composite_cases = (
+            {"event": {"name": "Bad", "event_url": "ftp://example.com"}, "participation": {}},
+            {"event": {"name": "Bad"}, "participation": {}, "project": {"title": "Bad", "demo_url": "ftp://example.com"}, "submission": {}},
+            {"event": {"name": "Bad"}, "participation": {}, "project_id": self.project.pk, "submission": {"submission_url": "ftp://example.com"}},
+            {"event": {"name": "Bad"}, "participation": {}, "achievements": [{"achievement_type": "award", "title": "Bad", "evidence_url": "ftp://example.com"}]},
+        )
+        for payload in composite_cases:
+            response = self.client.post(ROOT + "entries/", payload, format="json")
+            self.assertEqual(response.status_code, 400, response.data)

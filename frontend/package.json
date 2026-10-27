@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test:hackathons": "node --test tests/hackathons.test.cjs",
     "start": "next start",
     "lint": "eslint"
   },

@@ -5,16 +5,16 @@ All paths below are relative to `/api/v1/hackathons/`. Every endpoint requires a
 | Path | Methods | Writable fields |
 | --- | --- | --- |
 | `overview/` | GET | None. Returns `hackathons_attended`, `projects_submitted`, `achievements_recorded`, `placements_recorded`. |
-| `events/`, `events/{id}/` | GET list or detail, POST, PATCH, DELETE | `name`, `organizer`, `description`, `event_url`, `start_date`, `end_date`, `format` (`online`, `in_person`, `hybrid`, `unknown`). Filters: `status`, `year`. |
+| `events/`, `events/{id}/` | GET list or detail, POST, PATCH, DELETE | `name`, `organizer`, `description`, `event_url`, `start_date`, `end_date`, `format` (`online`, `in_person`, `hybrid`, `unknown`). Filters: `status`, `year`, `name` (case-insensitive substring). |
 | `projects/`, `projects/{id}/` | GET list or detail, POST, PATCH, DELETE | `title`, `description`, `repository_url`, `demo_url`, `video_url`, `image_url`, `technologies` (string array), `is_public`. Filter: `title`. |
 | `participations/`, `participations/{id}/` | GET list or detail, POST, PATCH, DELETE | `event` on create only; `status` (`registered`, `attended`, `submitted`), `team_name`, `role`, `is_public`. |
 | `submissions/`, `submissions/{id}/` | GET list or detail, POST, PATCH, DELETE | `event` and `project` on create only; `status` (`draft`, `submitted`, `withdrawn`), `submission_url`, `submitted_at` (ISO 8601). |
 | `achievements/`, `achievements/{id}/` | GET list or detail, POST, PATCH, DELETE | `participation` on create only; `submission` (nullable), `achievement_type` (`placement`, `award`, `finalist`, `participation`, `other`), `title`, `rank`, `total_participants`, `description`, `evidence_url`. Filter: `achievement_type`. |
 | `entries/` | POST | Composite request described below. |
 
-POST returns the created record with HTTP 201. PATCH returns the updated record with HTTP 200. DELETE returns HTTP 204. Event responses also contain the user's `participation`, `submissions`, and `achievements`. Optional URL fields accept HTTP(S) URLs or empty strings. Optional dates and numeric values accept `null`. Rank and total participants must be positive, and rank cannot exceed total participants. `source`, `external_id`, ownership fields, `verification_status`, and timestamps cannot be supplied. Immutable relationship fields cannot be patched. New projects and participations remain private by default; visibility changes require an explicit PATCH.
+POST returns the created record with HTTP 201. PATCH returns the updated record with HTTP 200. DELETE returns HTTP 204. Event responses also contain the user's `participation`, `submissions`, and `achievements`. Optional URL fields accept HTTP(S) URLs or empty strings; other schemes return HTTP 400. Optional dates and numeric values accept `null`. Rank and total participants must be positive, and rank cannot exceed total participants. `source`, `external_id`, ownership fields, `verification_status`, and timestamps cannot be supplied. Immutable relationship fields cannot be patched. New projects and participations remain private by default; visibility changes require an explicit PATCH. Verified achievements cannot be updated or deleted through these APIs (HTTP 403); Django Admin retains its verification workflow.
 
-Imported events, projects, and submissions are visible to their owner but are read-only through these manual endpoints. Their deletion is blocked. Deletion of a manual event or project is also blocked when it would cascade to an imported submission. User-created achievements under imported participations remain editable. Deleting an event cascades to its participation, submissions, and achievements. Deleting a project cascades to its submissions; linked achievements retain their participation and lose the submission link. Deleting a participation cascades to its achievements.
+Imported events, projects, and submissions are visible to their owner but are read-only through these manual endpoints. Their deletion is blocked. Deletion of a manual event or project is also blocked when it would cascade to an imported submission. User-created achievements under imported participations remain editable. Deleting an event cascades to its participation, submissions, and achievements. Deleting a project cascades to its submissions; linked achievements retain their participation and lose the submission link. Deleting a participation cascades to its achievements. These related deletions are blocked when they would delete or unlink a verified achievement.
 
 ## Composite entry
 
@@ -51,3 +51,7 @@ On success, HTTP 201 returns:
 ```
 
 The whole operation runs inside one database transaction. Validation or uniqueness failures return HTTP 400 and roll back every new record. Database constraints continue to prevent duplicate participations and project/event submissions under concurrent requests.
+
+## Manual UI verification pending
+
+The in-app browser was unavailable during the review correction run. In a browser set to a non-UTC time zone (for example, Asia/Dhaka), open a submission whose API timestamp includes an offset, confirm that the `datetime-local` editor shows the corresponding local clock time, edit only its status and confirm that `submitted_at` is unchanged, then change the datetime and confirm that the saved ISO timestamp represents the entered local time. Also try selecting an event and project beyond page 1, changing search terms after selection, and switching away from form sections containing invalid URLs before saving.

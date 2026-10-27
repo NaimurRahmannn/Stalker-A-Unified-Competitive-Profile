@@ -8,6 +8,7 @@ import { hackathonApi } from "../api";
 import { achievementPayload, achievementSchema, blankAchievement, type AchievementFormValues } from "../schemas";
 import type { Achievement, Event, Project, Submission } from "../types";
 import { getApiErrorMessage } from "@/lib/utils";
+import { fromLocalDateTimeInput, toLocalDateTimeInput } from "../datetime";
 import { Field, fieldClass } from "./hackathon-entry-form";
 
 type Resource = "events" | "projects" | "participations" | "submissions" | "achievements";
@@ -23,27 +24,34 @@ export function Editor({ resource, record, onSaved, onCancel, submissionOptions 
     submissions: ["status", "submission_url", "submitted_at"],
     achievements: ["achievement_type", "title", "rank", "total_participants", "description", "evidence_url", "submission"],
   };
-  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(keys[resource].map((key) => [key, Array.isArray(record[key]) ? (record[key] as string[]).join(", ") : record[key] == null ? "" : typeof record[key] === "boolean" ? String(record[key]) : String(record[key])])));
+  const [initialValues] = useState<Record<string, string>>(() => Object.fromEntries(keys[resource].map((key) => [key, key === "submitted_at" ? toLocalDateTimeInput(record[key] as string | null) : Array.isArray(record[key]) ? (record[key] as string[]).join(", ") : record[key] == null ? "" : String(record[key])])));
+  const [values, setValues] = useState<Record<string, string>>(initialValues);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const save = async (event: React.FormEvent) => {
     event.preventDefault(); if (busy) return;
     setError("");
-    const payload: Record<string, unknown> = { ...values };
+    const changed = Object.keys(values).filter((key) => values[key] !== initialValues[key]);
+    if (changed.length === 0) { onCancel(); return; }
+    const payload: Record<string, unknown> = Object.fromEntries(changed.map((key) => [key, values[key]]));
     if (resource === "events") {
       if (!values.name.trim()) { setError("Hackathon name is required."); return; }
       if (values.start_date && values.end_date && values.end_date < values.start_date) { setError("End date cannot precede start date."); return; }
-      payload.start_date = values.start_date || null; payload.end_date = values.end_date || null;
+      if ("start_date" in payload) payload.start_date = values.start_date || null;
+      if ("end_date" in payload) payload.end_date = values.end_date || null;
     }
-    if (resource === "projects") { if (!values.title.trim()) { setError("Project title is required."); return; } payload.technologies = values.technologies.split(",").map((part) => part.trim()).filter(Boolean); payload.is_public = values.is_public === "true"; }
-    if (resource === "participations") payload.is_public = values.is_public === "true";
-    if (resource === "submissions") payload.submitted_at = values.submitted_at ? new Date(values.submitted_at).toISOString() : null;
+    if (resource === "projects") { if (!values.title.trim()) { setError("Project title is required."); return; } if ("technologies" in payload) payload.technologies = values.technologies.split(",").map((part) => part.trim()).filter(Boolean); if ("is_public" in payload) payload.is_public = values.is_public === "true"; }
+    if (resource === "participations" && "is_public" in payload) payload.is_public = values.is_public === "true";
+    if (resource === "submissions" && "submitted_at" in payload) {
+      try { payload.submitted_at = fromLocalDateTimeInput(values.submitted_at); }
+      catch (cause) { setError(cause instanceof Error ? cause.message : "Invalid submission date and time."); return; }
+    }
     if (resource === "achievements") {
       const parsed = achievementSchema.safeParse({ ...values, link_submission: false });
       if (!parsed.success) { setError(parsed.error.issues[0]?.message || "Invalid achievement."); return; }
-      Object.assign(payload, achievementPayload(parsed.data));
-      payload.submission = values.submission ? Number(values.submission) : null;
-      delete payload.link_submission;
+      const normalized = achievementPayload(parsed.data);
+      for (const key of changed) if (key in normalized) payload[key] = normalized[key as keyof typeof normalized];
+      if ("submission" in payload) payload.submission = values.submission ? Number(values.submission) : null;
     }
     for (const key of ["event_url", "repository_url", "demo_url", "video_url", "image_url", "submission_url", "evidence_url"]) {
       if (typeof payload[key] === "string" && payload[key]) { try { const url = new URL(payload[key]); if (!["http:", "https:"].includes(url.protocol)) throw new Error(); } catch { setError(`${format(key)} must be an http(s) URL.`); return; } }
@@ -60,7 +68,7 @@ export function Editor({ resource, record, onSaved, onCancel, submissionOptions 
     } catch (err) { setError(getApiErrorMessage(err, "Could not save changes.")); } finally { setBusy(false); }
   };
   return <form onSubmit={save} className="mt-3 grid gap-3 rounded-xl border border-violet-200 bg-violet-50/50 p-4 sm:grid-cols-2">
-    {keys[resource].map((key) => <Field key={key} title={format(key)}>{key === "submission" ? <select className={fieldClass} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })}><option value="">No linked submission</option>{submissionOptions.map((item) => <option key={item.id} value={item.id}>{item.project_title}</option>)}</select> : ["format", "status", "achievement_type", "is_public"].includes(key) ? <select className={fieldClass} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })}>{(key === "format" ? ["unknown", "online", "in_person", "hybrid"] : key === "is_public" ? ["false", "true"] : key === "achievement_type" ? ["placement", "award", "finalist", "participation", "other"] : resource === "participations" ? ["registered", "attended", "submitted"] : ["draft", "submitted", "withdrawn"]).map((option) => <option key={option} value={option}>{format(option)}</option>)}</select> : <input className={fieldClass} type={key.endsWith("_date") ? "date" : key === "submitted_at" ? "datetime-local" : ["rank", "total_participants"].includes(key) ? "number" : "text"} value={key === "submitted_at" && values[key] ? values[key].slice(0, 16) : values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })} />}</Field>)}
+    {keys[resource].map((key) => <Field key={key} title={format(key)}>{key === "submission" ? <select className={fieldClass} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })}><option value="">No linked submission</option>{submissionOptions.map((item) => <option key={item.id} value={item.id}>{item.project_title}</option>)}</select> : ["format", "status", "achievement_type", "is_public"].includes(key) ? <select className={fieldClass} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })}>{(key === "format" ? ["unknown", "online", "in_person", "hybrid"] : key === "is_public" ? ["false", "true"] : key === "achievement_type" ? ["placement", "award", "finalist", "participation", "other"] : resource === "participations" ? ["registered", "attended", "submitted"] : ["draft", "submitted", "withdrawn"]).map((option) => <option key={option} value={option}>{format(option)}</option>)}</select> : <input className={fieldClass} type={key.endsWith("_date") ? "date" : key === "submitted_at" ? "datetime-local" : ["rank", "total_participants"].includes(key) ? "number" : "text"} step={key === "submitted_at" ? 1 : undefined} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })} />}</Field>)}
     {error && <p role="alert" className="sm:col-span-2 text-sm text-rose-700">{error}</p>}
     <div className="flex gap-2 sm:col-span-2"><button disabled={busy} className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Saving…" : "Save changes"}</button><button type="button" onClick={onCancel} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button></div>
   </form>;
@@ -102,7 +110,7 @@ export function HackathonDetail({ event, projects, refresh, onDeleted }: { event
     {editor("events", event.id, event as unknown as Record<string, unknown>)}
     {event.participation && <section className="border-t border-slate-100 pt-4"><div className="flex justify-between gap-3"><div><h3 className="font-semibold">Participation</h3><p className="text-sm text-slate-600">{format(event.participation.status)}{event.participation.team_name ? ` · ${event.participation.team_name}` : ""}{event.participation.role ? ` · ${event.participation.role}` : ""}</p></div>{controls("participations", event.participation.id, event.participation as unknown as Record<string, unknown>, "Its achievements will also be deleted.")}</div>{editor("participations", event.participation.id, event.participation as unknown as Record<string, unknown>)}</section>}
     <section className="border-t border-slate-100 pt-4"><h3 className="font-semibold">Projects & submissions</h3>{event.submissions.length === 0 ? <p className="mt-2 text-sm text-slate-500">No projects submitted yet.</p> : <div className="mt-3 space-y-3">{event.submissions.map((submission: Submission) => { const project = projectMap.get(submission.project); return <div key={submission.id} className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between gap-3"><div><p className="font-medium">{submission.project_title}</p><p className="text-xs text-slate-500">{format(submission.status)}</p>{submission.submission_url && <a href={submission.submission_url} target="_blank" rel="noopener noreferrer" className="text-xs text-violet-700 underline">Submission link</a>}</div>{controls("submissions", submission.id, submission as unknown as Record<string, unknown>, "Achievements linked to it will retain their participation and lose the submission link.", submission.source === "manual")}</div>{editor("submissions", submission.id, submission as unknown as Record<string, unknown>)}{project && <div className="mt-3 border-t border-slate-100 pt-3"><div className="flex justify-between gap-3"><p className="text-sm text-slate-600">Project details · {project.technologies.join(", ") || "No technologies listed"}</p>{controls("projects", project.id, project as unknown as Record<string, unknown>, "All submissions of this project across hackathons will be deleted.", project.source === "manual")}</div>{editor("projects", project.id, project as unknown as Record<string, unknown>)}</div>}</div>; })}</div>}</section>
-    <section className="border-t border-slate-100 pt-4"><h3 className="font-semibold">Achievements</h3>{event.achievements.length === 0 && <p className="mt-2 text-sm text-slate-500">No achievements recorded yet.</p>}{event.achievements.map((achievement: Achievement) => <div key={achievement.id} className="mt-3 rounded-xl border border-slate-200 p-4"><div className="flex justify-between gap-3"><div><p className="font-medium">{achievement.title}{achievement.rank != null ? ` · Rank ${achievement.rank}` : ""}</p><p className="text-xs text-slate-500">{format(achievement.achievement_type)} · {achievement.verification_status === "verified" ? "Verified" : "Self-reported"}{achievement.total_participants ? ` · ${achievement.total_participants} participants` : ""}</p>{achievement.description && <p className="mt-1 text-sm text-slate-600">{achievement.description}</p>}{achievement.evidence_url && <a href={achievement.evidence_url} target="_blank" rel="noopener noreferrer" className="text-xs text-violet-700 underline">Evidence</a>}</div>{controls("achievements", achievement.id, achievement as unknown as Record<string, unknown>, "This achievement will be permanently removed.")}</div>{editor("achievements", achievement.id, achievement as unknown as Record<string, unknown>)}</div>)}{event.participation && <AchievementAdd participationId={event.participation.id} submissions={event.submissions} onSaved={refresh} />}</section>
+    <section className="border-t border-slate-100 pt-4"><h3 className="font-semibold">Achievements</h3>{event.achievements.length === 0 && <p className="mt-2 text-sm text-slate-500">No achievements recorded yet.</p>}{event.achievements.map((achievement: Achievement) => <div key={achievement.id} className="mt-3 rounded-xl border border-slate-200 p-4"><div className="flex justify-between gap-3"><div><p className="font-medium">{achievement.title}{achievement.rank != null ? ` · Rank ${achievement.rank}` : ""}</p><p className="text-xs text-slate-500">{format(achievement.achievement_type)} · {achievement.verification_status === "verified" ? "Verified" : "Self-reported"}{achievement.total_participants ? ` · ${achievement.total_participants} participants` : ""}</p>{achievement.description && <p className="mt-1 text-sm text-slate-600">{achievement.description}</p>}{achievement.evidence_url && <a href={achievement.evidence_url} target="_blank" rel="noopener noreferrer" className="text-xs text-violet-700 underline">Evidence</a>}</div>{controls("achievements", achievement.id, achievement as unknown as Record<string, unknown>, "This achievement will be permanently removed.", achievement.verification_status !== "verified")}</div>{editor("achievements", achievement.id, achievement as unknown as Record<string, unknown>)}</div>)}{event.participation && <AchievementAdd participationId={event.participation.id} submissions={event.submissions} onSaved={refresh} />}</section>
     {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
   </article>;
 }

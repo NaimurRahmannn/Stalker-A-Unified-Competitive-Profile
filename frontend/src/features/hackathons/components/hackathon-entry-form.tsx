@@ -3,7 +3,9 @@
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { hackathonApi } from "../api";
-import { achievementPayload, blankAchievement, blankEntry, entrySchema, type EntryFormValues } from "../schemas";
+import { blankAchievement, blankEntry, entrySchema, type EntryFormValues } from "../schemas";
+import { buildEntryPayload } from "../payload";
+import { ExistingRecordPicker } from "./existing-record-picker";
 import type { Event, Project } from "../types";
 import { getApiErrorMessage } from "@/lib/utils";
 import { useState } from "react";
@@ -11,8 +13,10 @@ import { useState } from "react";
 const input = "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100";
 const label = "block text-xs font-semibold text-slate-600";
 
-export function HackathonEntryForm({ events, projects, onSaved, onCancel }: { events: Event[]; projects: Project[]; onSaved: () => Promise<void>; onCancel: () => void }) {
+export function HackathonEntryForm({ onSaved, onCancel }: { onSaved: () => Promise<void>; onCancel: () => void }) {
   const [serverError, setServerError] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const { register, handleSubmit, control, reset, setValue, formState: { errors, isSubmitting } } = useForm<EntryFormValues>({ resolver: zodResolver(entrySchema), defaultValues: blankEntry() });
   const { fields, append, remove } = useFieldArray({ control, name: "achievements" });
   const eventMode = useWatch({ control, name: "eventMode" });
@@ -21,19 +25,8 @@ export function HackathonEntryForm({ events, projects, onSaved, onCancel }: { ev
 
   const save = handleSubmit(async (value) => {
     setServerError("");
-    const payload: Record<string, unknown> = {
-      participation: { status: value.status, team_name: value.team_name, role: value.role },
-      achievements: value.achievements.map((item) => ({ ...achievementPayload(item), link_submission: value.projectMode !== "none" && item.link_submission })),
-    };
-    if (value.eventMode === "existing") payload.event_id = Number(value.eventId);
-    else payload.event = { name: value.name.trim(), organizer: value.organizer, description: value.description, event_url: value.event_url, start_date: value.start_date || null, end_date: value.end_date || null, format: value.format };
-    if (value.projectMode !== "none") {
-      if (value.projectMode === "existing") payload.project_id = Number(value.projectId);
-      else payload.project = { title: value.title.trim(), description: value.project_description, repository_url: value.repository_url, demo_url: value.demo_url, video_url: value.video_url, image_url: value.image_url, technologies: value.technologies.split(",").map((item) => item.trim()).filter(Boolean) };
-      payload.submission = { status: value.submission_status, submission_url: value.submission_url, submitted_at: value.submitted_at ? new Date(value.submitted_at).toISOString() : null };
-    }
     try {
-      await hackathonApi.entries(payload);
+      await hackathonApi.entries(buildEntryPayload(value));
       reset(blankEntry());
       await onSaved();
     } catch (error) { setServerError(getApiErrorMessage(error, "Could not save hackathon.")); }
@@ -43,7 +36,7 @@ export function HackathonEntryForm({ events, projects, onSaved, onCancel }: { ev
     <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Add Hackathon</h2><button type="button" onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-900">Close</button></div>
     <section className="space-y-3"><h3 className="font-semibold text-violet-700">1. Hackathon details</h3>
       <label className={label}>Entry type<select className={input} {...register("eventMode")}><option value="new">New hackathon</option><option value="existing">Existing hackathon</option></select></label>
-      {eventMode === "existing" ? <label className={label}>Hackathon<select className={input} {...register("eventId", { onChange: (change) => { const selected = events.find((event) => event.id === Number(change.target.value)); if (selected?.participation) { setValue("status", selected.participation.status); setValue("team_name", selected.participation.team_name); setValue("role", selected.participation.role); } } })}><option value="">Select a hackathon</option>{events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}</select><Error text={errors.eventId?.message} /></label> : <div className="grid gap-3 sm:grid-cols-2">
+      {eventMode === "existing" ? <ExistingRecordPicker kind="event" value={values.eventId ?? ""} selectedItem={selectedEvent} error={errors.eventId?.message} onSelect={(item) => { setSelectedEvent(item && "participation" in item ? item : null); setValue("eventId", item ? String(item.id) : "", { shouldValidate: true }); if (item && "participation" in item && item.participation) { setValue("status", item.participation.status); setValue("team_name", item.participation.team_name); setValue("role", item.participation.role); } }} /> : <div className="grid gap-3 sm:grid-cols-2">
         <Field title="Hackathon name" error={errors.name?.message}><input className={input} {...register("name")} /></Field>
         <Field title="Organizer"><input className={input} {...register("organizer")} /></Field>
         <Field title="Description"><textarea className={input} rows={2} {...register("description")} /></Field>
@@ -58,7 +51,7 @@ export function HackathonEntryForm({ events, projects, onSaved, onCancel }: { ev
     </section>
     <section className="space-y-3 border-t border-slate-100 pt-5"><h3 className="font-semibold text-violet-700">3. Project & submission (optional)</h3>
       <Field title="Project"><select className={input} {...register("projectMode")}><option value="none">No project</option><option value="new">Create a project</option><option value="existing">Use an existing project</option></select></Field>
-      {projectMode === "existing" && <Field title="Existing project" error={errors.projectId?.message}><select className={input} {...register("projectId")}><option value="">Select a project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}</select></Field>}
+      {projectMode === "existing" && <ExistingRecordPicker kind="project" value={values.projectId ?? ""} selectedItem={selectedProject} error={errors.projectId?.message} onSelect={(item) => { setSelectedProject(item && "title" in item ? item : null); setValue("projectId", item ? String(item.id) : "", { shouldValidate: true }); }} />}
       {projectMode === "new" && <div className="grid gap-3 sm:grid-cols-2"><Field title="Project title" error={errors.title?.message}><input className={input} {...register("title")} /></Field><Field title="Technologies (comma separated)"><input className={input} {...register("technologies")} /></Field><Field title="Description"><textarea className={input} rows={2} {...register("project_description")} /></Field>{(["repository_url", "demo_url", "video_url", "image_url"] as const).map((key) => <Field key={key} title={key.replaceAll("_", " ")} error={errors[key]?.message}><input type="url" className={input} {...register(key)} /></Field>)}</div>}
       {projectMode !== "none" && <div className="grid gap-3 sm:grid-cols-3"><Field title="Submission status"><select className={input} {...register("submission_status")}><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="withdrawn">Withdrawn</option></select></Field><Field title="Submission URL" error={errors.submission_url?.message}><input type="url" className={input} {...register("submission_url")} /></Field><Field title="Submitted at"><input type="datetime-local" className={input} {...register("submitted_at")} /></Field></div>}
     </section>

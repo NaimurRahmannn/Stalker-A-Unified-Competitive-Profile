@@ -4,8 +4,8 @@ import type { Achievement, EntryResponse, Event, Overview, Page, Participation, 
 const root = "/hackathons";
 export const hackathonApi = {
   overview: async () => (await api.get<Overview>(`${root}/overview/`)).data,
-  events: async (page = 1) => (await api.get<Page<Event>>(`${root}/events/`, { params: { page } })).data,
-  projects: async (page = 1, pageSize = 20) => (await api.get<Page<Project>>(`${root}/projects/`, { params: { page, page_size: pageSize } })).data,
+  events: async (page = 1, name = "") => (await api.get<Page<Event>>(`${root}/events/`, { params: { page, ...(name ? { name } : {}) } })).data,
+  projects: async (page = 1, pageSize = 20, title = "") => (await api.get<Page<Project>>(`${root}/projects/`, { params: { page, page_size: pageSize, ...(title ? { title } : {}) } })).data,
   entries: async (payload: object) => (await api.post<EntryResponse>(`${root}/entries/`, payload)).data,
   patchEvent: async (id: number, payload: object) => (await api.patch<Event>(`${root}/events/${id}/`, payload)).data,
   patchProject: async (id: number, payload: object) => (await api.patch<Project>(`${root}/projects/${id}/`, payload)).data,

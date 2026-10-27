@@ -15,21 +15,44 @@ export const achievementSchema = z.object({
   link_submission: z.boolean(),
 }).refine((value) => !value.rank || !value.total_participants || Number(value.rank) <= Number(value.total_participants), { path: ["rank"], message: "Rank cannot exceed total participants." });
 
+const newEventSchema = z.object({
+  name: z.string().trim().min(1, "Hackathon name is required."),
+  event_url: optionalUrl,
+  start_date: optionalDate,
+  end_date: optionalDate,
+  format: z.enum(["online", "in_person", "hybrid", "unknown"]),
+}).refine((value) => !value.start_date || !value.end_date || value.end_date >= value.start_date, { path: ["end_date"], message: "End date cannot precede start date." });
+
+const newProjectSchema = z.object({
+  title: z.string().trim().min(1, "Project title is required."),
+  repository_url: optionalUrl,
+  demo_url: optionalUrl,
+  video_url: optionalUrl,
+  image_url: optionalUrl,
+});
+
+const submissionSchema = z.object({ submission_status: z.enum(["draft", "submitted", "withdrawn"]), submission_url: optionalUrl, submitted_at: optionalDateTime });
+const selectedIdSchema = z.string().regex(/^[1-9]\d*$/, "Select a record.");
+
 export const entrySchema = z.object({
   eventMode: z.enum(["new", "existing"]), eventId: z.string(),
-  name: z.string(), organizer: z.string(), description: z.string(), event_url: optionalUrl,
-  start_date: optionalDate, end_date: optionalDate, format: z.enum(["online", "in_person", "hybrid", "unknown"]),
+  name: z.string(), organizer: z.string(), description: z.string(), event_url: z.string(),
+  start_date: z.string(), end_date: z.string(), format: z.string(),
   status: z.enum(["registered", "attended", "submitted"]), team_name: z.string(), role: z.string(),
   projectMode: z.enum(["none", "new", "existing"]), projectId: z.string(), title: z.string(), project_description: z.string(),
-  repository_url: optionalUrl, demo_url: optionalUrl, video_url: optionalUrl, image_url: optionalUrl, technologies: z.string(),
-  submission_status: z.enum(["draft", "submitted", "withdrawn"]), submission_url: optionalUrl, submitted_at: optionalDateTime,
+  repository_url: z.string(), demo_url: z.string(), video_url: z.string(), image_url: z.string(), technologies: z.string(),
+  submission_status: z.string(), submission_url: z.string(), submitted_at: z.string(),
   achievements: z.array(achievementSchema),
 }).superRefine((value, context) => {
-  if (value.eventMode === "new" && !value.name.trim()) context.addIssue({ code: "custom", path: ["name"], message: "Hackathon name is required." });
-  if (value.eventMode === "existing" && !value.eventId) context.addIssue({ code: "custom", path: ["eventId"], message: "Select a hackathon." });
-  if (value.projectMode === "new" && !value.title.trim()) context.addIssue({ code: "custom", path: ["title"], message: "Project title is required." });
-  if (value.projectMode === "existing" && !value.projectId) context.addIssue({ code: "custom", path: ["projectId"], message: "Select a project." });
-  if (value.start_date && value.end_date && value.end_date < value.start_date) context.addIssue({ code: "custom", path: ["end_date"], message: "End date cannot precede start date." });
+  const check = (schema: z.ZodType, path?: string) => {
+    const result = schema.safeParse(path ? value[path as "eventId" | "projectId"] : value);
+    if (!result.success) for (const issue of result.error.issues) context.addIssue({ code: "custom", path: path ? [path] : issue.path, message: issue.message });
+  };
+  if (value.eventMode === "new") check(newEventSchema);
+  else check(selectedIdSchema, "eventId");
+  if (value.projectMode === "new") check(newProjectSchema);
+  if (value.projectMode === "existing") check(selectedIdSchema, "projectId");
+  if (value.projectMode !== "none") check(submissionSchema);
 });
 
 export type EntryFormValues = z.input<typeof entrySchema>;
