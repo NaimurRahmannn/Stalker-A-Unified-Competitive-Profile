@@ -7,7 +7,7 @@ from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase
 
-from apps.hackathons.admin import HackathonAchievementAdmin
+from apps.hackathons.admin import HackathonAchievementAdmin, HackathonEventAdmin
 from apps.hackathons.models import (
     HackathonAchievement, HackathonEvent, HackathonParticipation,
     HackathonProject, HackathonSubmission,
@@ -213,6 +213,85 @@ class ManualAPITests(APITestCase):
                 self.achievement.refresh_from_db()
                 self.assertEqual(self.achievement.verification_status, "verified")
                 self.assertEqual(self.achievement.submission_id, self.submission.pk)
+
+    def test_self_reported_context_and_unrelated_records_remain_editable(self):
+        cases = (
+            ("events", self.event, {"name": "Renamed local hackathon"}),
+            ("participations", self.participation, {"team_name": "New team"}),
+            ("submissions", self.submission, {"status": "draft"}),
+            ("projects", self.project, {"title": "Renamed project"}),
+        )
+        for resource, record, payload in cases:
+            with self.subTest(resource=resource):
+                response = self.client.patch(ROOT + f"{resource}/{record.pk}/", payload, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                record.refresh_from_db()
+                for field, value in payload.items():
+                    self.assertEqual(getattr(record, field), value)
+
+        self.achievement.submission = self.submission
+        self.achievement.verification_status = HackathonAchievement.VerificationStatus.VERIFIED
+        self.achievement.save()
+        other_event = HackathonEvent.objects.create(owner=self.alice, name="Unrelated event")
+        other_project = HackathonProject.objects.create(owner=self.alice, title="Unrelated project")
+        other_submission = HackathonSubmission.objects.create(owner=self.alice, event=other_event, project=other_project)
+        self.assertEqual(self.client.patch(ROOT + f"projects/{other_project.pk}/", {"title": "Still editable"}, format="json").status_code, 200)
+        self.assertEqual(self.client.patch(ROOT + f"submissions/{other_submission.pk}/", {"status": "submitted"}, format="json").status_code, 200)
+
+    def test_verified_context_is_read_only_for_user_updates(self):
+        self.achievement.submission = self.submission
+        self.achievement.verification_status = HackathonAchievement.VerificationStatus.VERIFIED
+        self.achievement.save()
+        overview_before = self.client.get(ROOT + "overview/").data
+        cases = (
+            ("events", self.event, {"name": "Major Global Hackathon"}),
+            ("events", self.event, {"organizer": "Famous Organizer"}),
+            ("events", self.event, {"event_url": "https://example.com/major"}),
+            ("participations", self.participation, {"team_name": "Winning team"}),
+            ("participations", self.participation, {"status": "submitted"}),
+            ("submissions", self.submission, {"status": "withdrawn"}),
+            ("submissions", self.submission, {"submission_url": "https://example.com/other"}),
+            ("projects", self.project, {"title": "Other project"}),
+            ("projects", self.project, {"repository_url": "https://example.com/other"}),
+            ("achievements", self.achievement, {"title": "First Place"}),
+        )
+        for resource, record, payload in cases:
+            with self.subTest(resource=resource, payload=payload):
+                before = {field: getattr(record, field) for field in payload}
+                response = self.client.patch(ROOT + f"{resource}/{record.pk}/", payload, format="json")
+                self.assertEqual(response.status_code, 403, response.data)
+                record.refresh_from_db()
+                for field, value in before.items():
+                    self.assertEqual(getattr(record, field), value)
+                self.assertEqual(self.achievement.verification_status, "verified")
+        self.assertEqual(self.client.put(ROOT + f"events/{self.event.pk}/", {"name": "Other"}, format="json").status_code, 403)
+        self.assertEqual(self.client.get(ROOT + "overview/").data, overview_before)
+        self.assertEqual(self.client.patch(ROOT + f"events/{self.other_event.pk}/", {"name": "Guess"}, format="json").status_code, 404)
+        self.assertEqual(self.client.patch(ROOT + f"projects/{self.other_project.pk}/", {"title": "Guess"}, format="json").status_code, 404)
+
+    def test_admin_can_correct_verified_event_context(self):
+        self.achievement.verification_status = HackathonAchievement.VerificationStatus.VERIFIED
+        self.achievement.save()
+        admin_user = get_user_model().objects.create_superuser(username="context-admin", email="context-admin@example.com", password="test12345")
+        request = RequestFactory().get("/admin/")
+        request.user = admin_user
+        admin = HackathonEventAdmin(HackathonEvent, AdminSite())
+        self.assertNotIn("name", admin.get_readonly_fields(request, self.event))
+        self.client.force_authenticate(user=None)
+        self.client.force_login(self.alice)
+        self.assertEqual(self.client.get(f"/admin/hackathons/hackathonevent/{self.event.pk}/change/").status_code, 302)
+        self.client.force_login(admin_user)
+        response = self.client.post(
+            f"/admin/hackathons/hackathonevent/{self.event.pk}/change/",
+            {
+                "name": "Corrected event", "organizer": "Corrected organizer",
+                "description": "", "event_url": "", "start_date": "", "end_date": "",
+                "format": "unknown", "source": "manual", "external_id": "", "_save": "Save",
+            },
+        )
+        self.assertEqual(response.status_code, 302, response.context)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.name, "Corrected event")
 
     def test_owner_scoped_event_name_search_is_paginated(self):
         for index in range(25):

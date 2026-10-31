@@ -24,9 +24,45 @@ class HackathonPagination(PageNumberPagination):
     max_page_size = 100
 
 
+def context_achievements(instance):
+    """Achievements whose verified meaning depends on this record."""
+    queryset = HackathonAchievement.objects.all()
+    if isinstance(instance, HackathonEvent):
+        return queryset.filter(participation__event_id=instance.pk)
+    if isinstance(instance, HackathonParticipation):
+        return queryset.filter(participation_id=instance.pk)
+    if isinstance(instance, HackathonSubmission):
+        return queryset.filter(submission_id=instance.pk)
+    if isinstance(instance, HackathonProject):
+        return queryset.filter(submission__project_id=instance.pk)
+    return queryset.filter(pk=instance.pk)
+
+
 class ManualViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = HackathonPagination
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        with transaction.atomic():
+            # Resolve through the owner-scoped queryset, then lock the current
+            # record and all achievements whose verification it could affect.
+            instance = self.get_object()
+            instance = type(instance).objects.select_for_update().get(pk=instance.pk)
+            statuses = list(
+                context_achievements(instance)
+                .order_by("pk")
+                .select_for_update(of=("self",))
+                .values_list("verification_status", flat=True)
+            )
+            if HackathonAchievement.VerificationStatus.VERIFIED in statuses:
+                raise PermissionDenied("This record is read-only while a verified achievement depends on it.")
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            if getattr(instance, "_prefetched_objects_cache", None):
+                instance._prefetched_objects_cache = {}
+            return Response(serializer.data)
 
     def perform_update(self, serializer):
         if hasattr(serializer.instance, "source") and serializer.instance.source != "manual":
@@ -66,10 +102,11 @@ class EventViewSet(ManualViewSet):
 
     def get_queryset(self):
         qs = HackathonEvent.objects.filter(owner=self.request.user).order_by("-created_at", "-pk")
-        qs = qs.prefetch_related(
-            Prefetch("participations", queryset=HackathonParticipation.objects.filter(user=self.request.user).prefetch_related("achievements")),
-            Prefetch("submissions", queryset=HackathonSubmission.objects.filter(owner=self.request.user).select_related("project")),
-        )
+        if self.action in ("list", "retrieve"):
+            qs = qs.prefetch_related(
+                Prefetch("participations", queryset=HackathonParticipation.objects.filter(user=self.request.user).prefetch_related("achievements")),
+                Prefetch("submissions", queryset=HackathonSubmission.objects.filter(owner=self.request.user).select_related("project")),
+            )
         state = self.request.query_params.get("status")
         if state in HackathonParticipation.Status.values:
             qs = qs.filter(participations__user=self.request.user, participations__status=state)
@@ -121,14 +158,6 @@ class SubmissionViewSet(ManualViewSet):
 
 class AchievementViewSet(ManualViewSet):
     serializer_class = AchievementSerializer
-
-    def update(self, request, *args, **kwargs):
-        with transaction.atomic():
-            instance = self.get_object()
-            locked = HackathonAchievement.objects.select_for_update().get(pk=instance.pk)
-            if locked.verification_status == HackathonAchievement.VerificationStatus.VERIFIED:
-                raise PermissionDenied("Verified achievements are read-only in manual management.")
-            return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         with transaction.atomic():
