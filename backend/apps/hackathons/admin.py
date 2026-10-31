@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
+from django.db import transaction
 
 from apps.hackathons.models import (
     HackathonAchievement,
@@ -121,6 +123,21 @@ class HackathonAchievementAdmin(admin.ModelAdmin):
     ]
     raw_id_fields = ["participation", "submission"]
     readonly_fields = ["created_at", "updated_at"]
+
+    def get_object(self, request, object_id, from_field=None):
+        if request.method != "POST":
+            return super().get_object(request, object_id, from_field)
+
+        queryset = self.get_queryset(request)
+        field = queryset.model._meta.pk if from_field is None else queryset.model._meta.get_field(from_field)
+        try:
+            object_id = field.to_python(object_id)
+            # Admin change forms run inside atomic(); lock before form validation
+            # so a concurrent user delete cannot leave a stale instance to save.
+            with transaction.atomic(using=queryset.db):
+                return queryset.select_for_update().get(**{field.name: object_id})
+        except (queryset.model.DoesNotExist, ValidationError, ValueError):
+            return None
 
     def get_readonly_fields(self, request, obj=None):
         readonly = list(super().get_readonly_fields(request, obj))
