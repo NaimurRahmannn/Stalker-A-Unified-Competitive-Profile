@@ -214,6 +214,50 @@ class ManualAPITests(APITestCase):
                 self.assertEqual(self.achievement.verification_status, "verified")
                 self.assertEqual(self.achievement.submission_id, self.submission.pk)
 
+    def test_self_reported_delete_paths_preserve_cascade_and_set_null(self):
+        self.achievement.submission = self.submission
+        self.achievement.save()
+        response = self.client.delete(ROOT + f"submissions/{self.submission.pk}/")
+        self.assertEqual(response.status_code, 204)
+        self.achievement.refresh_from_db()
+        self.assertIsNone(self.achievement.submission_id)
+        self.assertTrue(HackathonParticipation.objects.filter(pk=self.participation.pk).exists())
+
+        second_event = HackathonEvent.objects.create(owner=self.alice, name="Second event")
+        second_participation = HackathonParticipation.objects.create(user=self.alice, event=second_event)
+        second_submission = HackathonSubmission.objects.create(owner=self.alice, event=second_event, project=self.project)
+        second_achievement = HackathonAchievement.objects.create(
+            participation=second_participation, submission=second_submission,
+            achievement_type="award", title="Self reported award",
+        )
+        self.assertEqual(self.client.delete(ROOT + f"projects/{self.project.pk}/").status_code, 204)
+        second_achievement.refresh_from_db()
+        self.assertIsNone(second_achievement.submission_id)
+        self.assertTrue(HackathonEvent.objects.filter(pk=second_event.pk).exists())
+
+        self.assertEqual(self.client.delete(ROOT + f"achievements/{self.achievement.pk}/").status_code, 204)
+        self.assertFalse(HackathonAchievement.objects.filter(pk=self.achievement.pk).exists())
+        self.assertEqual(self.client.delete(ROOT + f"participations/{second_participation.pk}/").status_code, 204)
+        self.assertFalse(HackathonAchievement.objects.filter(pk=second_achievement.pk).exists())
+        self.assertEqual(self.client.delete(ROOT + f"events/{self.event.pk}/").status_code, 204)
+        self.assertFalse(HackathonParticipation.objects.filter(pk=self.participation.pk).exists())
+
+    def test_unrelated_records_can_be_deleted_while_a_claim_is_verified(self):
+        self.achievement.submission = self.submission
+        self.achievement.verification_status = HackathonAchievement.VerificationStatus.VERIFIED
+        self.achievement.save()
+        other_event = HackathonEvent.objects.create(owner=self.alice, name="Unrelated")
+        other_project = HackathonProject.objects.create(owner=self.alice, title="Unrelated project")
+        other_participation = HackathonParticipation.objects.create(user=self.alice, event=other_event)
+        other_submission = HackathonSubmission.objects.create(owner=self.alice, event=other_event, project=other_project)
+        self.assertEqual(self.client.delete(ROOT + f"submissions/{other_submission.pk}/").status_code, 204)
+        self.assertEqual(self.client.delete(ROOT + f"participations/{other_participation.pk}/").status_code, 204)
+        self.assertEqual(self.client.delete(ROOT + f"projects/{other_project.pk}/").status_code, 204)
+        self.assertEqual(self.client.delete(ROOT + f"events/{other_event.pk}/").status_code, 204)
+        self.achievement.refresh_from_db()
+        self.assertEqual(self.achievement.verification_status, "verified")
+        self.assertEqual(self.achievement.submission_id, self.submission.pk)
+
     def test_self_reported_context_and_unrelated_records_remain_editable(self):
         cases = (
             ("events", self.event, {"name": "Renamed local hackathon"}),
