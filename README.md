@@ -54,7 +54,3 @@ developer can track their journey, compare progress across platforms, and share
 a public profile that represents more than a resume or a single coding-site
 account.
 
-## Guiding Question
-
-**What does my technical journey look like across all the platforms where I
-learn, compete, and build?**
