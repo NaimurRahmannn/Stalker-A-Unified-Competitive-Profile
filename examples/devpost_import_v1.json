@@ -1,0 +1,21 @@
+{
+  "format_version": 1,
+  "profile_url": "https://devpost.com/example_user",
+  "projects": [
+    {
+      "project_url": "https://devpost.com/software/smart-city-ai",
+      "title": "Smart City AI",
+      "description": "AI-powered city monitoring system",
+      "repository_url": "https://github.com/example/smart-city-ai",
+      "demo_url": "https://example.com/demo",
+      "technologies": ["Python", "React", "Django"],
+      "submissions": [
+        {
+          "hackathon_name": "Global AI Hackathon",
+          "hackathon_url": "https://global-ai-hackathon.devpost.com/",
+          "status": "submitted"
+        }
+      ]
+    }
+  ]
+}
