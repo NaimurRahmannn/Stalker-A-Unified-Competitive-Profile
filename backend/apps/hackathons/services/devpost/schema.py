@@ -10,13 +10,20 @@ from .identity import event_reference, external_id, external_url, profile_refere
 
 
 MAX_BYTES = 1_048_576
+MAX_ENVELOPE_BYTES = 16_384
+MAX_REQUEST_BYTES = MAX_BYTES + MAX_ENVELOPE_BYTES
 MAX_PROJECTS = 100
 MAX_SUBMISSIONS = 20
 
 
 class PayloadTooLarge(APIException):
     status_code = 413
-    default_detail = "Import exceeds 1 MB."
+    default_detail = "Import document exceeds 1 MB."
+
+
+class RequestTooLarge(APIException):
+    status_code = 413
+    default_detail = "Import request exceeds the document limit and envelope allowance."
 
 
 @dataclass(frozen=True)
@@ -68,6 +75,8 @@ def _object(value, allowed, label):
 def _string(value, label, limit, required=False):
     if not isinstance(value, str):
         raise ValidationError({label: "Expected text."})
+    if len(value) > limit:
+        raise ValidationError({label: f"Enter text of at most {limit} characters."})
     value = value.strip()
     if len(value) > limit or (required and not value):
         raise ValidationError({label: f"Enter {'nonempty ' if required else ''}text of at most {limit} characters."})
@@ -87,7 +96,7 @@ def _date(value, label):
 
 def normalize(document, linked_handle: str) -> NormalizedDocument:
     try:
-        if len(json.dumps(document, ensure_ascii=False).encode("utf-8")) > MAX_BYTES:
+        if len(json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > MAX_BYTES:
             raise PayloadTooLarge()
     except (TypeError, ValueError, RecursionError) as exc:
         raise ValidationError({"detail": "Invalid JSON structure."}) from exc

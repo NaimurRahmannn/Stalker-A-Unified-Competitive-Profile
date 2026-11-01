@@ -13,7 +13,7 @@ from apps.connectors.models import PlatformAccount
 from apps.hackathons.models import DevpostImportRun
 from apps.hackathons.services.devpost.import_service import ImportConflict, apply_import, preview
 from apps.hackathons.services.devpost.providers.user_json import UserJsonProvider
-from apps.hackathons.services.devpost.schema import MAX_BYTES, PayloadTooLarge, normalize
+from apps.hackathons.services.devpost.schema import MAX_REQUEST_BYTES, RequestTooLarge, normalize
 
 
 class ImportRunSerializer(serializers.ModelSerializer):
@@ -36,10 +36,10 @@ class DevpostImportBase(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         length = request._request.META.get("CONTENT_LENGTH", "")
-        if length.isdigit() and int(length) > MAX_BYTES:
-            raise PayloadTooLarge()
-        if len(request._request.body) > MAX_BYTES:
-            raise PayloadTooLarge()
+        if length.isdigit() and int(length) > MAX_REQUEST_BYTES:
+            raise RequestTooLarge()
+        if len(request._request.body) > MAX_REQUEST_BYTES:
+            raise RequestTooLarge()
 
     def account(self, request):
         account = PlatformAccount.objects.filter(user=request.user, platform=PlatformAccount.Platform.DEVPOST).first()
@@ -69,6 +69,8 @@ class DevpostImportListView(DevpostImportBase):
     def post(self, request):
         if not isinstance(request.data, dict) or not isinstance(request.data.get("preview_token"), str):
             raise ValidationError({"preview_token": "Preview the document before applying."})
+        if len(request.data["preview_token"]) > 8192:
+            raise ValidationError({"preview_token": "Preview token is too large."})
         account, document = self.document(request, request.data.get("document"))
         try:
             run = apply_import(request.user, account.pk, document, request.data["preview_token"])

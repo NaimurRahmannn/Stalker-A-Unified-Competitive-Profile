@@ -1,9 +1,12 @@
 from copy import deepcopy
+import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
+from django.db import connection
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
@@ -14,7 +17,7 @@ from apps.hackathons.models import (
 )
 from apps.hackathons.services.devpost.identity import external_id
 from apps.hackathons.services.devpost.import_service import ImportConflict
-from apps.hackathons.services.devpost.schema import normalize
+from apps.hackathons.services.devpost.schema import MAX_BYTES, MAX_REQUEST_BYTES, normalize
 
 
 ROOT = "/api/v1/hackathons/devpost/imports/"
@@ -37,6 +40,31 @@ def sample_document(handle="example_user"):
             }],
         }],
     }
+
+
+def limit_document():
+    """100 projects and a 1 MiB canonical document with one shared event."""
+    projects = []
+    for index in range(100):
+        projects.append({
+            "project_url": f"https://devpost.com/software/test-project-{index}",
+            "title": "T" * 500,
+            "description": "D" * (4878 if index == 0 else 4874),
+            "repository_url": "https://example.com/" + "r" * 480,
+            "demo_url": "https://example.com/" + "d" * 480,
+            "technologies": ["x" * 100] * 30,
+            "submissions": [{
+                "hackathon_name": "H" * 500,
+                "hackathon_url": "https://test-event.devpost.com/",
+                "organizer": "O" * 255,
+                "status": "submitted",
+            }],
+        })
+    return {"format_version": 1, "profile_url": "https://devpost.com/example_user", "projects": projects}
+
+
+def canonical_size(document):
+    return len(json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
 
 class DevpostImportTests(TestCase):
@@ -202,6 +230,7 @@ class DevpostImportTests(TestCase):
         self.link(); doc = sample_document(); plan = self.preview(doc)
         changed = deepcopy(doc); changed["projects"][0]["title"] = "Other"
         self.assertEqual(self.apply(changed, plan["preview_token"]).status_code, 409)
+        self.assertEqual(self.apply(doc, plan["preview_token"] + "tampered").status_code, 409)
         self.assertEqual(self.client.post(ROOT, {"document": doc}, format="json").status_code, 400)
         other_client = APIClient(); other_client.force_authenticate(self.other)
         other_client.post(ACCOUNTS, {"platform": "devpost", "handle": "example_user"}, format="json")
@@ -218,6 +247,66 @@ class DevpostImportTests(TestCase):
         doc = sample_document(); doc["projects"][0]["description"] = "x" * 1_100_000
         self.assertEqual(self.client.post(ROOT + "preview/", doc, format="json").status_code, 413)
         self.assertEqual(self.client.post(ROOT + "preview/", {"format_version": 1, "profile_url": "https://devpost.com/example_user", "projects": "bad"}, format="json").status_code, 400)
+        for mutation in (
+            lambda value: value["projects"][0].pop("title"),
+            lambda value: value["projects"][0]["submissions"][0].pop("status"),
+            lambda value: value["projects"][0].update(title=" " * 501 + "A"),
+            lambda value: value["projects"][0].update(submissions=value["projects"][0]["submissions"] * 21),
+        ):
+            with self.subTest(mutation=mutation):
+                invalid = sample_document(); mutation(invalid)
+                self.assertEqual(self.client.post(ROOT + "preview/", invalid, format="json").status_code, 400)
+
+    def test_document_size_boundary_and_apply_envelope(self):
+        self.link()
+        document = limit_document()
+        self.assertEqual(canonical_size(document), MAX_BYTES)
+        self.assertEqual(len(normalize(document, "example_user").projects), 100)
+        below = deepcopy(document)
+        below["projects"][0]["description"] = below["projects"][0]["description"][:-1]
+        self.assertEqual(canonical_size(below), MAX_BYTES - 1)
+        self.assertEqual(self.client.post(ROOT + "preview/", below, format="json").status_code, 200)
+        plan = self.client.post(ROOT + "preview/", document, format="json")
+        self.assertEqual(plan.status_code, 200, plan.data)
+        applied = self.apply(document, plan.data["preview_token"])
+        self.assertEqual(applied.status_code, 200, applied.data)
+        self.assertEqual((HackathonProject.objects.count(), HackathonSubmission.objects.count()), (100, 100))
+        above = deepcopy(document)
+        above["projects"][0]["description"] += "D"
+        self.assertEqual(canonical_size(above), MAX_BYTES + 1)
+        self.assertEqual(self.client.post(ROOT + "preview/", above, format="json").status_code, 413)
+        self.assertEqual(self.apply(above, plan.data["preview_token"]).status_code, 413)
+
+    def test_bounded_request_and_non_json_input(self):
+        self.link()
+        oversized = b" " * (MAX_REQUEST_BYTES + 1)
+        self.assertEqual(self.client.generic("POST", ROOT + "preview/", oversized, content_type="application/json").status_code, 413)
+        self.assertEqual(self.client.generic("POST", ROOT, oversized, content_type="application/json").status_code, 413)
+        self.assertEqual(self.client.generic("POST", ROOT + "preview/", b"{broken", content_type="application/json").status_code, 400)
+        self.assertEqual(self.client.generic("POST", ROOT + "preview/", b"{}", content_type="text/plain").status_code, 415)
+        self.assertEqual(self.client.post(ROOT, {"document": sample_document(), "preview_token": "x" * 8193}, format="json").status_code, 400)
+
+    def test_upper_bound_project_and_submission_preview_query_ceiling(self):
+        self.link()
+        document = sample_document()
+        document["projects"] = []
+        for project_index in range(100):
+            project = {
+                "project_url": f"https://devpost.com/software/bound-{project_index}",
+                "title": f"Bound {project_index}",
+                "submissions": [{
+                    "hackathon_name": f"Event {event_index}",
+                    "hackathon_url": f"https://bound-{event_index}.devpost.com/",
+                    "status": "submitted",
+                } for event_index in range(20)],
+            }
+            document["projects"].append(project)
+        self.assertLess(canonical_size(document), MAX_BYTES)
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.post(ROOT + "preview/", document, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual((response.data["projects_detected"], response.data["submissions_detected"]), (100, 2000))
+        self.assertLessEqual(len(queries), 15)
 
     def test_imported_fields_update_and_different_users_are_isolated(self):
         self.link()

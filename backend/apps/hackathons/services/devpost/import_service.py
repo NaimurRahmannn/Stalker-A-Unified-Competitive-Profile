@@ -228,6 +228,8 @@ def apply_import(user, account_id: int, document: NormalizedDocument, token: str
             if state != signed.get("state") or public["conflicts"]:
                 raise ImportConflict()
             events = {submission.event.external_id: submission.event for project in document.projects for submission in project.submissions}
+            event_actions = {item["event_url"]: item["event_action"]
+                             for project in public["projects"] for item in project["submissions"]}
             participation_creates = {item["event_url"] for project in public["projects"]
                                      for item in project["submissions"] if item["participation_action"] == "create"}
             submitted_events = {submission.event.external_id for project in document.projects
@@ -237,7 +239,7 @@ def apply_import(user, account_id: int, document: NormalizedDocument, token: str
             record_ids = {"events": [], "participations": [], "projects": [], "submissions": []}
             warnings = []
             for key, incoming in events.items():
-                action = next(item["event_action"] for project in public["projects"] for item in project["submissions"] if item["event_url"] == incoming.event_url)
+                action = event_actions[incoming.event_url]
                 current = event_by_external.get(key)
                 if action == "create":
                     current = HackathonEvent.objects.create(owner=user, source="devpost", external_id=key, name=incoming.name,
