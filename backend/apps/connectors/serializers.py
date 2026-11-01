@@ -28,6 +28,7 @@ from apps.connectors.services import (
     can_sync_platform_account,
     get_sync_cooldown_seconds,
 )
+from apps.hackathons.services.devpost.identity import profile_reference
 
 
 class ConnectorHealthSerializer(serializers.Serializer):
@@ -587,6 +588,22 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                     {"handle": "Enter a numeric CTFtime team ID."}
                 )
 
+        if platform == PlatformAccount.Platform.DEVPOST:
+            reference = attrs.get("handle", self.instance.handle if self.instance else "")
+            try:
+                handle, canonical_url = profile_reference(reference)
+            except serializers.ValidationError as exc:
+                raise serializers.ValidationError({"handle": exc.detail}) from exc
+            if "profile_url" in attrs and attrs["profile_url"].strip():
+                try:
+                    url_handle, _ = profile_reference(attrs["profile_url"])
+                except serializers.ValidationError as exc:
+                    raise serializers.ValidationError({"profile_url": exc.detail}) from exc
+                if url_handle != handle:
+                    raise serializers.ValidationError({"profile_url": "Profile URL must match the Devpost username."})
+            attrs["handle"] = handle
+            attrs["profile_url"] = canonical_url
+
         return attrs
 
     def update(
@@ -606,7 +623,10 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             instance = super().update(instance, validated_data)
             if handle_changed or platform_changed:
-                instance.profile_url = ""
+                instance.profile_url = (
+                    f"https://devpost.com/{instance.handle}"
+                    if instance.platform == PlatformAccount.Platform.DEVPOST else ""
+                )
                 instance.is_verified = False
                 instance.handle_validated_at = None
                 instance.ownership_verified_at = None
