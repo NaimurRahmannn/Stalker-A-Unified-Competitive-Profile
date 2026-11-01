@@ -19,9 +19,11 @@ Phase 3 is implemented for independent review; it is not independently accepted 
 
 ## STALKER JSON v1
 
+The repository sample is demonstration data. Replace its handle, project, repository, demo, technology, and hackathon placeholders before use.
+
 See [the sample file](examples/devpost_import_v1.json). The top-level object must have `format_version: 1`, a `profile_url` matching the linked handle, and a `projects` array. Each project needs a Devpost `/software/{slug}` URL and title. Optional fields are `description`, `repository_url`, `demo_url`, `technologies`, and `submissions`. A project with no submissions stays a portfolio-only project. Each submission needs a name, stable Devpost hackathon subdomain URL, and explicit `draft`, `submitted`, or `withdrawn` status. Optional fields are organizer, start/end dates in `YYYY-MM-DD`, event format (`online`, `in_person`, `hybrid`, `unknown`), and submission URL. Unknown fields, including `owner`, internal IDs, verification status, awards, and ranks, are rejected.
 
-Limits: **1 MB per request**, **100 projects**, **20 submissions per project**, **30 technologies per project**; titles and URLs are capped to their model limits. Event URLs must be root URLs of a Devpost hackathon subdomain such as `https://global-ai-hackathon.devpost.com/`. Event dates and organizer are never invented. Projects without a referenced event do not create submissions, participations, awards, placements, or ratings.
+Limits: **1 MiB (1,048,576 bytes) per import document** after compact UTF-8 JSON serialization, plus a bounded **16 KiB HTTP envelope allowance** for JSON formatting and the apply token. Both preview and apply enforce the same document limit and a 1,064,960-byte raw request limit; apply tokens are capped at 8,192 characters. There can be at most **100 projects**, **20 submissions per project**, and **30 technologies per project**; titles and URLs are capped to their model limits. Event URLs must be root URLs of a Devpost hackathon subdomain such as `https://global-ai-hackathon.devpost.com/`. Event dates and organizer are never invented. Projects without a referenced event do not create submissions, participations, awards, placements, or ratings.
 
 ## API
 
@@ -41,7 +43,7 @@ Error codes: **400** malformed or unsupported input, **401** unauthenticated, **
 
 ## Frontend workflow
 
-The existing `/hackathon` page keeps the Phase 2 manual forms, overview, lists, editing, and deletion. Its Devpost section links, changes, or unlinks the existing platform account and labels ownership verification separately. A handle change warns that pending previews become invalid and historical records remain. Users can paste JSON, select a `.json` file, or load the STALKER schema example. Preview shows record actions and possible manual matches; an explicit checkbox is required before apply. Result counts and warnings appear after apply, and the existing lists and overview refresh. Owner-scoped import history is paginated. Imported events and projects are labeled as imports; imported projects link to their canonical Devpost URL and remain read-only through manual CRUD.
+The existing `/hackathon` page keeps the Phase 2 manual forms, overview, lists, editing, and deletion. Its Devpost section links, changes, or unlinks the existing platform account and labels ownership verification separately. A handle change warns that pending previews become invalid and historical records remain. Users can paste JSON, select a `.json` file, or load the STALKER schema example. The schema example contains explicit placeholder values and is blocked from preview until all placeholders are replaced. Preview shows record actions and possible manual matches; an explicit checkbox is required before apply. Result counts and warnings appear after apply, and the existing lists and overview refresh. Owner-scoped import history is paginated. Imported events and projects are labeled as imports; imported projects link to their canonical Devpost URL and remain read-only through manual CRUD.
 
 ## Identity, deduplication, and manual data
 
