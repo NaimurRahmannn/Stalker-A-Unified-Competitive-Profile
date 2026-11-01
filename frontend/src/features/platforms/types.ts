@@ -165,7 +165,7 @@ export type PlatformAccount = {
 };
 
 export type ConnectPlatformPayload = {
-  platform: ConnectablePlatform;
+  platform: ConnectablePlatform | "devpost";
   handle: string;
 };
 

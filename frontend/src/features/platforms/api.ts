@@ -35,3 +35,8 @@ export async function syncPlatformAccount(
 export async function deletePlatformAccount(id: number): Promise<void> {
   await api.delete(`/platform-accounts/${id}/`);
 }
+
+export async function updatePlatformAccount(id: number, handle: string): Promise<PlatformAccount> {
+  const { data } = await api.patch<PlatformAccount>(`/platform-accounts/${id}/`, { handle });
+  return data;
+}

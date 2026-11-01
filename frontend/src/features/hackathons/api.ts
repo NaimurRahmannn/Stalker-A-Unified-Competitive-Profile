@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { Achievement, EntryResponse, Event, Overview, Page, Participation, Project, Submission } from "./types";
+import type { Achievement, DevpostImportDocument, DevpostImportRun, DevpostPreview, EntryResponse, Event, Overview, Page, Participation, Project, Submission } from "./types";
 
 const root = "/hackathons";
 export const hackathonApi = {
@@ -14,4 +14,7 @@ export const hackathonApi = {
   addAchievement: async (payload: object) => (await api.post<Achievement>(`${root}/achievements/`, payload)).data,
   patchAchievement: async (id: number, payload: object) => (await api.patch<Achievement>(`${root}/achievements/${id}/`, payload)).data,
   remove: async (resource: "events" | "projects" | "participations" | "submissions" | "achievements", id: number) => { await api.delete(`${root}/${resource}/${id}/`); },
+  previewDevpost: async (document: DevpostImportDocument) => (await api.post<DevpostPreview>(`${root}/devpost/imports/preview/`, document)).data,
+  applyDevpost: async (document: DevpostImportDocument, previewToken: string) => (await api.post<DevpostImportRun>(`${root}/devpost/imports/`, { document, preview_token: previewToken })).data,
+  devpostHistory: async (page = 1) => (await api.get<Page<DevpostImportRun>>(`${root}/devpost/imports/`, { params: { page } })).data,
 };
