@@ -9,27 +9,12 @@ import { connectPlatformAccount, deletePlatformAccount, listPlatformAccounts, up
 import type { PlatformAccount } from "@/features/platforms/types";
 import { getApiErrorMessage } from "@/lib/utils";
 import { hackathonApi } from "../api";
+import { DEVPOST_DOCUMENT_LIMIT, DEVPOST_REQUEST_LIMIT, exampleDocument, hasExamplePlaceholders } from "../devpost-example";
 import { devpostAccountSchema, devpostImportSchema } from "../schemas";
 import type { DevpostImportDocument, DevpostImportRun, DevpostPreview, Page } from "../types";
 
 const accountFormSchema = z.object({ reference: devpostAccountSchema });
 type AccountValues = z.infer<typeof accountFormSchema>;
-const sizeLimit = 1_048_576;
-
-function exampleDocument(handle: string): DevpostImportDocument {
-  return {
-    format_version: 1,
-    profile_url: `https://devpost.com/${handle}`,
-    projects: [{
-      project_url: "https://devpost.com/software/smart-city-ai",
-      title: "Smart City AI",
-      description: "AI-powered city monitoring system",
-      repository_url: "https://github.com/example/smart-city-ai",
-      technologies: ["Python", "React"],
-      submissions: [{ hackathon_name: "Global AI Hackathon", hackathon_url: "https://global-ai-hackathon.devpost.com/", status: "submitted" }],
-    }],
-  };
-}
 
 export function DevpostIntegration({ onImported }: { onImported: () => Promise<void> }) {
   const [account, setAccount] = useState<PlatformAccount | null>(null);
@@ -97,7 +82,7 @@ export function DevpostIntegration({ onImported }: { onImported: () => Promise<v
   const selectFile = async (file: File | undefined) => {
     if (!file) return;
     clearPreview(); setError("");
-    if (file.size > sizeLimit) { setError("JSON files must be at most 1 MB."); return; }
+    if (file.size > DEVPOST_REQUEST_LIMIT) { setError("JSON files exceed the 1 MB document limit and formatting allowance."); return; }
     try { setDocumentText(await file.text()); }
     catch { setError("Could not read the JSON file."); }
   };
@@ -105,15 +90,17 @@ export function DevpostIntegration({ onImported }: { onImported: () => Promise<v
   const previewImport = async () => {
     if (!account) return;
     clearPreview(); setError("");
-    if (new TextEncoder().encode(documentText).length > sizeLimit) { setError("JSON must be at most 1 MB."); return; }
+    if (new TextEncoder().encode(documentText).length > DEVPOST_REQUEST_LIMIT) { setError("JSON exceeds the 1 MB document limit and formatting allowance."); return; }
     let parsed: unknown;
     try { parsed = JSON.parse(documentText); }
     catch { setError("Enter valid JSON before previewing."); return; }
     const checked = devpostImportSchema.safeParse(parsed);
     if (!checked.success) { setError(checked.error.issues[0]?.message ?? "Invalid import document."); return; }
+    const normalized = checked.data as DevpostImportDocument;
+    if (new TextEncoder().encode(JSON.stringify(normalized)).length > DEVPOST_DOCUMENT_LIMIT) { setError("Import document must be at most 1 MB."); return; }
+    if (hasExamplePlaceholders(normalized)) { setError("Replace every example project and hackathon placeholder with your own data before previewing."); return; }
     setBusy(true);
     try {
-      const normalized = checked.data as DevpostImportDocument;
       const plan = await hackathonApi.previewDevpost(normalized);
       setDocument(normalized); setPreview(plan);
     } catch (err) { setError(getApiErrorMessage(err, "Could not preview import.")); }
@@ -151,11 +138,12 @@ export function DevpostIntegration({ onImported }: { onImported: () => Promise<v
       </div>
       {account && <div className="rounded-xl border border-slate-200 p-4">
         <h3 className="font-semibold">Import data</h3>
-        <p className="mt-1 text-xs text-slate-600">Use the STALKER JSON v1 format, not an official Devpost export. Maximum 1 MB, 100 projects, and 20 submissions per project. Project-only entries are welcome.</p>
+        <p className="mt-1 text-xs text-slate-600">Use the STALKER JSON v1 format, not an official Devpost export. Maximum 1 MB of document data, 100 projects, and 20 submissions per project. Project-only entries are welcome.</p>
+        <p className="mt-1 text-xs text-amber-800">The schema example is demonstration data. Replace every placeholder with your own project and hackathon details before previewing.</p>
         <div className="mt-3 flex flex-wrap gap-3"><label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-sm">Choose JSON file<input type="file" accept=".json,application/json" className="sr-only" onChange={(event) => void selectFile(event.target.files?.[0])} /></label>
           <button type="button" onClick={() => { clearPreview(); setDocumentText(JSON.stringify(exampleDocument(account.handle), null, 2)); }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Load schema example</button></div>
         <label htmlFor="devpost-json" className="mt-3 block text-xs font-semibold text-slate-600">JSON document</label>
-        <textarea id="devpost-json" value={documentText} maxLength={sizeLimit} onChange={(event) => { clearPreview(); setDocumentText(event.target.value); }} rows={10} spellCheck={false} className="mt-1 w-full rounded-lg border border-slate-300 p-3 font-mono text-xs" placeholder="Paste STALKER JSON v1 here or choose a file" />
+        <textarea id="devpost-json" value={documentText} maxLength={DEVPOST_REQUEST_LIMIT} onChange={(event) => { clearPreview(); setDocumentText(event.target.value); }} rows={10} spellCheck={false} className="mt-1 w-full rounded-lg border border-slate-300 p-3 font-mono text-xs" placeholder="Paste STALKER JSON v1 here or choose a file" />
         <button type="button" disabled={busy || !documentText.trim()} onClick={() => void previewImport()} className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Working…" : "Preview import"}</button>
       </div>}
       {preview && <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">

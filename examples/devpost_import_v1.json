@@ -1,19 +1,19 @@
 {
   "format_version": 1,
-  "profile_url": "https://devpost.com/example_user",
+  "profile_url": "https://devpost.com/replace_with_your_handle",
   "projects": [
     {
-      "project_url": "https://devpost.com/software/smart-city-ai",
-      "title": "Smart City AI",
-      "description": "AI-powered city monitoring system",
-      "repository_url": "https://github.com/example/smart-city-ai",
-      "demo_url": "https://example.com/demo",
-      "technologies": ["Python", "React", "Django"],
+      "project_url": "https://devpost.com/software/replace-with-your-project-slug",
+      "title": "REPLACE_WITH_YOUR_PROJECT_TITLE",
+      "description": "DEMO DATA: Replace every placeholder with your own details.",
+      "repository_url": "https://example.com/replace-with-your-repository-url",
+      "demo_url": "https://example.com/replace-with-your-demo-url",
+      "technologies": ["REPLACE_WITH_YOUR_TECHNOLOGY"],
       "submissions": [
         {
-          "hackathon_name": "Global AI Hackathon",
-          "hackathon_url": "https://global-ai-hackathon.devpost.com/",
-          "status": "submitted"
+          "hackathon_name": "REPLACE_WITH_YOUR_HACKATHON_NAME",
+          "hackathon_url": "https://replace-with-your-hackathon.devpost.com/",
+          "status": "draft"
         }
       ]
     }
