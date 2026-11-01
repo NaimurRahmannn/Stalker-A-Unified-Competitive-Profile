@@ -134,6 +134,7 @@ class HackathonProject(models.Model):
         related_name="hackathon_projects",
     )
     title = models.CharField(max_length=500)
+    project_url = models.URLField(max_length=500, blank=True)
     description = models.TextField(blank=True)
     repository_url = models.URLField(max_length=500, blank=True)
     demo_url = models.URLField(max_length=500, blank=True)
@@ -644,3 +645,31 @@ class HackathonAchievement(models.Model):
 
     def __str__(self) -> str:
         return f"{self.title} ({self.get_achievement_type_display()})"
+
+
+class DevpostImportRun(models.Model):
+    """Provenance and bounded outcome for a user-supplied import document."""
+
+    class Status(models.TextChoices):
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="devpost_import_runs")
+    linked_account = models.ForeignKey("connectors.PlatformAccount", null=True, blank=True, on_delete=models.SET_NULL)
+    profile_handle = models.CharField(max_length=64)
+    input_method = models.CharField(max_length=32, default="user_json")
+    status = models.CharField(max_length=16, choices=Status.choices)
+    request_fingerprint = models.CharField(max_length=64)
+    projects_processed = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    updated_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    error_count = models.PositiveIntegerField(default=0)
+    result = models.JSONField(default=dict)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-started_at", "-pk"]
+        constraints = [models.UniqueConstraint(fields=["user", "request_fingerprint"], name="unique_devpost_import_request")]
+        indexes = [models.Index(fields=["user", "-started_at"], name="devpost_run_user_idx")]

@@ -117,8 +117,8 @@ class ProjectSerializer(ManualSerializer):
 
     class Meta:
         model = HackathonProject
-        fields = ("id", "title", "description", "repository_url", "demo_url", "video_url", "image_url", "technologies", "is_public", "source", "external_id", "created_at", "updated_at")
-        read_only_fields = ("id", "source", "external_id", "created_at", "updated_at")
+        fields = ("id", "title", "project_url", "description", "repository_url", "demo_url", "video_url", "image_url", "technologies", "is_public", "source", "external_id", "created_at", "updated_at")
+        read_only_fields = ("id", "project_url", "source", "external_id", "created_at", "updated_at")
 
 
 class ParticipationSerializer(ManualSerializer):

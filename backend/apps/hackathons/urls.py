@@ -5,6 +5,7 @@ from apps.hackathons.views import (
     AchievementViewSet, EventViewSet, HackathonOverviewView, ManualEntryView,
     ParticipationViewSet, ProjectViewSet, SubmissionViewSet,
 )
+from apps.hackathons.devpost_views import DevpostImportDetailView, DevpostImportListView, DevpostImportPreviewView
 
 router = DefaultRouter()
 router.register("events", EventViewSet, basename="hackathon-event")
@@ -14,6 +15,9 @@ router.register("submissions", SubmissionViewSet, basename="hackathon-submission
 router.register("achievements", AchievementViewSet, basename="hackathon-achievement")
 
 urlpatterns = [
+    path("devpost/imports/preview/", DevpostImportPreviewView.as_view(), name="devpost-import-preview"),
+    path("devpost/imports/", DevpostImportListView.as_view(), name="devpost-import-list"),
+    path("devpost/imports/<int:pk>/", DevpostImportDetailView.as_view(), name="devpost-import-detail"),
     path(
         "overview/",
         HackathonOverviewView.as_view(),
