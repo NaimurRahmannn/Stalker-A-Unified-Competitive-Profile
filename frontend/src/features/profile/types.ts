@@ -66,4 +66,39 @@ export interface PublicProfileResponse {
     summary: CompetitiveOverviewSummary;
     platforms: CompetitivePlatformSummary[];
   };
+  hackathons: PublicHackathonSummary;
 }
+
+export type PublicHackathonSummary = {
+  published_projects: number;
+  public_participations: number;
+  public_achievements: number;
+  verified_achievements: number;
+};
+export type PublicPage<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+export type PublicHackathonProject = {
+  id: number; title: string; description: string; technologies: string[]; source: "manual" | "devpost";
+  associations: Array<{ event_id: number; event_name: string; event_url: string | null }>;
+  project_url: string | null; repository_url: string | null; demo_url: string | null;
+  video_url: string | null; image_url: string | null;
+};
+export type PublicHackathonParticipation = {
+  id: number; status: "registered" | "attended" | "submitted"; team_name: string; role: string;
+  event: { id: number; name: string; organizer: string; start_date: string | null; end_date: string | null;
+    format: "online" | "in_person" | "hybrid" | "unknown"; event_url: string | null };
+};
+export type PublicHackathonAchievement = {
+  id: number; participation_id: number; project_id: number | null; achievement_type: string;
+  title: string; rank: number | null; total_participants: number | null; description: string;
+  verification_status: "self_reported" | "evidence_provided" | "verified";
+};
+export type PublicHackathonSubmission = {
+  id: number; project_id: number; project_title: string; event_id: number; event_name: string; submission_url: string | null;
+};
+export type PublicHackathonPortfolio = {
+  summary: PublicHackathonSummary;
+  projects: PublicPage<PublicHackathonProject>;
+  participations: PublicPage<PublicHackathonParticipation>;
+  achievements: PublicPage<PublicHackathonAchievement>;
+  submissions: PublicPage<PublicHackathonSubmission>;
+};

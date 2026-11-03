@@ -14,6 +14,7 @@ import { ProfileHero } from "./profile-hero";
 import { ProfileRecentSections } from "./profile-recent-sections";
 import { PublicProfileFooter } from "./public-profile-footer";
 import { PublicProfileNavbar } from "./public-profile-navbar";
+import { PublicHackathonPortfolio } from "./hackathons/public-hackathon-portfolio";
 
 function Block({ className = "" }: { className?: string }) { return <div className={`animate-pulse rounded-lg bg-slate-200 ${className}`} />; }
 function PublicProfileLoading() {
@@ -27,19 +28,22 @@ function ProfileError({ notFound, message, onRetry }: { notFound: boolean; messa
 
 export function PublicProfilePageContent({ username }: { username: string }) {
   const [profile, setProfile] = useState<PublicProfileResponse | null>(null);
+  const [loadedUsername, setLoadedUsername] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; notFound: boolean } | null>(null);
+  const [failedUsername, setFailedUsername] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const invalidUsername = !username.trim();
   useEffect(() => {
     let cancelled = false;
     if (invalidUsername) return;
-    void getPublicProfile(username).then((data) => { if (!cancelled) { setProfile(data); setError(null); } }).catch((requestError: unknown) => { if (!cancelled) setError({ message: getApiErrorMessage(requestError, "The profile service is unavailable."), notFound: requestError instanceof AxiosError && requestError.response?.status === 404 }); });
+    void getPublicProfile(username).then((data) => { if (!cancelled) { setProfile(data); setLoadedUsername(username); setError(null); setFailedUsername(null); } }).catch((requestError: unknown) => { if (!cancelled) { setFailedUsername(username); setError({ message: getApiErrorMessage(requestError, "The profile service is unavailable."), notFound: requestError instanceof AxiosError && requestError.response?.status === 404 }); } });
     return () => { cancelled = true; };
   }, [invalidUsername, username, version]);
-  const view = useMemo(() => profile ? buildPublicProfileViewModel(profile) : null, [profile]);
+  const view = useMemo(() => profile && loadedUsername === username ? buildPublicProfileViewModel(profile) : null, [profile, loadedUsername, username]);
+  const currentError = failedUsername === username ? error : null;
   if (invalidUsername) return <ProfileError notFound message="A username is required." onRetry={() => undefined} />;
-  if (!view && !error) return <PublicProfileLoading />;
-  if (!view && error) return <ProfileError {...error} onRetry={() => { setError(null); setVersion((value) => value + 1); }} />;
+  if (!view && !currentError) return <PublicProfileLoading />;
+  if (!view && currentError) return <ProfileError {...currentError} onRetry={() => { setError(null); setVersion((value) => value + 1); }} />;
   if (!view) return null;
-  return <div className="min-h-screen bg-slate-50 text-slate-900"><PublicProfileNavbar /><ProfileHero hero={view.hero} metrics={view.summaryMetrics} /><main className="mx-auto max-w-310 space-y-4 px-5 py-7 sm:px-8"><PlatformsOverview platforms={view.platforms} /><CompetitiveProgrammingSection platforms={view.competitivePlatforms} metrics={view.competitiveMetrics} performance={view.performance} /><DomainProfileCards cards={view.domainCards} /><ProfileRecentSections /></main><PublicProfileFooter /></div>;
+  return <div className="min-h-screen bg-slate-50 text-slate-900"><PublicProfileNavbar /><ProfileHero hero={view.hero} metrics={view.summaryMetrics} /><main className="mx-auto max-w-310 space-y-4 px-5 py-7 sm:px-8"><PlatformsOverview platforms={view.platforms} /><CompetitiveProgrammingSection platforms={view.competitivePlatforms} metrics={view.competitiveMetrics} performance={view.performance} /><DomainProfileCards cards={view.domainCards} /><PublicHackathonPortfolio key={username} username={username} /><ProfileRecentSections /></main><PublicProfileFooter /></div>;
 }

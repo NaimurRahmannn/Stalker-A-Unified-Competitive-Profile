@@ -4,7 +4,7 @@ import { formatDashboardPlatformName, getPlatformMark } from "@/features/dashboa
 import type { MetricAccent, PlatformMark } from "@/features/dashboard/types";
 import type { CTFTeamProfile } from "@/features/platforms/types";
 import { formatRelativeTime } from "@/lib/utils";
-import type { PublicAtCoderStats, PublicCodeforcesStats, PublicLeetCodeStats, PublicProfilePlatform, PublicProfileResponse, PublicProfileUser } from "./types";
+import type { PublicAtCoderStats, PublicCodeforcesStats, PublicHackathonSummary, PublicLeetCodeStats, PublicProfilePlatform, PublicProfileResponse, PublicProfileUser } from "./types";
 
 export type ProfileSocialLink = { label: string; href: string; kind: "github" | "linkedin" };
 export type ProfileHeroView = { displayName: string; username: string; initials: string; avatarUrl: string | null; bio: string | null; country: string | null; institution: string | null; socialLinks: ProfileSocialLink[] };
@@ -12,7 +12,7 @@ export type ProfileMetricView = { label: string; value: string; icon: LucideIcon
 export type PublicPlatformView = { id: number; slug: string; name: string; handle: string; handleValid: boolean; mark: PlatformMark | null; profileUrl: string | null; lastSyncedLabel: string; rating: string; maxRating: string; rank: string; solved: string; contests: string; hasDetailedStats: boolean };
 export type CompetitiveMetricView = { label: string; value: string };
 export type DomainAccountView = Pick<PublicPlatformView, "id" | "name" | "handle" | "handleValid" | "mark" | "profileUrl" | "rating" | "rank" | "contests">;
-export type DomainCardView = { key: "ctf" | "hackathon" | "datathon"; title: string; subtitle: string; accounts: DomainAccountView[] };
+export type DomainCardView = { key: "ctf" | "hackathon" | "datathon"; title: string; subtitle: string; accounts: DomainAccountView[]; metrics?: Array<{ label: string; value: string }> };
 export type PerformanceSummaryView = { lastActive: string; memberSince: string };
 export type PublicProfileViewModel = { hero: ProfileHeroView; summaryMetrics: ProfileMetricView[]; platforms: PublicPlatformView[]; competitivePlatforms: PublicPlatformView[]; competitiveMetrics: CompetitiveMetricView[]; domainCards: DomainCardView[]; performance: PerformanceSummaryView };
 
@@ -56,11 +56,15 @@ function buildPlatform(platform: PublicProfilePlatform): PublicPlatformView {
   };
 }
 
-function buildDomains(platforms: PublicPlatformView[]): DomainCardView[] {
+function buildDomains(platforms: PublicPlatformView[], hackathons: PublicHackathonSummary): DomainCardView[] {
   const select = (slugs: string[]) => platforms.filter((platform) => slugs.includes(platform.slug)).map(({ id, name, handle, handleValid, mark, profileUrl, rating, rank, contests }) => ({ id, name, handle, handleValid, mark, profileUrl, rating, rank, contests }));
   return [
     { key: "ctf", title: "CTF / Cybersecurity", subtitle: "Security platforms and capture-the-flag profiles", accounts: select(["ctftime", "tryhackme", "hackthebox"]) },
-    { key: "hackathon", title: "Hackathon", subtitle: "Hackathon profiles and project showcases", accounts: select(["devpost", "dorahacks"]) },
+    { key: "hackathon", title: "Hackathon", subtitle: "Hackathon profiles and project showcases", accounts: select(["devpost", "dorahacks"]), metrics: [
+      { label: "Projects", value: String(hackathons.published_projects) },
+      { label: "Events", value: String(hackathons.public_participations) },
+      { label: "Achievements", value: String(hackathons.public_achievements) },
+    ] },
     { key: "datathon", title: "Datathon / Data Science", subtitle: "Data science and competition profiles", accounts: select(["kaggle"]) },
   ];
 }
@@ -89,7 +93,7 @@ export function buildPublicProfileViewModel(profile: PublicProfileResponse): Pub
       { label: "Tracked Contest Participations", value: formatNumber(summary.contest_count) },
       { label: "Platforms Active", value: String(summary.active_platforms) },
     ],
-    domainCards: buildDomains(platformViews),
+    domainCards: buildDomains(platformViews, profile.hackathons),
     performance: { lastActive: relativeDate(lastActive, "—"), memberSince: monthYear(memberSince) },
   };
 }
