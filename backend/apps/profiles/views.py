@@ -10,6 +10,12 @@ from apps.profiles.serializers import (
     PublicProfilePlatformSerializer,
     PublicProfileUserSerializer,
 )
+from apps.profiles.hackathon_public import (
+    PublicHackathonAchievementSerializer, PublicHackathonParticipationSerializer,
+    PublicHackathonProjectSerializer, PublicHackathonSubmissionSerializer,
+    hackathon_summary, paginated_public_collection, public_achievements,
+    public_participations, public_project_cards, public_submissions,
+)
 
 
 class PublicProfileView(APIView):
@@ -35,8 +41,23 @@ class PublicProfileView(APIView):
                     user,
                     include_activity=False,
                 ),
+                "hackathons": hackathon_summary(user),
             }
         )
+
+
+class PublicHackathonPortfolioView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, username: str):
+        user = get_object_or_404(User, username=username)
+        return Response({
+            "summary": hackathon_summary(user),
+            "projects": paginated_public_collection(request, public_project_cards(user), PublicHackathonProjectSerializer, "projects_page"),
+            "participations": paginated_public_collection(request, public_participations(user).select_related("event"), PublicHackathonParticipationSerializer, "participations_page"),
+            "achievements": paginated_public_collection(request, public_achievements(user).select_related("submission"), PublicHackathonAchievementSerializer, "achievements_page"),
+            "submissions": paginated_public_collection(request, public_submissions(user).select_related("project", "event"), PublicHackathonSubmissionSerializer, "submissions_page"),
+        })
 
 
 PublicProfileAPIView = PublicProfileView
