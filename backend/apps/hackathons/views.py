@@ -1,7 +1,9 @@
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Prefetch
+from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -55,6 +57,18 @@ def lock_deletion_context(instance):
 class ManualViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = HackathonPagination
+
+    def set_visibility(self, request, pk):
+        if not isinstance(request.data, dict) or set(request.data) != {"is_public"}:
+            raise ValidationError({"is_public": "Provide only the is_public Boolean field."})
+        if type(request.data["is_public"]) is not bool:
+            raise ValidationError({"is_public": "Use a JSON Boolean."})
+        with transaction.atomic():
+            instance = get_object_or_404(self.get_queryset().select_for_update(), pk=pk)
+            if instance.is_public != request.data["is_public"]:
+                instance.is_public = request.data["is_public"]
+                instance.save(update_fields=("is_public", "updated_at"))
+            return Response({"id": instance.pk, "is_public": instance.is_public})
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -164,6 +178,10 @@ class ProjectViewSet(ManualViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user, source="manual", external_id="")
 
+    @action(detail=True, methods=["patch"], url_path="visibility")
+    def visibility(self, request, pk=None):
+        return self.set_visibility(request, pk)
+
 
 class ParticipationViewSet(ManualViewSet):
     serializer_class = ParticipationSerializer
@@ -173,6 +191,10 @@ class ParticipationViewSet(ManualViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=["patch"], url_path="visibility")
+    def visibility(self, request, pk=None):
+        return self.set_visibility(request, pk)
 
 
 class SubmissionViewSet(ManualViewSet):
