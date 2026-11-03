@@ -16,6 +16,11 @@ show project-building experience.
 STALKER brings those scattered signals together into one dashboard and one
 shareable profile.
 
+Hackathon projects and participations start private. Owners can publish each
+independently from `/hackathon`; published work appears on `/profile/{username}`.
+The public Hackathon API is `GET /api/v1/profile/{username}/hackathons/`.
+Imported Devpost projects remain private until their owner publishes them.
+
 ## What We Are Building
 
 STALKER is a platform where users can connect their public handles from
