@@ -34,11 +34,12 @@ const invoke = async (name, ...args) => {
   if (name === "updatePlatformAccount") { state.account = account(args[1]); return state.account; }
   if (name === "deletePlatformAccount") { state.account = null; return; }
   if (name === "devpostHistory") return page(args[0]);
+  if (name === "duplicateReviews") return { candidates: [], reviews: { count: 0, results: [], previous: null, next: null } };
   if (name === "previewDevpost") return state.preview;
   if (name === "applyDevpost") return state.applied;
 };
 const platformApi = Object.fromEntries(["listPlatformAccounts", "connectPlatformAccount", "updatePlatformAccount", "deletePlatformAccount"].map((name) => [name, (...args) => invoke(name, ...args)]));
-const hackathonApi = Object.fromEntries(["devpostHistory", "previewDevpost", "applyDevpost"].map((name) => [name, (...args) => invoke(name, ...args)]));
+const hackathonApi = Object.fromEntries(["devpostHistory", "previewDevpost", "applyDevpost", "duplicateReviews"].map((name) => [name, (...args) => invoke(name, ...args)]));
 const originalLoad = Module._load;
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {
@@ -47,7 +48,7 @@ Module._resolveFilename = function (request, parent, ...rest) {
 };
 Module._load = function (request, parent, ...rest) {
   if (request === "@/features/platforms/api") return platformApi;
-  if (request === "../api" && parent?.filename.endsWith("devpost-integration.tsx")) return { hackathonApi };
+  if (request === "../api" && (parent?.filename.endsWith("devpost-integration.tsx") || parent?.filename.endsWith("duplicate-review-panel.tsx"))) return { hackathonApi };
   if (request === "sonner") return { toast: { success: () => {} } };
   return originalLoad.call(this, request, parent, ...rest);
 };
@@ -97,8 +98,9 @@ function validDocument() {
 function preview() {
   return { preview_token: "signed-token", projects_detected: 1, hackathons_detected: 1, participations_detected: 1, submissions_detected: 1,
     new_records: 4, existing_matches: 0, protected_records: 0, potential_manual_duplicates: 0, conflicts: [],
-    projects: [{ project_url: "https://devpost.com/software/my-real-project", title: "My Real Project", action: "create", possible_manual_project_ids: [],
-      submissions: [{ event_url: "https://my-hackathon.devpost.com/", event_name: "My Hackathon", event_action: "create", participation_action: "create", action: "create", possible_manual_event_ids: [] }] }] };
+    action_counts: { create: 4, update: 0, unchanged: 0, protected: 0, conflict: 0 },
+    projects: [{ project_url: "https://devpost.com/software/my-real-project", title: "My Real Project", action: "create", changes: [], reason: "", possible_manual_project_ids: [], possible_manual_projects: [],
+      submissions: [{ event_url: "https://my-hackathon.devpost.com/", event_name: "My Hackathon", event_action: "create", event_changes: [], participation_action: "create", action: "create", changes: [], reason: "", possible_manual_event_ids: [], possible_manual_events: [] }] }] };
 }
 function apiError(status, detail) {
   const error = new AxiosError(`HTTP ${status}`);

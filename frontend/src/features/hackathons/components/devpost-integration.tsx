@@ -12,6 +12,8 @@ import { hackathonApi } from "../api";
 import { DEVPOST_DOCUMENT_LIMIT, DEVPOST_REQUEST_LIMIT, exampleDocument, hasExamplePlaceholders } from "../devpost-example";
 import { devpostAccountSchema, devpostImportSchema } from "../schemas";
 import type { DevpostImportDocument, DevpostImportRun, DevpostPreview, Page } from "../types";
+import { DuplicateReviewPanel } from "./duplicate-review-panel";
+import { ImportPreviewDetails } from "./import-preview-details";
 
 const accountFormSchema = z.object({ reference: devpostAccountSchema });
 type AccountValues = z.infer<typeof accountFormSchema>;
@@ -115,7 +117,7 @@ export function DevpostIntegration({ onImported }: { onImported: () => Promise<v
       setResult(run); setPreview(null); setConfirmed(false);
       setHistoryPage(1); await Promise.all([onImported(), hackathonApi.devpostHistory(1).then(setHistory)]);
       toast.success("Devpost data imported");
-    } catch (err) { setError(getApiErrorMessage(err, "Import could not be applied. Preview again.")); setPreview(null); setConfirmed(false); await loadHistory(); }
+    } catch (err) { setError(`${getApiErrorMessage(err, "Import could not be applied.")} Preview again before importing.`); setPreview(null); setConfirmed(false); await loadHistory(); }
     finally { setBusy(false); }
   };
 
@@ -148,14 +150,12 @@ export function DevpostIntegration({ onImported }: { onImported: () => Promise<v
       </div>}
       {preview && <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
         <h3 className="font-semibold">Import preview</h3>
-        <p className="mt-1 text-sm">{preview.projects_detected} projects · {preview.hackathons_detected} hackathons · {preview.participations_detected} participations · {preview.submissions_detected} submissions · {preview.new_records} new · {preview.existing_matches} existing · {preview.protected_records} protected</p>
-        {preview.potential_manual_duplicates > 0 && <p className="mt-2 text-xs text-amber-800">{preview.potential_manual_duplicates} possible manual matches will remain separate and untouched.</p>}
-        {preview.conflicts.length > 0 && <div className="mt-2 text-xs text-rose-700"><p>{preview.conflicts.length} conflicting records must be resolved before importing.</p>{preview.conflicts.slice(0, 5).map((conflict, index) => <p key={index} className="break-all">{conflict.project_url || conflict.event_url}</p>)}</div>}
-        <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">{preview.projects.map((project) => <div key={project.project_url} className="rounded-lg border border-violet-100 bg-white p-3 text-sm"><p className="font-medium">{project.title} · {project.action}</p><p className="break-all text-xs text-slate-500">{project.project_url}</p>{project.possible_manual_project_ids.length > 0 && <p className="text-xs text-amber-800">Possible manual project IDs: {project.possible_manual_project_ids.join(", ")}</p>}{project.submissions.map((submission) => <p key={submission.event_url} className="mt-1 text-xs text-slate-600">{submission.event_name}: event {submission.event_action}, participation {submission.participation_action}, submission {submission.action}{submission.possible_manual_event_ids.length > 0 ? ` · possible manual event IDs: ${submission.possible_manual_event_ids.join(", ")}` : ""}</p>)}</div>)}</div>
+        <ImportPreviewDetails preview={preview} />
         <label className="mt-3 flex items-start gap-2 text-xs text-slate-700"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-0.5" />I reviewed these changes and want to import this user-provided data.</label>
         <button type="button" disabled={busy || !confirmed || preview.conflicts.length > 0} onClick={() => void applyImport()} className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Confirm import</button>
       </div>}
       {result && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><h3 className="font-semibold">Import completed</h3><p>{result.created_count} created · {result.updated_count} updated · {result.skipped_count} skipped</p><p>{result.result.events_created ?? 0} hackathons, {result.result.participations_created ?? 0} participations, and {result.result.submissions_created ?? 0} submissions created.</p>{result.result.warnings?.map((warning, index) => <p key={`${index}-${warning}`} className="mt-1 text-xs">{warning}</p>)}</div>}
+      <DuplicateReviewPanel refreshKey={result?.id ?? 0} />
       <div className="rounded-xl border border-slate-200 p-4"><h3 className="font-semibold">Import history</h3>
         {history?.count ? <div className="mt-3 space-y-2">{history.results.map((run) => <div key={run.id} className="rounded-lg border border-slate-100 p-3 text-xs"><p className="font-medium">{run.status} · {run.profile_handle} · {new Date(run.started_at).toLocaleString()}</p><p>{run.projects_processed} projects · {run.created_count} created · {run.updated_count} updated · {run.skipped_count} skipped · {run.error_count} errors</p>{run.result.error && <p className="text-rose-700">{run.result.error}</p>}</div>)}</div> : <p className="mt-2 text-sm text-slate-500">No imports yet.</p>}
         <div className="mt-3 flex items-center justify-between text-xs"><button disabled={!history?.previous} onClick={() => setHistoryPage((page) => page - 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40">Previous</button><span>Page {historyPage}</span><button disabled={!history?.next} onClick={() => setHistoryPage((page) => page + 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40">Next</button></div>
