@@ -5,11 +5,19 @@ export type SubmissionStatus = "draft" | "submitted" | "withdrawn";
 export type AchievementType = "placement" | "award" | "finalist" | "participation" | "other";
 export type Overview = { hackathons_attended: number; projects_submitted: number; achievements_recorded: number; placements_recorded: number };
 export type Participation = { id: number; event: number; status: ParticipationStatus; team_name: string; role: string; is_public: boolean };
-export type Project = { id: number; title: string; project_url: string; description: string; repository_url: string; demo_url: string; video_url: string; image_url: string; technologies: string[]; is_public: boolean; source: string };
+export type Project = { id: number; title: string; project_url: string; description: string; repository_url: string; demo_url: string; video_url: string; image_url: string; technologies: string[]; is_public: boolean; source: string; updated_at: string; related_hackathon_count: number };
 export type Submission = { id: number; event: number; project: number; project_title: string; status: SubmissionStatus; submission_url: string; submitted_at: string | null; source: string };
 export type Achievement = { id: number; participation: number; submission: number | null; achievement_type: AchievementType; title: string; rank: number | null; total_participants: number | null; description: string; evidence_url: string; verification_status: "self_reported" | "evidence_provided" | "verified" };
 export type Event = { id: number; name: string; organizer: string; description: string; event_url: string; start_date: string | null; end_date: string | null; format: EventFormat; source: string; participation: Participation | null; submissions: Submission[]; achievements: Achievement[] };
 export type EntryResponse = { event_id: number; participation_id: number; project_id: number | null; submission_id: number | null; achievement_ids: number[] };
+
+export type ProjectFilters = { search: string; source: string; visibility: string; technology: string; ordering: string };
+export type EventFilters = { name: string; status: string; year: string; event_format: string; source: string; ordering: string };
+export type ImportFieldChange = { field: string; before: string | string[] | null; after: string | string[] | null; truncated: boolean };
+export type DuplicateRecord = { id: number; title?: string; name?: string; project_url?: string; event_url?: string; repository_url?: string; demo_url?: string; source: string; is_public?: boolean };
+export type DuplicateReview = { id: number | null; record_type: "project" | "event"; manual: DuplicateRecord; imported: DuplicateRecord;
+  reason: string; decision: "unresolved" | "related" | "distinct"; created_at?: string; updated_at?: string };
+export type DuplicateReviewListing = { candidates: DuplicateReview[]; reviews: Page<DuplicateReview> };
 
 export type DevpostImportDocument = {
   format_version: 1;
@@ -25,8 +33,13 @@ export type DevpostPreview = {
   projects_detected: number; hackathons_detected: number; participations_detected: number; submissions_detected: number;
   new_records: number; existing_matches: number; protected_records: number; potential_manual_duplicates: number;
   conflicts: Array<{ project_url: string; event_url: string }>;
+  action_counts: Record<"create" | "update" | "unchanged" | "protected" | "conflict", number>;
   projects: Array<{ project_url: string; title: string; action: string; possible_manual_project_ids: number[];
-    submissions: Array<{ event_url: string; event_name: string; event_action: string; participation_action: string; action: string; possible_manual_event_ids: number[] }> }>;
+    changes: ImportFieldChange[]; reason: string;
+    possible_manual_projects: Array<{ id: number; title: string; project_url: string; repository_url: string; demo_url: string; reason: string }>;
+    submissions: Array<{ event_url: string; event_name: string; event_action: string; event_reason: string; event_changes: ImportFieldChange[];
+      participation_action: string; action: string; changes: ImportFieldChange[]; reason: string; possible_manual_event_ids: number[];
+      possible_manual_events: Array<{ id: number; name: string; event_url: string; reason: string }> }> }>;
   preview_token: string; expires_in_seconds: number;
 };
 export type DevpostImportRun = {

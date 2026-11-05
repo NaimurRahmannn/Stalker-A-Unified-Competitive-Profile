@@ -1,11 +1,11 @@
 import api from "@/lib/api";
-import type { Achievement, DevpostImportDocument, DevpostImportRun, DevpostPreview, EntryResponse, Event, Overview, Page, Participation, Project, Submission } from "./types";
+import type { Achievement, DevpostImportDocument, DevpostImportRun, DevpostPreview, DuplicateReview, DuplicateReviewListing, EntryResponse, Event, EventFilters, Overview, Page, Participation, Project, ProjectFilters, Submission } from "./types";
 
 const root = "/hackathons";
 export const hackathonApi = {
   overview: async () => (await api.get<Overview>(`${root}/overview/`)).data,
-  events: async (page = 1, name = "") => (await api.get<Page<Event>>(`${root}/events/`, { params: { page, ...(name ? { name } : {}) } })).data,
-  projects: async (page = 1, pageSize = 20, title = "") => (await api.get<Page<Project>>(`${root}/projects/`, { params: { page, page_size: pageSize, ...(title ? { title } : {}) } })).data,
+  events: async (page = 1, name = "", filters?: EventFilters) => (await api.get<Page<Event>>(`${root}/events/`, { params: { page, ...(name ? { name } : {}), ...filters } })).data,
+  projects: async (page = 1, pageSize = 20, title = "", filters?: ProjectFilters) => (await api.get<Page<Project>>(`${root}/projects/`, { params: { page, page_size: pageSize, ...(title ? { title } : {}), ...filters } })).data,
   entries: async (payload: object) => (await api.post<EntryResponse>(`${root}/entries/`, payload)).data,
   patchEvent: async (id: number, payload: object) => (await api.patch<Event>(`${root}/events/${id}/`, payload)).data,
   patchProject: async (id: number, payload: object) => (await api.patch<Project>(`${root}/projects/${id}/`, payload)).data,
@@ -19,4 +19,9 @@ export const hackathonApi = {
   previewDevpost: async (document: DevpostImportDocument) => (await api.post<DevpostPreview>(`${root}/devpost/imports/preview/`, document)).data,
   applyDevpost: async (document: DevpostImportDocument, previewToken: string) => (await api.post<DevpostImportRun>(`${root}/devpost/imports/`, { document, preview_token: previewToken })).data,
   devpostHistory: async (page = 1) => (await api.get<Page<DevpostImportRun>>(`${root}/devpost/imports/`, { params: { page } })).data,
+  duplicateReviews: async (page = 1) => (await api.get<DuplicateReviewListing>(`${root}/duplicate-reviews/`, { params: { page } })).data,
+  createDuplicateReview: async (payload: { record_type: "project" | "event"; manual_id: number; imported_id: number; decision: DuplicateReview["decision"] }) =>
+    (await api.post<DuplicateReview>(`${root}/duplicate-reviews/`, payload)).data,
+  updateDuplicateReview: async (id: number, decision: DuplicateReview["decision"]) =>
+    (await api.patch<DuplicateReview>(`${root}/duplicate-reviews/${id}/`, { decision })).data,
 };

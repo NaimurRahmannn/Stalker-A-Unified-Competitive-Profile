@@ -114,10 +114,11 @@ class ProjectSerializer(ManualSerializer):
     demo_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
     video_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
     image_url = HttpUrlField(max_length=500, allow_blank=True, required=False)
+    related_hackathon_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = HackathonProject
-        fields = ("id", "title", "project_url", "description", "repository_url", "demo_url", "video_url", "image_url", "technologies", "is_public", "source", "external_id", "created_at", "updated_at")
+        fields = ("id", "title", "project_url", "description", "repository_url", "demo_url", "video_url", "image_url", "technologies", "is_public", "source", "external_id", "related_hackathon_count", "created_at", "updated_at")
         read_only_fields = ("id", "project_url", "source", "external_id", "created_at", "updated_at")
 
 

@@ -1,6 +1,8 @@
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Prefetch
+from django.db.models import BooleanField, Count, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Value
+from django.db.models.expressions import RawSQL
+from django.db.models.functions import Coalesce, Lower
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.decorators import action
@@ -24,6 +26,32 @@ class HackathonPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 100
+
+
+def choice_filter(request, name, choices):
+    value = request.query_params.get(name, "")
+    if value and value not in choices:
+        raise ValidationError({name: f"Choose one of: {', '.join(choices)}."})
+    return value
+
+
+def bounded_text_filter(request, name, limit=100):
+    value = request.query_params.get(name, "").strip()
+    if len(value) > limit:
+        raise ValidationError({name: f"Use at most {limit} characters."})
+    return value
+
+
+def technology_match(term):
+    """Exact case-insensitive JSON-array member check on supported databases."""
+    column = '"hackathons_hackathonproject"."technologies"'
+    if connection.vendor == "postgresql":
+        sql = f"EXISTS (SELECT 1 FROM jsonb_array_elements_text({column}) AS tech(value) WHERE LOWER(tech.value) = LOWER(%s))"
+    elif connection.vendor == "sqlite":
+        sql = f"EXISTS (SELECT 1 FROM json_each({column}) WHERE LOWER(json_each.value) = LOWER(%s))"
+    else:
+        raise ValidationError({"technology": "Technology filtering is unavailable on this database."})
+    return RawSQL(sql, [term], output_field=BooleanField())
 
 
 def context_achievements(instance):
@@ -150,18 +178,34 @@ class EventViewSet(ManualViewSet):
                 Prefetch("participations", queryset=HackathonParticipation.objects.filter(user=self.request.user).prefetch_related("achievements")),
                 Prefetch("submissions", queryset=HackathonSubmission.objects.filter(owner=self.request.user).select_related("project")),
             )
-        state = self.request.query_params.get("status")
-        if state in HackathonParticipation.Status.values:
+        if self.action != "list":
+            return qs
+        state = choice_filter(self.request, "status", HackathonParticipation.Status.values)
+        if state:
             qs = qs.filter(participations__user=self.request.user, participations__status=state)
         year = self.request.query_params.get("year")
         if year:
-            if not year.isdigit() or not (1 <= int(year) <= 9999):
+            if len(year) > 4 or not year.isdigit() or not (1 <= int(year) <= 9999):
                 raise ValidationError({"year": "Enter a valid year."})
             qs = qs.filter(start_date__year=int(year))
-        name = self.request.query_params.get("name")
+        name = bounded_text_filter(self.request, "name")
         if name:
-            qs = qs.filter(name__icontains=name[:100])
-        return qs
+            qs = qs.filter(name__icontains=name)
+        # DRF reserves the `format` query parameter for renderer selection.
+        event_format = choice_filter(self.request, "event_format", HackathonEvent.Format.values)
+        source = choice_filter(self.request, "source", HackathonEvent.Source.values)
+        if event_format:
+            qs = qs.filter(format=event_format)
+        if source:
+            qs = qs.filter(source=source)
+        ordering = choice_filter(self.request, "ordering", ("newest", "oldest", "date_newest", "date_oldest", "name_asc"))
+        order = {
+            "newest": ("-created_at", "-pk"), "oldest": ("created_at", "pk"),
+            "date_newest": (F("start_date").desc(nulls_last=True), "-pk"),
+            "date_oldest": (F("start_date").asc(nulls_last=True), "pk"),
+            "name_asc": (Lower("name").asc(), "pk"),
+        }
+        return qs.order_by(*order[ordering or "newest"])
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user, source="manual", external_id="")
@@ -171,9 +215,35 @@ class ProjectViewSet(ManualViewSet):
     serializer_class = ProjectSerializer
 
     def get_queryset(self):
-        qs = HackathonProject.objects.filter(owner=self.request.user).order_by("-created_at", "-pk")
-        title = self.request.query_params.get("title")
-        return qs.filter(title__icontains=title[:100]) if title else qs
+        related_count = (HackathonSubmission.objects.filter(project_id=OuterRef("pk"), owner=self.request.user)
+                         .values("project_id").annotate(total=Count("event_id", distinct=True)).values("total")[:1])
+        qs = HackathonProject.objects.filter(owner=self.request.user).annotate(
+            related_hackathon_count=Coalesce(Subquery(related_count, output_field=IntegerField()), Value(0))
+        )
+        if self.action != "list":
+            return qs.order_by("-created_at", "-pk")
+        title = bounded_text_filter(self.request, "title")
+        search = bounded_text_filter(self.request, "search")
+        technology = bounded_text_filter(self.request, "technology")
+        source = choice_filter(self.request, "source", HackathonProject.Source.values)
+        visibility = choice_filter(self.request, "visibility", ("public", "private"))
+        ordering = choice_filter(self.request, "ordering", ("newest", "oldest", "recently_updated", "title_asc", "title_desc"))
+        if title:
+            qs = qs.filter(title__icontains=title)
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search))
+        if source:
+            qs = qs.filter(source=source)
+        if visibility:
+            qs = qs.filter(is_public=visibility == "public")
+        if technology:
+            qs = qs.annotate(_technology_match=technology_match(technology)).filter(_technology_match=True)
+        order = {
+            "newest": ("-created_at", "-pk"), "oldest": ("created_at", "pk"),
+            "recently_updated": ("-updated_at", "-pk"), "title_asc": (Lower("title").asc(), "pk"),
+            "title_desc": (Lower("title").desc(), "-pk"),
+        }
+        return qs.order_by(*order[ordering or "newest"])
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user, source="manual", external_id="")
