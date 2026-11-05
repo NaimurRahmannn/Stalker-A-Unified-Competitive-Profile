@@ -673,3 +673,65 @@ class DevpostImportRun(models.Model):
         ordering = ["-started_at", "-pk"]
         constraints = [models.UniqueConstraint(fields=["user", "request_fingerprint"], name="unique_devpost_import_request")]
         indexes = [models.Index(fields=["user", "-started_at"], name="devpost_run_user_idx")]
+
+
+class HackathonDuplicateReview(models.Model):
+    """An owner's non-destructive decision about a manual/imported record pair."""
+
+    class RecordType(models.TextChoices):
+        PROJECT = "project", "Project"
+        EVENT = "event", "Event"
+
+    class Decision(models.TextChoices):
+        UNRESOLVED = "unresolved", "Unresolved"
+        RELATED = "related", "Related"
+        DISTINCT = "distinct", "Distinct"
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="hackathon_duplicate_reviews")
+    record_type = models.CharField(max_length=10, choices=RecordType.choices)
+    manual_project = models.ForeignKey(HackathonProject, null=True, blank=True, on_delete=models.CASCADE,
+                                       related_name="manual_duplicate_reviews")
+    imported_project = models.ForeignKey(HackathonProject, null=True, blank=True, on_delete=models.CASCADE,
+                                         related_name="imported_duplicate_reviews")
+    manual_event = models.ForeignKey(HackathonEvent, null=True, blank=True, on_delete=models.CASCADE,
+                                     related_name="manual_duplicate_reviews")
+    imported_event = models.ForeignKey(HackathonEvent, null=True, blank=True, on_delete=models.CASCADE,
+                                       related_name="imported_duplicate_reviews")
+    decision = models.CharField(max_length=12, choices=Decision.choices, default=Decision.UNRESOLVED)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(condition=(
+                models.Q(record_type="project", manual_project__isnull=False, imported_project__isnull=False,
+                         manual_event__isnull=True, imported_event__isnull=True) |
+                models.Q(record_type="event", manual_event__isnull=False, imported_event__isnull=False,
+                         manual_project__isnull=True, imported_project__isnull=True)
+            ), name="hack_review_pair_type_chk"),
+            models.UniqueConstraint(fields=["owner", "manual_project", "imported_project"],
+                                    condition=models.Q(record_type="project"), name="hack_review_project_pair_uniq"),
+            models.UniqueConstraint(fields=["owner", "manual_event", "imported_event"],
+                                    condition=models.Q(record_type="event"), name="hack_review_event_pair_uniq"),
+        ]
+        indexes = [models.Index(fields=["owner", "-updated_at"], name="hack_review_owner_idx")]
+
+    def clean(self):
+        super().clean()
+        if self.record_type == self.RecordType.PROJECT:
+            manual, imported = self.manual_project, self.imported_project
+        elif self.record_type == self.RecordType.EVENT:
+            manual, imported = self.manual_event, self.imported_event
+        else:
+            raise ValidationError({"record_type": "Choose project or event."})
+        if not manual or not imported:
+            raise ValidationError("A manual and an imported record are required.")
+        if manual.pk == imported.pk or manual.owner_id != self.owner_id or imported.owner_id != self.owner_id:
+            raise ValidationError("Both distinct records must belong to the review owner.")
+        if manual.source != "manual" or imported.source != "devpost":
+            raise ValidationError("The pair must contain a manual record and a Devpost import.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
