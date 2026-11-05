@@ -70,7 +70,7 @@ function buildDomains(platforms: PublicPlatformView[], hackathons: PublicHackath
 }
 
 export function buildPublicProfileViewModel(profile: PublicProfileResponse): PublicProfileViewModel {
-  const supportedPlatforms = profile.platforms.filter((item) => competitiveSlugs.has(item.platform) || item.platform === "ctftime");
+  const supportedPlatforms = profile.platforms.filter((item) => competitiveSlugs.has(item.platform) || ["ctftime", "devpost", "dorahacks"].includes(item.platform));
   const platformViews = supportedPlatforms.map(buildPlatform);
   const summary = profile.competitive_programming.summary;
   const latestSync = newestDate(supportedPlatforms.map((item) => item.last_synced_at));
