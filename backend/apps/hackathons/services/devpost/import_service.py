@@ -37,6 +37,35 @@ def _locked(queryset, lock):
     return queryset.select_for_update() if lock else queryset
 
 
+def _preview_value(value):
+    if hasattr(value, "isoformat"):
+        value = value.isoformat()
+    if isinstance(value, str):
+        return value[:240], len(value) > 240
+    if isinstance(value, (tuple, list)):
+        return [item[:100] if isinstance(item, str) else item for item in value[:30]], len(value) > 30 or any(
+            isinstance(item, str) and len(item) > 100 for item in value[:30]
+        )
+    return value, False
+
+
+def _field_changes(current, incoming, fields):
+    if current is None:
+        return []
+    changes = []
+    for field in fields:
+        before = getattr(current, field)
+        after = getattr(incoming, field)
+        if field == "technologies":
+            after = list(after)
+        if before != after:
+            shown_before, before_cut = _preview_value(before)
+            shown_after, after_cut = _preview_value(after)
+            changes.append({"field": field, "before": shown_before, "after": shown_after,
+                            "truncated": before_cut or after_cut})
+    return changes
+
+
 def inspect_import(user, document: NormalizedDocument, lock=False):
     """Return a plan and its current-state fingerprint; never write records."""
     events = {submission.event.external_id: submission.event for project in document.projects for submission in project.submissions}
@@ -90,18 +119,21 @@ def inspect_import(user, document: NormalizedDocument, lock=False):
         prefix + url.removeprefix("https://").rstrip("/") + suffix
         for url in event_urls for prefix in ("http://", "https://") for suffix in ("", "/")
     }
-    manual_events = list(HackathonEvent.objects.filter(owner=user, source="manual", event_url__in=manual_event_urls).values("id", "event_url", "updated_at"))
+    manual_events = list(HackathonEvent.objects.filter(owner=user, source="manual", event_url__in=manual_event_urls)
+                         .order_by("pk").values("id", "name", "event_url", "updated_at")[:500])
     repo_urls = [project.repository_url for project in document.projects if project.repository_url]
     demo_urls = [project.demo_url for project in document.projects if project.demo_url]
     manual_projects = list(HackathonProject.objects.filter(owner=user, source="manual").filter(
         Q(project_url__in=project_urls) | Q(repository_url__in=repo_urls + project_urls) | Q(demo_url__in=demo_urls + project_urls)
-    ).values("id", "project_url", "repository_url", "demo_url", "updated_at"))
+    ).order_by("pk").values("id", "title", "project_url", "repository_url", "demo_url", "updated_at")[:500])
 
     event_actions = {}
+    event_changes = {}
     participation_actions = {}
     conflicts = []
     for key, incoming in events.items():
         current = event_by_external.get(key)
+        event_changes[key] = _field_changes(current, incoming, ("name", "event_url", "organizer", "start_date", "end_date", "format"))
         if event_ids_by_url.get(incoming.event_url, set()) - {key}:
             action = "conflict"
             conflicts.append({"project_url": "", "event_url": incoming.event_url})
@@ -116,8 +148,11 @@ def inspect_import(user, document: NormalizedDocument, lock=False):
         participation_actions[key] = "conflict" if action == "conflict" else "unchanged" if current and current.pk in participation_by_event else "create"
 
     project_actions = {}
+    project_changes = {}
     for incoming in document.projects:
         current = project_by_external.get(incoming.external_id)
+        project_changes[incoming.external_id] = _field_changes(current, incoming,
+            ("title", "project_url", "description", "repository_url", "demo_url", "technologies"))
         if project_ids_by_url.get(incoming.project_url, set()) - {incoming.external_id}:
             action = "conflict"
             conflicts.append({"project_url": incoming.project_url, "event_url": ""})
@@ -131,9 +166,11 @@ def inspect_import(user, document: NormalizedDocument, lock=False):
         project_actions[incoming.external_id] = action
 
     submission_actions = {}
+    submission_changes = {}
     for project in document.projects:
         for incoming in project.submissions:
             current = submission_by_external.get(incoming.external_id)
+            submission_changes[incoming.external_id] = _field_changes(current, incoming, ("status", "submission_url"))
             existing_project = project_by_external.get(project.external_id)
             existing_event = event_by_external.get(incoming.event.external_id)
             pair = (existing_project.pk, existing_event.pk) if existing_project and existing_event else None
@@ -156,31 +193,48 @@ def inspect_import(user, document: NormalizedDocument, lock=False):
 
     projects_public = []
     for project in document.projects:
-        matches = [row["id"] for row in manual_projects if
+        matches = [row for row in manual_projects if
                    row["project_url"] == project.project_url or
                    project.repository_url and row["repository_url"] == project.repository_url or
                    project.demo_url and row["demo_url"] == project.demo_url or
                    row["repository_url"] == project.project_url or row["demo_url"] == project.project_url]
+        matches = matches[:5]
         projects_public.append({
             "project_url": project.project_url, "title": project.title,
-            "action": project_actions[project.external_id], "possible_manual_project_ids": matches[:5],
+            "action": project_actions[project.external_id], "changes": project_changes[project.external_id],
+            "reason": "A verified achievement protects this record." if project_actions[project.external_id] == "protected" else
+                      "An imported source identity conflicts with an existing record." if project_actions[project.external_id] == "conflict" else "",
+            "possible_manual_project_ids": [row["id"] for row in matches],
+            "possible_manual_projects": [{"id": row["id"], "title": row["title"],
+                "project_url": row["project_url"], "repository_url": row["repository_url"],
+                "demo_url": row["demo_url"], "reason": "Matching project or repository or demo URL"} for row in matches],
             "submissions": [{
                 "event_url": submission.event.event_url,
                 "event_name": submission.event.name,
                 "event_action": event_actions[submission.event.external_id],
+                "event_reason": "A verified achievement protects this event." if event_actions[submission.event.external_id] == "protected" else
+                                "An imported event identity conflicts with an existing record." if event_actions[submission.event.external_id] == "conflict" else "",
+                "event_changes": event_changes[submission.event.external_id],
                 "participation_action": participation_actions[submission.event.external_id],
                 "action": submission_actions[submission.external_id],
+                "changes": submission_changes[submission.external_id],
+                "reason": "A verified achievement protects this submission." if submission_actions[submission.external_id] == "protected" else
+                          "The submission identity or project/event pair conflicts with an existing record." if submission_actions[submission.external_id] == "conflict" else "",
                 "possible_manual_event_ids": [row["id"] for row in manual_events if row["event_url"].removeprefix("http://").removeprefix("https://").rstrip("/") == submission.event.event_url.removeprefix("https://").rstrip("/")][:5],
+                "possible_manual_events": [{"id": row["id"], "name": row["name"], "event_url": row["event_url"],
+                    "reason": "Matching event URL"} for row in manual_events if row["event_url"].removeprefix("http://").removeprefix("https://").rstrip("/") == submission.event.event_url.removeprefix("https://").rstrip("/")][:5],
             } for submission in project.submissions],
         })
+    all_actions = (*event_actions.values(), *participation_actions.values(), *project_actions.values(), *submission_actions.values())
     public = {
         "projects_detected": len(document.projects),
         "hackathons_detected": len(events),
         "submissions_detected": len(submission_ids),
         "participations_detected": len(events),
-        "new_records": sum(action == "create" for action in (*event_actions.values(), *participation_actions.values(), *project_actions.values(), *submission_actions.values())),
-        "existing_matches": sum(action in {"update", "unchanged", "protected"} for action in (*event_actions.values(), *participation_actions.values(), *project_actions.values(), *submission_actions.values())),
+        "new_records": sum(action == "create" for action in all_actions),
+        "existing_matches": sum(action in {"update", "unchanged", "protected"} for action in all_actions),
         "protected_records": sum(action == "protected" for action in (*event_actions.values(), *project_actions.values(), *submission_actions.values())),
+        "action_counts": {action: sum(item == action for item in all_actions) for action in ("create", "update", "unchanged", "protected", "conflict")},
         "potential_manual_duplicates": len(manual_events) + len(manual_projects),
         "conflicts": conflicts,
         "projects": projects_public,
