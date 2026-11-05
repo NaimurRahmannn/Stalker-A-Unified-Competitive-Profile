@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { PublicHackathonPortfolio, PublicProfileResponse } from "./types";
+import type { PublicHackathonPortfolio, PublicHackathonProjectDetail, PublicProfileResponse } from "./types";
 
 export async function getPublicProfile(
   username: string,
@@ -21,6 +21,11 @@ export async function getPublicHackathonPortfolio(username: string, pages: {
       achievements_page: pages.achievements, submissions_page: pages.submissions,
     },
   });
+  return data;
+}
+
+export async function getPublicHackathonProject(username: string, projectId: number): Promise<PublicHackathonProjectDetail> {
+  const { data } = await api.get<PublicHackathonProjectDetail>(`/profile/${encodeURIComponent(username)}/hackathons/projects/${projectId}/`);
   return data;
 }
 

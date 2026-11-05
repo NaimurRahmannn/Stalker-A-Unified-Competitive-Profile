@@ -93,7 +93,11 @@ export type PublicHackathonAchievement = {
   verification_status: "self_reported" | "evidence_provided" | "verified";
 };
 export type PublicHackathonSubmission = {
-  id: number; project_id: number; project_title: string; event_id: number; event_name: string; submission_url: string | null;
+  id: number; project_id: number; project_title: string; event_id: number; event_name: string; event_url: string | null; submission_url: string | null;
+};
+export type PublicHackathonProjectDetail = {
+  project: PublicHackathonProject; submission_count: number; submissions: PublicHackathonSubmission[];
+  achievement_count: number; achievements: PublicHackathonAchievement[];
 };
 export type PublicHackathonPortfolio = {
   summary: PublicHackathonSummary;

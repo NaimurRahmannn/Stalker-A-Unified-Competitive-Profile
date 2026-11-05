@@ -26,6 +26,7 @@ Module._resolveFilename = function (request, parent, ...rest) {
   return originalResolve.call(this, request, parent, ...rest);
 };
 Module._load = function (request, parent, ...rest) {
+  if (request === "next/link") return { default: function Link({ href, children, ...props }) { return require("react").createElement("a", { href, ...props }, children); } };
   if (request === "../../api" && parent?.filename.endsWith("public-hackathon-portfolio.tsx")) return { getPublicHackathonPortfolio: (...args) => { calls.push(["portfolio", ...args]); return portfolioResult(...args); } };
   if (request === "../api" && parent?.filename.endsWith("visibility-control.tsx")) return { hackathonApi: {
     projectVisibility: (...args) => { calls.push(["project", ...args]); return visibilityResult(...args); },
@@ -58,7 +59,7 @@ const pages = { projects: 1, participations: 1, achievements: 1, submissions: 1 
 
 test("public cards show approved data, safe links, and accurate verification", () => {
   reset();
-  const html = renderToStaticMarkup(React.createElement(PublicHackathonPortfolioContent, { portfolio: portfolio(), pages, onPage: () => {} }));
+  const html = renderToStaticMarkup(React.createElement(PublicHackathonPortfolioContent, { portfolio: portfolio(), pages, username: "portfolio", onPage: () => {} }));
   for (const value of ["Published projects", "Public project", "Python", "Devpost project", "Repository", "Live demo", "Public event", "Team", "Community award", "Self-reported", "First place", "Verified", "Rank 1", "Submitted work"]) assert.ok(html.includes(value), value);
   assert.ok(!html.includes("Secret project"));
   assert.ok(html.includes('rel="noopener noreferrer"'));
@@ -69,11 +70,11 @@ test("empty and evidence-provided presentations are accurate", () => {
   reset(); const empty = portfolio();
   empty.summary = { published_projects: 0, public_participations: 0, public_achievements: 0, verified_achievements: 0 };
   for (const name of ["projects", "participations", "achievements", "submissions"]) empty[name] = { count: 0, results: [], next: null, previous: null };
-  assert.match(renderToStaticMarkup(React.createElement(PublicHackathonPortfolioContent, { portfolio: empty, pages, onPage: () => {} })), /No Hackathon work has been published yet/);
+  assert.match(renderToStaticMarkup(React.createElement(PublicHackathonPortfolioContent, { portfolio: empty, pages, username: "portfolio", onPage: () => {} })), /No Hackathon work has been published yet/);
   const evidence = portfolio(); evidence.achievements.results[0].verification_status = "evidence_provided";
-  assert.match(renderToStaticMarkup(React.createElement(PublicHackathonPortfolioContent, { portfolio: evidence, pages, onPage: () => {} })), /Evidence provided/);
+  assert.match(renderToStaticMarkup(React.createElement(PublicHackathonPortfolioContent, { portfolio: evidence, pages, username: "portfolio", onPage: () => {} })), /Evidence provided/);
   const unsafe = portfolio(); unsafe.projects.results[0].project_url = "javascript:alert(1)";
-  const unsafeHtml = renderToStaticMarkup(React.createElement(PublicHackathonPortfolioContent, { portfolio: unsafe, pages, onPage: () => {} }));
+  const unsafeHtml = renderToStaticMarkup(React.createElement(PublicHackathonPortfolioContent, { portfolio: unsafe, pages, username: "portfolio", onPage: () => {} }));
   assert.ok(!unsafeHtml.includes('href="javascript:'));
 });
 

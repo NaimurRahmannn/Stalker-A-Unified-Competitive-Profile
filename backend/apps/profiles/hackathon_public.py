@@ -136,12 +136,16 @@ class PublicHackathonAchievementSerializer(serializers.ModelSerializer):
 
 class PublicHackathonSubmissionSerializer(serializers.ModelSerializer):
     event_name = serializers.CharField(source="event.name")
+    event_url = serializers.SerializerMethodField()
     project_title = serializers.CharField(source="project.title")
     submission_url = serializers.SerializerMethodField()
 
     class Meta:
         model = HackathonSubmission
-        fields = ("id", "project_id", "project_title", "event_id", "event_name", "submission_url")
+        fields = ("id", "project_id", "project_title", "event_id", "event_name", "event_url", "submission_url")
+
+    def get_event_url(self, obj):
+        return safe_public_url(obj.event.event_url)
 
     def get_submission_url(self, obj):
         return safe_public_url(obj.submission_url)

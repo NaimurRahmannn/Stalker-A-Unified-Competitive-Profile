@@ -60,4 +60,21 @@ class PublicHackathonPortfolioView(APIView):
         })
 
 
+class PublicHackathonProjectDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, username: str, project_id: int):
+        user = get_object_or_404(User, username=username)
+        project = get_object_or_404(public_project_cards(user), pk=project_id)
+        submissions = public_submissions(user).filter(project_id=project.pk).select_related("project", "event").order_by("-created_at", "-pk")
+        achievements = public_achievements(user).filter(submission__project_id=project.pk).select_related("submission").order_by("-created_at", "-pk")
+        return Response({
+            "project": PublicHackathonProjectSerializer(project).data,
+            "submission_count": submissions.count(),
+            "submissions": PublicHackathonSubmissionSerializer(submissions[:20], many=True).data,
+            "achievement_count": achievements.count(),
+            "achievements": PublicHackathonAchievementSerializer(achievements[:20], many=True).data,
+        })
+
+
 PublicProfileAPIView = PublicProfileView
