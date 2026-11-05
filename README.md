@@ -20,6 +20,11 @@ Hackathon projects and participations start private. Owners can publish each
 independently from `/hackathon`; published work appears on `/profile/{username}`.
 The public Hackathon API is `GET /api/v1/profile/{username}/hackathons/`.
 Imported Devpost projects remain private until their owner publishes them.
+Owners can search and filter projects and events on `/hackathon`. Published
+projects have a dedicated `/profile/{username}/hackathons/projects/{projectId}`
+page. Possible manual/Devpost duplicates can be reviewed without merging data.
+See [Hackathon portfolio management](HACKATHONS_PHASE5.md) for API contracts,
+privacy rules, and verification status.
 
 ## What We Are Building
 
