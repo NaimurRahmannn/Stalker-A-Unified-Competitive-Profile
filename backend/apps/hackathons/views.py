@@ -16,6 +16,7 @@ from apps.hackathons.models import (
     HackathonAchievement, HackathonEvent, HackathonParticipation,
     HackathonProject, HackathonSubmission,
 )
+from apps.hackathons.overview import build_hackathon_overview
 from apps.hackathons.serializers import (
     AchievementSerializer, EntrySerializer, EventSerializer, ParticipationSerializer,
     ProjectSerializer, SubmissionSerializer, model_errors,
@@ -364,45 +365,4 @@ class HackathonOverviewView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-
-        hackathons_attended = (
-            HackathonParticipation.objects.filter(
-                user=user,
-                status__in=[
-                    HackathonParticipation.Status.ATTENDED,
-                    HackathonParticipation.Status.SUBMITTED,
-                ],
-            )
-            .values("event")
-            .distinct()
-            .count()
-        )
-
-        projects_submitted = (
-            HackathonProject.objects.filter(
-                owner=user,
-                submissions__status="submitted",
-            )
-            .distinct()
-            .count()
-        )
-
-        achievements_qs = HackathonAchievement.objects.filter(
-            participation__user=user,
-        )
-        achievements_recorded = achievements_qs.count()
-        placements_recorded = achievements_qs.filter(
-            achievement_type=HackathonAchievement.AchievementType.PLACEMENT,
-            rank__isnull=False,
-        ).count()
-
-        return Response(
-            {
-                "hackathons_attended": hackathons_attended,
-                "projects_submitted": projects_submitted,
-                "achievements_recorded": achievements_recorded,
-                "placements_recorded": placements_recorded,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response(build_hackathon_overview(request.user), status=status.HTTP_200_OK)

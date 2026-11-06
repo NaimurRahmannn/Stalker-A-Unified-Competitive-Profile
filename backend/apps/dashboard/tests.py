@@ -15,6 +15,10 @@ from apps.connectors.models import (
     LeetCodeStats,
     PlatformAccount,
 )
+from apps.hackathons.models import (
+    HackathonAchievement, HackathonEvent, HackathonParticipation,
+    HackathonProject, HackathonSubmission,
+)
 
 User = get_user_model()
 
@@ -101,6 +105,42 @@ class DashboardMeEndpointTests(APITestCase):
             },
         )
         self.assertEqual(response.data["platforms"], [])
+        self.assertEqual(response.data["hackathons"], {
+            "hackathons_attended": 0,
+            "projects_submitted": 0,
+            "achievements_recorded": 0,
+            "placements_recorded": 0,
+        })
+
+    def test_dashboard_hackathons_match_management_overview_and_exclude_other_users(self):
+        for user in (self.user, self.other_user):
+            event = HackathonEvent.objects.create(owner=user, name=f"{user.username} event")
+            participation = HackathonParticipation.objects.create(user=user, event=event, status="submitted")
+            project = HackathonProject.objects.create(owner=user, title=f"{user.username} project")
+            submission = HackathonSubmission.objects.create(
+                owner=user, event=event, project=project, status="submitted",
+            )
+            HackathonAchievement.objects.create(
+                participation=participation, submission=submission,
+                achievement_type="placement", title="First place", rank=1,
+            )
+            if user == self.user:
+                HackathonAchievement.objects.create(
+                    participation=participation, achievement_type="award", title="Special award",
+                )
+
+        self.authenticate()
+        response = self.client.get(self.url)
+        overview = self.client.get("/api/v1/hackathons/overview/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["hackathons"], {
+            "hackathons_attended": 1,
+            "projects_submitted": 1,
+            "achievements_recorded": 2,
+            "placements_recorded": 1,
+        })
+        self.assertEqual(response.data["hackathons"], overview.data)
 
     def test_authenticated_user_with_unverified_platform_accounts_gets_stats_null(self):
         PlatformAccount.objects.create(

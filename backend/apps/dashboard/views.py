@@ -8,6 +8,7 @@ from apps.dashboard.serializers import (
     DashboardPlatformSerializer,
     DashboardUserSerializer,
 )
+from apps.hackathons.overview import build_hackathon_overview
 
 
 class DashboardMeView(APIView):
@@ -29,6 +30,7 @@ class DashboardMeView(APIView):
                     request.user,
                     include_activity=False,
                 ),
+                "hackathons": build_hackathon_overview(request.user),
             }
         )
 
