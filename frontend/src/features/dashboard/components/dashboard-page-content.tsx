@@ -208,8 +208,6 @@ export function DashboardPageContent() {
           <section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
             <DashboardTopHeader
               displayName="there"
-              isRefreshing={isLoading}
-              onRefresh={retry}
               platformSummary="Dashboard data is not available yet."
             />
           </section>
@@ -222,8 +220,6 @@ export function DashboardPageContent() {
           <section className="px-5 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
             <DashboardTopHeader
               displayName={viewModel.displayName}
-              isRefreshing={isLoading}
-              onRefresh={retry}
               platformSummary={viewModel.platformSummary}
               username={viewModel.username}
             />

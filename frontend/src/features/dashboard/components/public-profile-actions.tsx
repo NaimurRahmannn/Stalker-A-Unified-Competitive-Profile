@@ -38,7 +38,7 @@ export function PublicProfileActions({ username }: PublicProfileActionsProps) {
   };
 
   return (
-    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-max sm:flex-row sm:items-center">
       <Link
         href={profilePath}
         className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-[13px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100"

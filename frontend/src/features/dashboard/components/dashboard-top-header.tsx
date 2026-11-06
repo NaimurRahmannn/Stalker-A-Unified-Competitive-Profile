@@ -1,6 +1,5 @@
 import {
   Bell,
-  RefreshCw,
   Search,
   Sun,
 } from "lucide-react";
@@ -28,19 +27,15 @@ function HeaderIconButton({
 
 export function DashboardTopHeader({
   displayName,
-  isRefreshing,
-  onRefresh,
   platformSummary,
   username,
 }: {
   displayName: string;
-  isRefreshing: boolean;
-  onRefresh: () => void;
   platformSummary: string;
   username?: string;
 }) {
   return (
-    <header className="flex flex-col gap-5 min-[1180px]:flex-row min-[1180px]:items-start min-[1180px]:justify-between">
+    <header className="flex flex-col gap-5 min-[1750px]:flex-row min-[1750px]:items-start min-[1750px]:justify-between">
       <div className="min-w-0">
         <h1 className="text-[25px] font-semibold leading-tight tracking-normal text-slate-950 sm:text-[28px]">
           Good morning, {displayName}{" "}
@@ -51,8 +46,8 @@ export function DashboardTopHeader({
         </p>
       </div>
 
-      <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center min-[1180px]:w-auto">
-        <label className="relative block w-full sm:min-w-80 min-[1180px]:w-101.25">
+      <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center min-[1750px]:w-auto min-[1750px]:justify-end">
+        <label className="relative block w-full sm:min-w-0 sm:flex-1 sm:basis-80 min-[1750px]:w-101.25 min-[1750px]:flex-none">
           <span className="sr-only">Search anything</span>
           <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
           <input
@@ -66,20 +61,6 @@ export function DashboardTopHeader({
         </label>
 
         {username ? <PublicProfileActions username={username} /> : null}
-
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
-        >
-          <RefreshCw
-            className={`size-4 text-blue-600 ${
-              isRefreshing ? "animate-spin" : ""
-            }`}
-          />
-          {isRefreshing ? "Refreshing..." : "Refresh"}
-        </button>
 
         <div className="hidden items-center gap-2 lg:flex">
           <HeaderIconButton label="Notifications">
