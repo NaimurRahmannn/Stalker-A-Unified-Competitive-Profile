@@ -5,6 +5,7 @@ const platformMarks: PlatformMark[] = [
   "codechef",
   "codeforces",
   "ctftime",
+  "devpost",
   "github",
   "kaggle",
   "leetcode",
@@ -15,6 +16,7 @@ const platformDisplayNames: Record<PlatformMark, string> = {
   codechef: "CodeChef",
   codeforces: "Codeforces",
   ctftime: "CTFtime",
+  devpost: "Devpost",
   github: "GitHub",
   kaggle: "Kaggle",
   leetcode: "LeetCode",
@@ -25,6 +27,7 @@ export const platformLogoSrc: Record<PlatformMark, string> = {
   codechef: "/images/codechef_logo.png",
   codeforces: "/images/codeforces_logo.png",
   ctftime: "/images/ctf_time.png",
+  devpost: "/images/devpost-logo.png",
   github: "/images/github_logo.png",
   kaggle: "/images/kaggle_logo.png",
   leetcode: "/images/leetcode_logo.png",
@@ -41,6 +44,7 @@ export function getPlatformMark(platform: string): PlatformMark | null {
 }
 
 export function formatDashboardPlatformName(platform: string): string {
+  if (platform.toLowerCase() === "dorahacks") return "DoraHacks";
   const mark = getPlatformMark(platform);
 
   if (mark) {

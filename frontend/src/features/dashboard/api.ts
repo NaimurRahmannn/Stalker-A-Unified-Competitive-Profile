@@ -1,5 +1,6 @@
 import type { AtCoderRatingColor, CodeforcesStats, CTFTeamProfile } from "@/features/platforms/types";
 import type { CompetitiveOverviewSummary, CompetitivePlatformSummary } from "@/features/competitive-programming/types";
+import type { Overview as HackathonOverview } from "@/features/hackathons/types";
 import api from "@/lib/api";
 
 export type DashboardUser = {
@@ -60,6 +61,7 @@ export type DashboardResponse = {
     summary: CompetitiveOverviewSummary;
     platforms: CompetitivePlatformSummary[];
   };
+  hackathons: HackathonOverview;
 };
 
 export async function getDashboard(): Promise<DashboardResponse> {

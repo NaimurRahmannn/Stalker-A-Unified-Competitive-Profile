@@ -13,6 +13,7 @@ import type {
   DashboardUser,
 } from "./api";
 import type { CompetitiveOverviewSummary, CompetitivePlatformSummary } from "@/features/competitive-programming/types";
+import type { Overview as HackathonOverview } from "@/features/hackathons/types";
 import { formatDashboardPlatformName, getPlatformMark } from "./data";
 import type {
   ChecklistItem,
@@ -57,7 +58,7 @@ function isSupportedPlatform(platform: DashboardPlatform): boolean {
 }
 
 function isManagedPlatform(platform: DashboardPlatform): boolean {
-  return isSupportedPlatform(platform) || platform.platform === "ctftime";
+  return isSupportedPlatform(platform) || ["ctftime", "devpost", "dorahacks"].includes(platform.platform);
 }
 
 function pluralize(value: number, singular: string, plural = `${singular}s`) {
@@ -192,7 +193,9 @@ function buildConnectedPlatforms(
     id: platform.id,
     name: formatDashboardPlatformName(platform.platform),
     handle: platform.platform === "ctftime" ? `Team #${platform.handle}` : formatHandle(platform.handle),
-    status: platform.platform === "ctftime"
+    status: platform.platform === "devpost" || platform.platform === "dorahacks"
+      ? "Linked"
+      : platform.platform === "ctftime"
       ? (platform.handle_validated ? "Team found" : "Team not validated")
       : (platform.handle_validated ? "Handle valid" : "Handle not validated"),
     mark: getPlatformMark(platform.platform),
@@ -345,16 +348,35 @@ function buildCTFJourneyItem(platforms: DashboardPlatform[]): JourneyItem {
   };
 }
 
-function buildJourneyItems(platforms: DashboardPlatform[], competitivePlatforms: CompetitivePlatformSummary[], summary: CompetitiveOverviewSummary): JourneyItem[] {
+function buildHackathonJourneyItem(overview: HackathonOverview): JourneyItem {
+  const hasActivity = Object.values(overview).some((count) => count > 0);
+  return {
+    title: "Hackathon",
+    icon: Trophy,
+    accent: "purple",
+    platformMarks: ["devpost"],
+    platformLabel: "Manual",
+    value: String(overview.hackathons_attended),
+    label: "Hackathons attended",
+    note: hasActivity
+      ? "Your recorded hackathon activity"
+      : "Record a hackathon to start tracking your work.",
+    stats: hasActivity ? [
+      { value: String(overview.projects_submitted), label: "Projects submitted" },
+      { value: String(overview.achievements_recorded), label: "Achievements recorded" },
+      { value: String(overview.placements_recorded), label: "Placements recorded" },
+    ] : [],
+    trendLabel: "Manage events, projects, and achievements in your hackathon portfolio.",
+    actionLabel: hasActivity ? "View Hackathons" : "Add Hackathon",
+    actionHref: "/hackathon",
+  };
+}
+
+function buildJourneyItems(platforms: DashboardPlatform[], competitivePlatforms: CompetitivePlatformSummary[], summary: CompetitiveOverviewSummary, hackathons: HackathonOverview): JourneyItem[] {
   return [
     buildCompetitiveProgrammingJourney(competitivePlatforms, summary),
     buildCTFJourneyItem(platforms),
-    buildComingSoonJourneyItem(
-      "Hackathon",
-      "Backend support pending",
-      Trophy,
-      "purple",
-    ),
+    buildHackathonJourneyItem(hackathons),
     buildComingSoonJourneyItem(
       "Datathon / Data Science",
       "Backend support pending",
@@ -431,7 +453,7 @@ export function buildDashboardViewModel(
     platformSummary: buildPlatformSummary(dashboard.platforms),
     metrics: buildMetrics(profileCompletion.progress, dashboard.competitive_programming.summary),
     connectedPlatforms: buildConnectedPlatforms(dashboard.platforms),
-    journeyItems: buildJourneyItems(dashboard.platforms, dashboard.competitive_programming.platforms, dashboard.competitive_programming.summary),
+    journeyItems: buildJourneyItems(dashboard.platforms, dashboard.competitive_programming.platforms, dashboard.competitive_programming.summary, dashboard.hackathons),
     profileProgress: profileCompletion.progress,
     profileChecklist: profileCompletion.checklist,
     nextSteps: buildNextSteps(profileCompletion.fields, dashboard.platforms),

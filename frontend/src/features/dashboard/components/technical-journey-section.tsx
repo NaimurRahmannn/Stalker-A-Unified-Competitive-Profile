@@ -7,17 +7,18 @@ import type { JourneyItem } from "../types";
 import { Sparkline } from "./sparkline";
 
 function PlatformBadges({ item }: { item: JourneyItem }) {
-  if (!item.platformMarks?.length) {
+  if (!item.platformMarks?.length && !item.platformLabel) {
     return <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500 shadow-sm">Planned</span>;
   }
 
   return (
     <div className="flex items-center gap-1.5" aria-label="Supported platforms">
-      {item.platformMarks.map((mark) => (
+      {item.platformMarks?.map((mark) => (
         <span key={mark} title={formatDashboardPlatformName(mark)} className="grid size-8 place-items-center rounded-lg border border-slate-200 bg-white shadow-[0_3px_9px_rgba(15,23,42,0.08)] transition duration-300 group-hover:-translate-y-0.5">
           <Image src={platformLogoSrc[mark]} alt={`${formatDashboardPlatformName(mark)} logo`} width={23} height={23} className="size-5.5 object-contain" />
         </span>
       ))}
+      {item.platformLabel && <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-700">{item.platformLabel}</span>}
     </div>
   );
 }
@@ -44,7 +45,7 @@ function JourneyCard({ item }: { item: JourneyItem }) {
       </div>
 
       <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-b border-slate-200/70 pb-3">
-        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">Platforms</span>
+        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.platformLabel ? "Sources" : "Platforms"}</span>
         <PlatformBadges item={item} />
       </div>
 

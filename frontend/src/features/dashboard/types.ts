@@ -21,6 +21,7 @@ export type JourneyItem = {
     label: string;
   }>;
   platformMarks?: PlatformMark[];
+  platformLabel?: string;
   sparkline?: number[];
   trendLabel?: string;
   note?: string;
@@ -30,7 +31,7 @@ export type JourneyItem = {
   isPlaceholder?: boolean;
 };
 
-export type PlatformStatus = "Handle valid" | "Handle not validated" | "Team found" | "Team not validated";
+export type PlatformStatus = "Handle valid" | "Handle not validated" | "Team found" | "Team not validated" | "Linked";
 
 export type PlatformMark =
   | "codeforces"
@@ -39,7 +40,8 @@ export type PlatformMark =
   | "atcoder"
   | "codechef"
   | "github"
-  | "kaggle";
+  | "kaggle"
+  | "devpost";
 
 export type ConnectedPlatform = {
   id: number;
