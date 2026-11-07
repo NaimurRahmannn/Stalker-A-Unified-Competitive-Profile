@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity,
-  Award,
   BarChart3,
   CalendarDays,
   ChevronDown,
@@ -33,7 +32,6 @@ export type DashboardSidebarActiveItem =
   | "hackathon"
   | "datathon"
   | "platforms"
-  | "achievements"
   | "activity"
   | "goals"
   | "contests"
@@ -114,13 +112,6 @@ const platformItems: SidebarItem[] = [
     label: "Platforms",
     href: "/platforms",
     icon: Link2,
-    accent: "slate",
-  },
-  {
-    id: "achievements",
-    label: "Achievements",
-    href: "#",
-    icon: Award,
     accent: "slate",
   },
   {
