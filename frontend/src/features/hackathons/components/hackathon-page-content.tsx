@@ -73,7 +73,7 @@ export function HackathonPageContent() {
   };
 
   return <main className="min-h-screen bg-slate-50 text-slate-900"><div className="mx-auto grid min-h-screen w-full grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)]">
-    <aside className="hidden bg-white p-5 lg:block lg:border-r lg:border-slate-200"><DashboardSidebar activeItem="hackathon" /></aside>
+    <aside className="hidden bg-white p-5 lg:sticky lg:top-0 lg:block lg:h-dvh lg:self-start lg:overflow-y-auto lg:overscroll-y-contain lg:border-r lg:border-slate-200"><DashboardSidebar activeItem="hackathon" /></aside>
     <div className="min-w-0"><DashboardMobileNav activeItem="hackathon" /><div className="mx-auto max-w-7xl space-y-6 p-5 sm:p-6 lg:p-8">
       <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-[28px] font-semibold text-slate-950">Hackathons</h1>
         <p className="mt-1 text-sm text-slate-600 sm:text-base">Track your hackathon participation, projects, and achievements.</p></div>
