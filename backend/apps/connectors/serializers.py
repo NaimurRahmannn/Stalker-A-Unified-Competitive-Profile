@@ -24,11 +24,14 @@ from apps.connectors.models import (
 from apps.connectors.providers.atcoder.client import normalize_atcoder_handle
 from apps.connectors.providers.atcoder.mapper import get_atcoder_rating_color
 from apps.connectors.providers.codeforces.mapper import normalize_rating_history
+from apps.connectors.providers.kaggle.identity import normalize_kaggle_identity
 from apps.connectors.services import (
     can_sync_platform_account,
     get_sync_cooldown_seconds,
 )
 from apps.hackathons.services.devpost.identity import profile_reference
+from apps.datathons.linking import link_kaggle_account
+from apps.datathons.models import KaggleProfileLink
 
 
 class ConnectorHealthSerializer(serializers.Serializer):
@@ -541,6 +544,14 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
         }
 
     def validate_handle(self, value: str) -> str:
+        platform = self.initial_data.get("platform") or (
+            self.instance.platform if self.instance else None
+        )
+        raw_value = self.initial_data.get("handle", value)
+        if platform == PlatformAccount.Platform.KAGGLE and isinstance(raw_value, str) and any(
+            ord(char) < 32 or ord(char) == 127 for char in raw_value
+        ):
+            raise serializers.ValidationError("Kaggle username contains control characters.")
         value = value.strip()
         if not value:
             raise serializers.ValidationError("Handle cannot be empty.")
@@ -604,7 +615,30 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             attrs["handle"] = handle
             attrs["profile_url"] = canonical_url
 
+        if platform == PlatformAccount.Platform.KAGGLE:
+            reference = attrs.get("handle", self.instance.handle if self.instance else "")
+            try:
+                identity = normalize_kaggle_identity(reference)
+            except ValueError as exc:
+                raise serializers.ValidationError({"handle": str(exc)}) from exc
+            if "profile_url" in attrs and attrs["profile_url"].strip():
+                try:
+                    url_identity = normalize_kaggle_identity(attrs["profile_url"])
+                except ValueError as exc:
+                    raise serializers.ValidationError({"profile_url": str(exc)}) from exc
+                if url_identity.lookup_key != identity.lookup_key:
+                    raise serializers.ValidationError({"profile_url": "Profile URL must match the Kaggle username."})
+            attrs["handle"] = identity.username
+            attrs["profile_url"] = identity.profile_url
+
         return attrs
+
+    def create(self, validated_data: dict) -> PlatformAccount:
+        with transaction.atomic():
+            instance = super().create(validated_data)
+            if instance.platform == PlatformAccount.Platform.KAGGLE:
+                link_kaggle_account(instance)
+        return instance
 
     def update(
         self,
@@ -625,7 +659,10 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
             if handle_changed or platform_changed:
                 instance.profile_url = (
                     f"https://devpost.com/{instance.handle}"
-                    if instance.platform == PlatformAccount.Platform.DEVPOST else ""
+                    if instance.platform == PlatformAccount.Platform.DEVPOST
+                    else normalize_kaggle_identity(instance.handle).profile_url
+                    if instance.platform == PlatformAccount.Platform.KAGGLE
+                    else ""
                 )
                 instance.is_verified = False
                 instance.handle_validated_at = None
@@ -669,6 +706,11 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 getattr(instance, "_prefetched_objects_cache", {}).pop(
                     "rating_events", None
                 )
+
+            if instance.platform == PlatformAccount.Platform.KAGGLE:
+                link_kaggle_account(instance)
+            else:
+                KaggleProfileLink.objects.filter(platform_account=instance).delete()
 
         return instance
 
