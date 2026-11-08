@@ -20,7 +20,7 @@ import { PlatformAccountCard } from "./platform-account-card";
 
 function managedAccounts(accounts: PlatformAccount[]) {
   return accounts.filter(
-    (account) => account.platform === "codeforces" || account.platform === "atcoder" || account.platform === "leetcode" || account.platform === "ctftime",
+    (account) => account.platform === "codeforces" || account.platform === "atcoder" || account.platform === "leetcode" || account.platform === "ctftime" || account.platform === "kaggle",
   );
 }
 
@@ -115,7 +115,9 @@ export function PlatformsManager() {
         setAccounts((prev) => [account, ...prev]);
         toast.success(account.platform === "ctftime"
           ? `Added CTFtime team #${account.handle}. Sync to load rankings.`
-          : `Connected @${account.handle} on ${formatPlatformName(account.platform)}.`);
+          : account.platform === "kaggle"
+            ? `Linked Kaggle profile @${account.handle}. Automatic sync is unavailable.`
+            : `Connected @${account.handle} on ${formatPlatformName(account.platform)}.`);
 
         return true;
       } catch (err) {
@@ -220,7 +222,7 @@ export function PlatformsManager() {
               No platforms connected yet
             </p>
             <p className="mt-1 text-xs font-medium text-slate-500">
-              Add a Codeforces, AtCoder, or LeetCode handle or a CTFtime team ID above to get started.
+              Add a supported platform handle, Kaggle username, or CTFtime team ID above to get started.
             </p>
           </div>
         ) : (

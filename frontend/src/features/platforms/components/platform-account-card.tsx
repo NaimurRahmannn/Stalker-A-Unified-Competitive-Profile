@@ -152,7 +152,7 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
         ? "Sync unavailable"
         : "Sync";
   const platformName = formatPlatformName(account.platform);
-  const logo = account.platform === "atcoder" ? "/images/atcoder_logo.png" : account.platform === "leetcode" ? "/images/leetcode_logo.png" : account.platform === "ctftime" ? "/images/ctf_time.png" : "/images/codeforces_logo.png";
+  const logo = account.platform === "atcoder" ? "/images/atcoder_logo.png" : account.platform === "leetcode" ? "/images/leetcode_logo.png" : account.platform === "ctftime" ? "/images/ctf_time.png" : account.platform === "kaggle" ? "/images/kaggle_logo.png" : "/images/codeforces_logo.png";
   const displayHandle = account.platform === "ctftime" ? `Team #${account.handle}` : `@${account.handle}`;
 
   const handleSync = async () => {

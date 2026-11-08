@@ -41,7 +41,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
         Connect a platform
       </h2>
       <p className="mt-1 text-xs font-medium text-slate-500">
-        Add a platform handle or CTFtime team ID, then sync to load its public stats.
+        Add a platform handle or CTFtime team ID. Kaggle linking does not start a stats sync.
       </p>
 
       <form
@@ -66,6 +66,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
             <option value="atcoder">AtCoder</option>
             <option value="leetcode">LeetCode</option>
             <option value="ctftime">CTFtime</option>
+            <option value="kaggle">Kaggle</option>
           </select>
         </div>
 
@@ -74,7 +75,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
             htmlFor="handle"
             className="mb-1 block text-xs font-semibold text-slate-600"
           >
-            {isCTFtime ? "Team ID" : "Handle"}
+            {isCTFtime ? "Team ID" : selectedPlatform === "kaggle" ? "Kaggle username" : "Handle"}
           </label>
           <input
             id="handle"
@@ -82,7 +83,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
             inputMode={isCTFtime ? "numeric" : "text"}
             autoComplete="off"
             spellCheck={false}
-            placeholder={isCTFtime ? "e.g. 1005" : "e.g. tourist"}
+            placeholder={isCTFtime ? "e.g. 1005" : selectedPlatform === "kaggle" ? "e.g. alexisbcook" : "e.g. tourist"}
             aria-invalid={errors.handle ? "true" : "false"}
             className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
             {...register("handle")}

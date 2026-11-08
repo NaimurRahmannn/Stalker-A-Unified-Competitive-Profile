@@ -15,7 +15,7 @@ export type CodeforcesStats = {
 };
 
 export type ImplementedCompetitivePlatform = "codeforces" | "atcoder" | "leetcode";
-export type ConnectablePlatform = ImplementedCompetitivePlatform | "ctftime";
+export type ConnectablePlatform = ImplementedCompetitivePlatform | "ctftime" | "kaggle";
 
 export type CTFYearlyRanking = {
   year: number;
