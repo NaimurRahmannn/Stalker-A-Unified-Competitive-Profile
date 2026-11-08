@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "apps.dashboard",
     "apps.profiles",
     "apps.hackathons",
+    "apps.datathons",
 ]
 
 MIDDLEWARE = [
