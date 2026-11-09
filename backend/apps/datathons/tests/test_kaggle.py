@@ -264,6 +264,8 @@ class KaggleOverviewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["linked"])
         self.assertIsNone(response.data["tracks"]["code"]["global_rank"])
+        self.assertIsNone(response.data["last_attempted_at"])
+        self.assertIsNone(response.data["tracks"]["code"]["source"])
 
     def test_cached_response_and_no_external_collection(self):
         account = PlatformAccount.objects.create(user=self.user, platform="kaggle", handle="example_user")
@@ -284,6 +286,9 @@ class KaggleOverviewTests(APITestCase):
         self.assertEqual(response.data["tracks"]["competitions"]["global_rank"], 1234)
         self.assertEqual(response.data["tracks"]["competitions"]["points"], Decimal("1250.5"))
         self.assertEqual(response.data["tracks"]["code"]["silver_medals"], 1)
+        self.assertEqual(response.data["tracks"]["competitions"]["source"], "offline_fixture_v1")
+        self.assertEqual(response.data["tracks"]["competitions"]["data_collected_at"], fixture_data().observed_at)
+        self.assertIsNotNone(response.data["last_attempted_at"])
         self.assertNotEqual(response.data["tracks"]["code"]["global_rank"], 1)
         profile.collection_status = "failed"
         profile.save(update_fields=["collection_status"])

@@ -12,6 +12,7 @@ def _empty_track():
         "rank_status": "unknown", "global_rank": None, "highest_rank": None,
         "tier": None, "points": None, "gold_medals": None,
         "silver_medals": None, "bronze_medals": None,
+        "source": None, "data_collected_at": None,
     }
 
 
@@ -28,7 +29,8 @@ class KaggleOverviewView(APIView):
         if account is None:
             return Response({
                 "linked": False, "username": None, "profile_url": None,
-                "collection_status": "not_collected", "last_successful_at": None,
+                "collection_status": "not_collected", "last_attempted_at": None,
+                "last_successful_at": None,
                 "tracks": tracks,
             })
         try:
@@ -48,11 +50,13 @@ class KaggleOverviewView(APIView):
                     "highest_rank": row.highest_rank, "tier": row.tier,
                     "points": row.points, "gold_medals": row.gold_medals,
                     "silver_medals": row.silver_medals, "bronze_medals": row.bronze_medals,
+                    "source": row.source, "data_collected_at": row.data_collected_at,
                 }
         return Response({
             "linked": True, "username": account.handle,
             "profile_url": account.profile_url,
             "collection_status": profile.collection_status if profile else "not_collected",
+            "last_attempted_at": profile.last_attempted_at if profile else None,
             "last_successful_at": profile.last_successful_at if profile else None,
             "tracks": tracks,
         })
