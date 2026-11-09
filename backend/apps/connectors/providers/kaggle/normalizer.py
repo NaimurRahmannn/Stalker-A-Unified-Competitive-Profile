@@ -73,10 +73,10 @@ def normalize_profile(parsed: ParsedKaggleProfile) -> NormalizedKaggleProfile:
                 raise KaggleDocumentError("invalid_tier", "Unknown Kaggle tier.")
         if raw_status == "unranked" and any(values.get(field) is not None for field in ("global_rank", "tier", "points")):
             raise KaggleDocumentError("invalid_rank_status", "Unranked track cannot have a current rank, tier or points.")
-        if raw_status == "ranked" and values.get("global_rank") is None and values.get("tier") is None:
-            raise KaggleDocumentError("invalid_rank_status", "Ranked track requires a rank or tier.")
-        if raw_status == "unknown" and (values.get("global_rank") is not None or values.get("tier") is not None):
-            raise KaggleDocumentError("invalid_rank_status", "Unknown track cannot have a rank or tier.")
-        status = raw_status or ("ranked" if values.get("global_rank") is not None or values.get("tier") is not None else "unknown")
+        if raw_status == "ranked" and values.get("global_rank") is None:
+            raise KaggleDocumentError("invalid_rank_status", "Ranked track requires a global rank.")
+        if raw_status == "unknown" and values.get("global_rank") is not None:
+            raise KaggleDocumentError("invalid_rank_status", "Unknown track cannot have a global rank.")
+        status = raw_status or ("ranked" if values.get("global_rank") is not None else "unknown")
         normalized.append(NormalizedKaggleTrack(track, status, values, frozenset(values)))
     return NormalizedKaggleProfile(parsed.username, parsed.observed_at, parsed.source, tuple(normalized))

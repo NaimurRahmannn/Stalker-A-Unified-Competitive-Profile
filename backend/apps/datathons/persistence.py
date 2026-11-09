@@ -31,6 +31,10 @@ def persist_kaggle_profile_statistics(profile: KaggleProfile, data: NormalizedKa
         if item.rank_status != "unknown" and row.rank_status != item.rank_status:
             row.rank_status = item.rank_status
             changed = True
+        elif (item.rank_status == "unknown" and row.rank_status == "unranked"
+              and any(item.values.get(field) is not None for field in ("tier", "points"))):
+            row.rank_status = "unknown"
+            changed = True
         if item.rank_status == "unranked":
             for field in ("global_rank", "tier", "points"):
                 if getattr(row, field) is not None:
@@ -38,7 +42,7 @@ def persist_kaggle_profile_statistics(profile: KaggleProfile, data: NormalizedKa
                     changed = True
         for field in item.provided_fields:
             value = item.values[field]
-            if value is None and item.rank_status != "unranked":
+            if value is None:
                 continue
             if getattr(row, field) != value:
                 setattr(row, field, value)

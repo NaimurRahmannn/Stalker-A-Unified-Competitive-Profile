@@ -21,7 +21,7 @@ from apps.connectors.providers.kaggle.normalizer import normalize_profile
 from apps.connectors.providers.kaggle.parser import parse_profile_document
 from apps.datathons.linking import link_kaggle_account
 from apps.datathons.models import KaggleProfile, KaggleProfileLink, KaggleRankingSnapshot, KaggleTrackStats
-from apps.datathons.persistence import persist_kaggle_profile_statistics
+from apps.datathons.persistence import persist_kaggle_profile_statistics, record_kaggle_collection_failure
 
 
 User = get_user_model()
@@ -67,6 +67,13 @@ class KaggleLinkTests(APITestCase):
         self.assertEqual(deleted.status_code, 204)
         self.assertFalse(KaggleProfileLink.objects.filter(platform_account_id=first.pk).exists())
         self.assertTrue(KaggleProfile.objects.filter(pk=profile.pk).exists())
+
+        recreated = self.client.post(url, {"platform": "kaggle", "handle": "Example_User"})
+        self.assertEqual(recreated.status_code, 201, recreated.data)
+        self.assertEqual(
+            PlatformAccount.objects.get(pk=recreated.data["id"]).kaggle_profile_link.kaggle_profile_id,
+            profile.pk,
+        )
 
     def test_invalid_references_and_cross_platform_links(self):
         response = self.client.post(reverse("platform-account-list"), {
@@ -130,6 +137,34 @@ class KagglePersistenceTests(TestCase):
         self.assertIsNone(row.global_rank)
         self.assertEqual(row.highest_rank, 321)
         self.assertEqual(row.gold_medals, 3)
+
+    def test_partial_tier_after_unranked_does_not_invent_a_rank(self):
+        observed_at = timezone.now()
+        persist_kaggle_profile_statistics(self.profile, NormalizedKaggleProfile(
+            "example_user", observed_at, "offline_fixture_v1", (
+                NormalizedKaggleTrack("competitions", "unranked", {
+                    "highest_rank": 25, "gold_medals": 2,
+                }, frozenset({"highest_rank", "gold_medals"})),
+            ),
+        ))
+        persist_kaggle_profile_statistics(self.profile, NormalizedKaggleProfile(
+            "example_user", observed_at + timedelta(seconds=1), "offline_fixture_v1", (
+                NormalizedKaggleTrack("competitions", "unranked", {
+                    "highest_rank": None, "gold_medals": None,
+                }, frozenset({"highest_rank", "gold_medals"})),
+            ),
+        ))
+        row = KaggleTrackStats.objects.get(profile=self.profile, track="competitions")
+        self.assertEqual((row.highest_rank, row.gold_medals), (25, 2))
+        persist_kaggle_profile_statistics(self.profile, NormalizedKaggleProfile(
+            "example_user", observed_at + timedelta(seconds=2), "offline_fixture_v1", (
+                NormalizedKaggleTrack("competitions", "unknown", {"tier": "Expert"}, frozenset({"tier"})),
+            ),
+        ))
+        row.refresh_from_db()
+        self.assertEqual(row.rank_status, "unknown")
+        self.assertIsNone(row.global_rank)
+        self.assertEqual(row.tier, "Expert")
 
     def test_stale_observation_and_failed_write_preserve_existing_data(self):
         original = fixture_data()

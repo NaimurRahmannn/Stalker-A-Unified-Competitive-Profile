@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
@@ -43,6 +44,25 @@ class KaggleParserTests(SimpleTestCase):
         }), "example_user"))
         self.assertNotIn("global_rank", data.tracks[0].values)
         self.assertNotIn("gold_medals", data.tracks[0].values)
+        self.assertEqual(data.tracks[0].rank_status, "unknown")
+
+    def test_ranked_requires_a_global_rank(self):
+        with self.assertRaises(KaggleDocumentError) as raised:
+            normalize_profile(parse_profile_document(document({
+                "competitions": {"rank_status": "ranked", "tier": "Expert"},
+            }), "example_user"))
+        self.assertEqual(raised.exception.code, "invalid_rank_status")
+
+    def test_duplicate_fields_and_missing_identity_fail_without_network(self):
+        duplicate = ('<html><script type="application/json" data-stalker-kaggle-profile="v1">'
+                     '{"username":"example_user","username":"other","observed_at":"2026-11-01T12:00:00Z","tracks":{}}'
+                     '</script></html>')
+        missing = document().replace('"username": "example_user", ', "")
+        with patch("requests.get", side_effect=AssertionError("network access")):
+            for source, code in ((duplicate, "duplicate_field"), (missing, "unsupported_schema")):
+                with self.subTest(code=code), self.assertRaises(KaggleDocumentError) as raised:
+                    parse_profile_document(source, "example_user")
+                self.assertEqual(raised.exception.code, code)
 
     def test_invalid_identity_and_markup_fail_with_codes(self):
         for source, code in (
