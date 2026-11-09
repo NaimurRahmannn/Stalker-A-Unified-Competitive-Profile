@@ -185,13 +185,70 @@ class KagglePersistenceTests(TestCase):
 
     def test_constraints_reject_duplicate_profile_and_track(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
-            KaggleProfile.objects.create(username="X", normalized_username="example_user", profile_url="https://www.kaggle.com/X")
+            KaggleProfile.objects.create(username="Example_User", normalized_username="example_user", profile_url="https://www.kaggle.com/Example_User")
         data = fixture_data()
         persist_kaggle_profile_statistics(self.profile, data)
         with self.assertRaises(IntegrityError), transaction.atomic():
             KaggleTrackStats.objects.create(
                 profile=self.profile, track="competitions", source="fixture", data_collected_at=timezone.now()
             )
+
+    def test_profile_identity_validation_and_database_constraints(self):
+        with self.assertRaises(ValidationError):
+            KaggleProfile.objects.create(
+                username="other_user", normalized_username="example_user",
+                profile_url="https://www.kaggle.com/other_user",
+            )
+        for changes in ({"username": ""}, {"normalized_username": ""},
+                        {"profile_url": ""}, {"collection_status": "stale"}):
+            with self.subTest(changes=changes), self.assertRaises(IntegrityError), transaction.atomic():
+                KaggleProfile.objects.filter(pk=self.profile.pk).update(**changes)
+
+    def test_track_and_snapshot_database_constraints(self):
+        now = timezone.now()
+        stats = {"profile": self.profile, "track": "code", "source": "offline_fixture_v1", "data_collected_at": now}
+        snapshot = {"profile": self.profile, "track": "code", "captured_on": timezone.localdate(now), "captured_at": now}
+        for changes in ({"track": "private"}, {"rank_status": "stale"},
+                        {"rank_status": "ranked"}, {"global_rank": 0},
+                        {"highest_rank": 0}, {"gold_medals": -1}, {"points": Decimal("-1")},
+                        {"rank_status": "unranked", "tier": "Expert"}):
+            with self.subTest(model="stats", changes=changes), self.assertRaises(IntegrityError), transaction.atomic():
+                KaggleTrackStats.objects.create(**(stats | changes))
+        for changes in ({"track": "private"}, {"rank_status": "stale"},
+                        {"rank_status": "ranked"}, {"global_rank": 0},
+                        {"points": Decimal("-1")},
+                        {"rank_status": "unranked", "tier": "Expert"}):
+            with self.subTest(model="snapshot", changes=changes), self.assertRaises(IntegrityError), transaction.atomic():
+                KaggleRankingSnapshot.objects.create(**(snapshot | changes))
+
+    def test_failed_collection_preserves_success_and_cached_values(self):
+        data = fixture_data()
+        persist_kaggle_profile_statistics(self.profile, data)
+        record_kaggle_collection_failure(self.profile, "invalid_document")
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.collection_status, "failed")
+        self.assertEqual(self.profile.last_error_code, "invalid_document")
+        self.assertEqual(self.profile.last_successful_at, data.observed_at)
+        self.assertIsNotNone(self.profile.last_attempted_at)
+        self.assertEqual(KaggleTrackStats.objects.get(profile=self.profile, track="competitions").global_rank, 1234)
+        self.assertEqual(KaggleRankingSnapshot.objects.filter(profile=self.profile).count(), 3)
+
+    def test_history_retains_latest_365_daily_snapshots(self):
+        now = timezone.now()
+        old = [KaggleRankingSnapshot(
+            profile=self.profile, track="competitions", rank_status="ranked", global_rank=rank,
+            captured_at=now - timedelta(days=rank), captured_on=timezone.localdate(now - timedelta(days=rank)),
+        ) for rank in range(1, 366)]
+        KaggleRankingSnapshot.objects.bulk_create(old)
+        persist_kaggle_profile_statistics(self.profile, NormalizedKaggleProfile(
+            "example_user", now, "offline_fixture_v1", (
+                NormalizedKaggleTrack("competitions", "ranked", {"global_rank": 1}, frozenset({"global_rank"})),
+            ),
+        ))
+        history = KaggleRankingSnapshot.objects.filter(profile=self.profile, track="competitions")
+        self.assertEqual(history.count(), 365)
+        self.assertFalse(history.filter(captured_on=timezone.localdate(now - timedelta(days=365))).exists())
+        self.assertTrue(history.filter(captured_on=timezone.localdate(now)).exists())
 
 
 class KaggleOverviewTests(APITestCase):

@@ -1,7 +1,12 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 from apps.connectors.models import PlatformAccount
+
+COLLECTION_STATUSES = ("not_collected", "success", "failed")
+KAGGLE_TRACKS = ("competitions", "code", "datasets")
+RANK_STATUSES = ("unknown", "ranked", "unranked")
 
 
 class KaggleProfile(models.Model):
@@ -21,6 +26,31 @@ class KaggleProfile(models.Model):
     last_error_code = models.CharField(max_length=64, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=~Q(username=""), name="kaggle_profile_username_nonempty"),
+            models.CheckConstraint(condition=~Q(normalized_username=""), name="kaggle_profile_key_nonempty"),
+            models.CheckConstraint(condition=~Q(profile_url=""), name="kaggle_profile_url_nonempty"),
+            models.CheckConstraint(
+                condition=Q(collection_status__in=COLLECTION_STATUSES),
+                name="kaggle_profile_collection_status_valid",
+            ),
+        ]
+
+    def clean(self):
+        from apps.connectors.providers.kaggle.identity import normalize_kaggle_identity
+
+        try:
+            identity = normalize_kaggle_identity(self.username)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+        if self.normalized_username != identity.lookup_key or self.profile_url != identity.profile_url:
+            raise ValidationError("Kaggle profile identity must match its username and canonical URL.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.username
@@ -83,8 +113,26 @@ class KaggleTrackStats(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["profile", "track"], name="unique_kaggle_profile_track"),
+            models.CheckConstraint(condition=Q(track__in=KAGGLE_TRACKS), name="kaggle_stats_track_valid"),
+            models.CheckConstraint(condition=Q(rank_status__in=RANK_STATUSES), name="kaggle_stats_status_valid"),
+            models.CheckConstraint(
+                condition=Q(highest_rank__isnull=True) | Q(highest_rank__gt=0),
+                name="kaggle_stats_highest_rank_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(points__isnull=True) | (Q(points__gte=0) & Q(points__lt=10000000000)),
+                name="kaggle_stats_points_valid",
+            ),
+            models.CheckConstraint(
+                condition=(Q(rank_status="ranked") & Q(global_rank__isnull=False) & Q(global_rank__gt=0))
+                | (Q(rank_status__in=["unknown", "unranked"]) & Q(global_rank__isnull=True)),
+                name="kaggle_stats_status_rank_consistent",
+            ),
+            models.CheckConstraint(
+                condition=~Q(rank_status="unranked") | (Q(tier__isnull=True) & Q(points__isnull=True)),
+                name="kaggle_stats_unranked_values_empty",
+            ),
         ]
-        indexes = [models.Index(fields=["profile", "track"], name="kaggle_stats_profile_track_idx")]
 
 
 class KaggleRankingSnapshot(models.Model):
@@ -101,6 +149,27 @@ class KaggleRankingSnapshot(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["profile", "track", "captured_on"], name="unique_kaggle_daily_ranking"
+            ),
+            models.CheckConstraint(condition=Q(track__in=KaggleTrackStats.Track.values), name="kaggle_snapshot_track_valid"),
+            models.CheckConstraint(
+                condition=Q(rank_status__in=KaggleTrackStats.RankStatus.values),
+                name="kaggle_snapshot_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(points__isnull=True) | (Q(points__gte=0) & Q(points__lt=10000000000)),
+                name="kaggle_snapshot_points_valid",
+            ),
+            models.CheckConstraint(
+                condition=(Q(rank_status=KaggleTrackStats.RankStatus.RANKED)
+                           & Q(global_rank__isnull=False) & Q(global_rank__gt=0))
+                | (Q(rank_status__in=[KaggleTrackStats.RankStatus.UNKNOWN, KaggleTrackStats.RankStatus.UNRANKED])
+                   & Q(global_rank__isnull=True)),
+                name="kaggle_snapshot_status_rank_consistent",
+            ),
+            models.CheckConstraint(
+                condition=~Q(rank_status=KaggleTrackStats.RankStatus.UNRANKED)
+                | (Q(tier__isnull=True) & Q(points__isnull=True)),
+                name="kaggle_snapshot_unranked_values_empty",
             ),
         ]
         indexes = [
