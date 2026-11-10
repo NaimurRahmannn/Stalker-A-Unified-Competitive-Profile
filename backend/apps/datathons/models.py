@@ -1,12 +1,18 @@
+import uuid
+
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from apps.connectors.models import PlatformAccount
 
 COLLECTION_STATUSES = ("not_collected", "success", "failed")
 KAGGLE_TRACKS = ("competitions", "code", "datasets")
 RANK_STATUSES = ("unknown", "ranked", "unranked")
+ACTIVE_RUN_STATUSES = ("queued", "running", "retrying")
+RUN_STATUSES = ACTIVE_RUN_STATUSES + ("succeeded", "failed", "cancelled")
 
 
 class KaggleProfile(models.Model):
@@ -24,6 +30,7 @@ class KaggleProfile(models.Model):
     last_attempted_at = models.DateTimeField(null=True, blank=True)
     last_successful_at = models.DateTimeField(null=True, blank=True)
     last_error_code = models.CharField(max_length=64, blank=True)
+    next_refresh_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -174,4 +181,60 @@ class KaggleRankingSnapshot(models.Model):
         ]
         indexes = [
             models.Index(fields=["profile", "track", "-captured_at"], name="kaggle_rank_history_idx")
+        ]
+
+
+class KaggleCollectionRun(models.Model):
+    class Trigger(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        SCHEDULED = "scheduled", "Scheduled"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RUNNING = "running", "Running"
+        RETRYING = "retrying", "Retrying"
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    profile = models.ForeignKey(KaggleProfile, on_delete=models.CASCADE, related_name="collection_runs")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="kaggle_collection_requests",
+    )
+    trigger = models.CharField(max_length=12, choices=Trigger.choices)
+    provider_name = models.CharField(max_length=64)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.QUEUED)
+    task_id = models.CharField(max_length=64, null=True, blank=True, unique=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=3)
+    queued_at = models.DateTimeField(default=timezone.now)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    dispatched_at = models.DateTimeField(null=True, blank=True)
+    dispatch_attempts = models.PositiveSmallIntegerField(default=0)
+    next_dispatch_at = models.DateTimeField(null=True, blank=True)
+    last_dispatch_error_code = models.CharField(max_length=64, blank=True)
+    error_code = models.CharField(max_length=64, blank=True)
+    safe_error_message = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(trigger__in=("manual", "scheduled")), name="kaggle_run_trigger_valid"),
+            models.CheckConstraint(condition=Q(status__in=RUN_STATUSES), name="kaggle_run_status_valid"),
+            models.CheckConstraint(condition=Q(max_attempts__gt=0), name="kaggle_run_max_attempts_positive"),
+            models.CheckConstraint(condition=Q(attempt_count__lte=models.F("max_attempts")), name="kaggle_run_attempts_bounded"),
+            models.UniqueConstraint(fields=["profile"], condition=Q(status__in=ACTIVE_RUN_STATUSES),
+                                    name="unique_active_kaggle_run_per_profile"),
+        ]
+        indexes = [
+            models.Index(fields=["profile", "status", "-created_at"], name="kaggle_run_profile_status_idx"),
+            models.Index(fields=["-created_at"], name="kaggle_run_created_idx"),
+            models.Index(fields=["status", "next_dispatch_at"], name="kaggle_run_dispatch_idx"),
+            models.Index(fields=["status", "lease_expires_at"], name="kaggle_run_lease_idx"),
         ]
