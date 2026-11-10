@@ -130,6 +130,48 @@ python manage.py runserver
 python manage.py test
 ```
 
+## Kaggle background collection infrastructure
+
+Kaggle collection and scheduled sync are **disabled by default**. There is no live Kaggle
+provider. The API and worker pipeline can be exercised with synthetic providers in tests;
+linking a Kaggle username does not verify ownership.
+
+From the repository root, start the local Redis broker:
+
+```bash
+docker compose up -d redis
+```
+
+From `backend/`, use separate terminals for Django, a Celery worker, and Celery Beat:
+
+```bash
+python manage.py migrate
+python manage.py runserver
+celery -A config worker -l INFO
+celery -A config beat -l INFO
+```
+
+On Windows, use `celery -A config worker -l INFO --pool=solo`. Production Linux
+workers can use the normal process pool; run only one Beat scheduler. The worker
+consumes the `kaggle` collection queue and `kaggle-control` maintenance queue.
+
+Set `CELERY_BROKER_URL` to a managed Redis URL in deployment. Relevant optional
+settings include `KAGGLE_COLLECTION_ENABLED`, `KAGGLE_PROVIDER_NAME`,
+`KAGGLE_SCHEDULED_SYNC_ENABLED`, `KAGGLE_MANUAL_SYNC_COOLDOWN_SECONDS`,
+`KAGGLE_REFRESH_INTERVAL_SECONDS`, `KAGGLE_SCHEDULER_BATCH_SIZE`,
+`KAGGLE_MAX_ATTEMPTS`, retry delays, lease duration, and run retention. Enabling
+collection still requires an explicitly registered authorized provider and its
+policy; the repository provides none. The default API response is `503` with
+`code: provider_disabled`.
+
+Authenticated endpoints are `POST /api/v1/datathons/kaggle/sync/` and
+`GET /api/v1/datathons/kaggle/sync-status/`. They use the caller's existing Kaggle
+link and never accept a supplied username or profile ID. Ranking reads remain
+database-only. The opt-in `python manage.py kaggle_benchmark --profiles 1000`
+command measures synthetic scheduling and collection, then rolls back all writes.
+Use `python manage.py kaggle_queue_health` for current run counts, due dispatches,
+and expired leases without exposing provider data.
+
 ## Implemented Endpoints
 
 All endpoints are served under the `/api/v1/` prefix.
