@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from decouple import AutoConfig, Csv
+from kombu import Exchange, Queue
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 config = AutoConfig(search_path=str(BASE_DIR))
@@ -109,6 +110,52 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
+
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://127.0.0.1:6379/0")
+CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=False, cast=bool)
+CELERY_TASK_EAGER_PROPAGATES = config("CELERY_TASK_EAGER_PROPAGATES", default=True, cast=bool)
+CELERY_TASK_ACKS_LATE = config("CELERY_TASK_ACKS_LATE", default=True, cast=bool)
+CELERY_TASK_REJECT_ON_WORKER_LOST = config("CELERY_TASK_REJECT_ON_WORKER_LOST", default=True, cast=bool)
+CELERY_WORKER_PREFETCH_MULTIPLIER = config("CELERY_WORKER_PREFETCH_MULTIPLIER", default=1, cast=int)
+CELERY_TASK_TIME_LIMIT = config("CELERY_TASK_TIME_LIMIT", default=120, cast=int)
+CELERY_TASK_SOFT_TIME_LIMIT = config("CELERY_TASK_SOFT_TIME_LIMIT", default=90, cast=int)
+CELERY_BROKER_VISIBILITY_TIMEOUT = config("CELERY_BROKER_VISIBILITY_TIMEOUT", default=3600, cast=int)
+CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": CELERY_BROKER_VISIBILITY_TIMEOUT,
+                                   "socket_connect_timeout": 3, "socket_timeout": 3}
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 5
+CELERY_TASK_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TIMEZONE = "UTC"
+CELERY_ENABLE_UTC = True
+CELERY_TASK_QUEUES = (
+    Queue("kaggle", Exchange("kaggle", type="direct"), routing_key="kaggle"),
+    Queue("kaggle-control", Exchange("kaggle-control", type="direct"), routing_key="kaggle-control"),
+)
+CELERY_TASK_DEFAULT_QUEUE = "kaggle-control"
+CELERY_TASK_ROUTES = {"apps.datathons.tasks.collect_kaggle_profile_task": {"queue": "kaggle"},
+                      "apps.datathons.tasks.*": {"queue": "kaggle-control"}}
+CELERY_BEAT_SCHEDULE = {
+    "kaggle-schedule-due": {"task": "apps.datathons.tasks.schedule_due_kaggle_profiles", "schedule": 60.0},
+    "kaggle-dispatch-pending": {"task": "apps.datathons.tasks.dispatch_pending_kaggle_runs", "schedule": 30.0},
+    "kaggle-recover-stale": {"task": "apps.datathons.tasks.recover_stale_kaggle_runs", "schedule": 60.0},
+    "kaggle-cleanup-runs": {"task": "apps.datathons.tasks.cleanup_old_kaggle_collection_runs", "schedule": 86400.0},
+}
+
+KAGGLE_COLLECTION_ENABLED = config("KAGGLE_COLLECTION_ENABLED", default=False, cast=bool)
+KAGGLE_PROVIDER_NAME = config("KAGGLE_PROVIDER_NAME", default="disabled")
+KAGGLE_SCHEDULED_SYNC_ENABLED = config("KAGGLE_SCHEDULED_SYNC_ENABLED", default=False, cast=bool)
+KAGGLE_MANUAL_SYNC_COOLDOWN_SECONDS = config("KAGGLE_MANUAL_SYNC_COOLDOWN_SECONDS", default=3600, cast=int)
+KAGGLE_REFRESH_INTERVAL_SECONDS = config("KAGGLE_REFRESH_INTERVAL_SECONDS", default=86400, cast=int)
+KAGGLE_SCHEDULER_BATCH_SIZE = config("KAGGLE_SCHEDULER_BATCH_SIZE", default=100, cast=int)
+KAGGLE_MAX_ATTEMPTS = config("KAGGLE_MAX_ATTEMPTS", default=3, cast=int)
+KAGGLE_RETRY_BASE_DELAY_SECONDS = config("KAGGLE_RETRY_BASE_DELAY_SECONDS", default=30, cast=int)
+KAGGLE_RETRY_MAX_DELAY_SECONDS = config("KAGGLE_RETRY_MAX_DELAY_SECONDS", default=900, cast=int)
+KAGGLE_RUN_LEASE_SECONDS = config("KAGGLE_RUN_LEASE_SECONDS", default=180, cast=int)
+KAGGLE_STALE_RUN_GRACE_SECONDS = config("KAGGLE_STALE_RUN_GRACE_SECONDS", default=3600, cast=int)
+KAGGLE_COLLECTION_RUN_RETENTION_DAYS = config("KAGGLE_COLLECTION_RUN_RETENTION_DAYS", default=30, cast=int)
 
 
 STATIC_URL = "static/"
