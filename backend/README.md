@@ -167,8 +167,12 @@ policy; the repository provides none. The default API response is `503` with
 Authenticated endpoints are `POST /api/v1/datathons/kaggle/sync/` and
 `GET /api/v1/datathons/kaggle/sync-status/`. They use the caller's existing Kaggle
 link and never accept a supplied username or profile ID. Ranking reads remain
-database-only. The opt-in `python manage.py kaggle_benchmark --profiles 1000`
-command measures synthetic scheduling and collection, then rolls back all writes.
+database-only. The opt-in `python manage.py kaggle_benchmark --profiles 1000
+--mode scheduler` command measures multiple bounded scheduling batches. Use
+`--mode queue` for run creation and deduplication or `--mode collection
+--worker-sample 5` for parser, normalizer, and persistence timing. All modes
+use synthetic records and roll back their database writes. They do not measure
+real Redis or Celery throughput; use an isolated database for large workloads.
 Use `python manage.py kaggle_queue_health` for current run counts, due dispatches,
 and expired leases without exposing provider data.
 
