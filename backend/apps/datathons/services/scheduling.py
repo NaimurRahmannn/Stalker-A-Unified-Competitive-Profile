@@ -8,8 +8,7 @@ from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
 from apps.datathons.models import ACTIVE_RUN_STATUSES, KaggleCollectionRun, KaggleProfile, KaggleProfileLink
-from apps.datathons.persistence import record_kaggle_collection_failure
-
+from .lifecycle import finalize_collection_failure
 from .providers import CollectionError, configured_provider
 from .queue import dispatch_kaggle_run, request_kaggle_collection
 
@@ -28,7 +27,25 @@ def retry_delay(attempt: int) -> int:
     return min(cap, exponential + random.randint(0, max(1, exponential // 4)))
 
 
-def schedule_due_profiles() -> int:
+def defer_unschedulable_profile(profile_id: int, error: CollectionError) -> None:
+    """Move a bad due profile out of the next batch without masking newer decisions."""
+    now = timezone.now()
+    permanent = error.code in {"invalid_identity", "no_valid_link"}
+    delay = (max(300, min(settings.KAGGLE_REFRESH_INTERVAL_SECONDS, 86400)) if permanent
+             else max(60, min(settings.KAGGLE_RETRY_BASE_DELAY_SECONDS, 3600)))
+    with transaction.atomic():
+        profile = KaggleProfile.objects.select_for_update().get(pk=profile_id)
+        if KaggleCollectionRun.objects.filter(profile=profile, status__in=ACTIVE_RUN_STATUSES).exists():
+            return
+        KaggleProfile.objects.filter(pk=profile_id).filter(
+            Q(next_refresh_at__lte=now) | Q(next_refresh_at__isnull=True)
+        ).update(next_refresh_at=now + timedelta(seconds=delay), last_error_code=error.code)
+    logger.warning("kaggle.scheduler_profile_deferred", extra={
+        "profile_id": profile_id, "error_code": error.code, "defer_seconds": delay,
+    })
+
+
+def schedule_due_profiles(*, profile_prefix: str | None = None) -> int:
     if not settings.KAGGLE_SCHEDULED_SYNC_ENABLED:
         return 0
     try:
@@ -38,11 +55,14 @@ def schedule_due_profiles() -> int:
     now = timezone.now()
     linked = KaggleProfileLink.objects.filter(kaggle_profile_id=OuterRef("pk"))
     active = KaggleCollectionRun.objects.filter(profile_id=OuterRef("pk"), status__in=ACTIVE_RUN_STATUSES)
-    ids = list(KaggleProfile.objects.annotate(
+    due = KaggleProfile.objects.annotate(
         has_link=Exists(linked), has_active=Exists(active),
     ).filter(has_link=True, has_active=False).filter(
         Q(next_refresh_at__lte=now) | Q(next_refresh_at__isnull=True)
-    ).order_by("next_refresh_at", "pk").values_list("pk", flat=True)[:batch_size()])
+    )
+    if profile_prefix is not None:
+        due = due.filter(normalized_username__startswith=profile_prefix)
+    ids = list(due.order_by("next_refresh_at", "pk").values_list("pk", flat=True)[:batch_size()])
     created = 0
     for profile_id in ids:
         try:
@@ -50,8 +70,10 @@ def schedule_due_profiles() -> int:
                 KaggleProfile(pk=profile_id), trigger=KaggleCollectionRun.Trigger.SCHEDULED,
             )
             created += not result.deduplicated
-        except CollectionError:
-            break
+        except CollectionError as exc:
+            if exc.code == "provider_disabled":
+                break
+            defer_unschedulable_profile(profile_id, exc)
     logger.info("kaggle.scheduler_batch", extra={"selected": len(ids), "created": created})
     return created
 
@@ -97,22 +119,13 @@ def recover_stale_runs() -> int:
             run.lease_expires_at = None
             run.dispatched_at = None
             if run.attempt_count >= run.max_attempts:
-                run.status = KaggleCollectionRun.Status.FAILED
-                run.finished_at = timezone.now()
-                run.next_attempt_at = None
-                run.next_dispatch_at = None
-                run.error_code = "worker_lost"
-                record_kaggle_collection_failure(run.profile, "worker_lost")
-                KaggleProfile.objects.filter(pk=run.profile_id).update(
-                    next_refresh_at=timezone.now() + timedelta(seconds=max(1, settings.KAGGLE_REFRESH_INTERVAL_SECONDS))
-                )
+                finalize_collection_failure(run, "worker_lost")
             else:
                 run.status = KaggleCollectionRun.Status.RETRYING
                 run.next_attempt_at = timezone.now() + timedelta(seconds=retry_delay(run.attempt_count))
-                run.next_dispatch_at = timezone.now()
+                run.next_dispatch_at = run.next_attempt_at
                 run.error_code = "worker_lost"
-                transaction.on_commit(lambda pk=run.pk: dispatch_kaggle_run(pk))
-            run.save()
+                run.save()
             recovered += 1
             logger.warning("kaggle.stale_run_recovered", extra={"run_id": str(run.pk),
                            "profile_id": run.profile_id, "provider": run.provider_name,
