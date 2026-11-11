@@ -11,15 +11,17 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import connection, transaction
 from django.test import override_settings
-from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from apps.connectors.models import PlatformAccount
+from apps.connectors.providers.kaggle.normalizer import normalize_profile
+from apps.connectors.providers.kaggle.parser import parse_profile_document
 from apps.datathons.models import KaggleCollectionRun, KaggleProfile, KaggleProfileLink
+from apps.datathons.persistence import persist_kaggle_profile_statistics, record_kaggle_collection_failure
+from apps.datathons.services.collection import collect_kaggle_profile
 from apps.datathons.services.providers import PROVIDERS, ProviderPolicy, ProviderRegistration
 from apps.datathons.services.queue import request_kaggle_collection
 from apps.datathons.services.scheduling import schedule_due_profiles
-from apps.datathons.tasks import process_collection_run
 
 
 class SyntheticProvider:
@@ -30,18 +32,29 @@ class SyntheticProvider:
                 + json.dumps(payload) + '</script></html>')
 
 
+class QueryCounter:
+    def __init__(self):
+        self.count = 0
+
+    def __call__(self, execute, sql, params, many, context):
+        self.count += 1
+        return execute(sql, params, many, context)
+
+
 class Command(BaseCommand):
-    help = "Benchmark 1K/5K/20K/30K synthetic Kaggle profiles; all database writes roll back."
+    help = "Benchmark synthetic Kaggle scheduling, queueing, or collection; all database writes roll back."
 
     def add_arguments(self, parser):
         parser.add_argument("--profiles", type=int, choices=[1000, 5000, 20000, 30000], default=1000)
+        parser.add_argument("--mode", choices=["scheduler", "queue", "collection"], default="scheduler")
         parser.add_argument("--batch-size", type=int, default=100)
         parser.add_argument("--worker-sample", type=int, default=10)
 
     def handle(self, *args, **options):
         count = options["profiles"]
         batch = max(1, min(options["batch_size"], 1000))
-        sample = max(0, min(options["worker_sample"], batch))
+        sample = max(1, min(options["worker_sample"], count))
+        mode = options["mode"]
         policy = ProviderPolicy(1, 0, 3, 10, 1_000_000)
         User = get_user_model()
         tracemalloc.start()
@@ -53,6 +66,7 @@ class Command(BaseCommand):
             "apps.datathons.tasks.provider_slot", return_value=nullcontext()
         ):
             stamp = int(time.time() * 1_000_000)
+            benchmark_prefix = f"kbench{stamp}"
             users = User.objects.bulk_create([
                 User(username=f"kbench{stamp}_{index}", email=f"kbench{stamp}_{index}@example.invalid")
                 for index in range(count)
@@ -72,25 +86,76 @@ class Command(BaseCommand):
                 for index in range(count)
             ], batch_size=1000)
             setup_seconds = time.perf_counter() - started
-            with CaptureQueriesContext(connection) as queries:
-                queue_started = time.perf_counter()
-                created = schedule_due_profiles()
-                queue_seconds = time.perf_counter() - queue_started
-                first = KaggleCollectionRun.objects.order_by("queued_at").first()
-                deduplicated = request_kaggle_collection(first.profile).deduplicated if first else False
-            worker_started = time.perf_counter()
-            for run_id in KaggleCollectionRun.objects.order_by("queued_at").values_list("pk", flat=True)[:sample]:
-                process_collection_run(run_id)
-            worker_seconds = time.perf_counter() - worker_started
+            counter = QueryCounter()
+            with connection.execute_wrapper(counter):
+                measured_at = time.perf_counter()
+                if mode == "scheduler":
+                    batches = 0
+                    scheduled = 0
+                    while scheduled < count:
+                        created = schedule_due_profiles(profile_prefix=benchmark_prefix)
+                        batches += 1
+                        scheduled += created
+                        if created == 0:
+                            break  # Invalid/deferred profiles cannot create an endless benchmark loop.
+                    metrics = {
+                        "profiles_examined": count, "eligible_profiles": count,
+                        "scheduler_batches": batches, "scheduled_profiles": scheduled,
+                        "batch_processing_rate": round(scheduled / (time.perf_counter() - measured_at), 2),
+                    }
+                elif mode == "queue":
+                    created = sum(not request_kaggle_collection(item).deduplicated for item in profiles)
+                    duplicate_sample = min(count, batch)
+                    reused = sum(request_kaggle_collection(item).deduplicated
+                                 for item in profiles[:duplicate_sample])
+                    metrics = {
+                        "created_runs": created, "duplicate_requests": duplicate_sample,
+                        "duplicate_runs_reused": reused,
+                        "active_run_count": KaggleCollectionRun.objects.filter(
+                            profile__normalized_username__startswith=benchmark_prefix,
+                            status__in=("queued", "running", "retrying"),
+                        ).count(),
+                        "database_lock_contention": "not measured by single-process mode",
+                    }
+                else:
+                    parser_seconds = normalizer_seconds = persistence_seconds = service_seconds = 0.0
+                    provider = SyntheticProvider()
+                    for item in profiles[:sample]:
+                        document = provider.load(item.username)
+                        started_stage = time.perf_counter()
+                        parsed = parse_profile_document(document, item.username)
+                        parser_seconds += time.perf_counter() - started_stage
+                        started_stage = time.perf_counter()
+                        normalized = normalize_profile(parsed)
+                        normalizer_seconds += time.perf_counter() - started_stage
+                        started_stage = time.perf_counter()
+                        persist_kaggle_profile_statistics(item, normalized, require_link=True)
+                        persistence_seconds += time.perf_counter() - started_stage
+                        started_stage = time.perf_counter()
+                        collect_kaggle_profile(item, provider=provider, policy=policy)
+                        service_seconds += time.perf_counter() - started_stage
+                    if sample:
+                        record_kaggle_collection_failure(profiles[0], "benchmark_failure")
+                    metrics = {
+                        "sampled_profiles": sample,
+                        "parser_seconds": round(parser_seconds, 3),
+                        "normalizer_seconds": round(normalizer_seconds, 3),
+                        "persistence_seconds": round(persistence_seconds, 3),
+                        "collection_service_seconds": round(service_seconds, 3),
+                        "failure_handling_sampled": bool(sample),
+                    }
+                measured_seconds = time.perf_counter() - measured_at
             _, peak_bytes = tracemalloc.get_traced_memory()
             transaction.set_rollback(True)
         tracemalloc.stop()
         self.stdout.write(json.dumps({
-            "profiles": count, "batch_size": batch, "created": created,
-            "setup_seconds": round(setup_seconds, 3), "scheduler_seconds": round(queue_seconds, 3),
-            "runs_per_second": round(created / queue_seconds, 2) if queue_seconds else None,
-            "duplicate_reused": deduplicated, "scheduler_and_duplicate_queries": len(queries),
-            "worker_sample": sample, "worker_seconds": round(worker_seconds, 3),
+            "mode": mode, "profiles": count, "batch_size": batch,
+            "setup_seconds": round(setup_seconds, 3), "measured_seconds": round(measured_seconds, 3),
+            "database_queries": counter.count,
+            "operations_per_second": round((count if mode != "collection" else sample) / measured_seconds, 2)
+            if measured_seconds else None,
+            **metrics,
             "peak_traced_memory_mb": round(peak_bytes / 1_048_576, 2),
+            "real_redis_or_celery": False,
             "database_writes_rolled_back": True,
         }, indent=2))
