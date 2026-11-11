@@ -31,7 +31,7 @@ from apps.connectors.services import (
 )
 from apps.hackathons.services.devpost.identity import profile_reference
 from apps.datathons.linking import link_kaggle_account
-from apps.datathons.models import KaggleProfileLink
+from apps.datathons.models import KaggleProfile, KaggleProfileLink
 
 
 class ConnectorHealthSerializer(serializers.Serializer):
@@ -655,6 +655,20 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
         )
 
         with transaction.atomic():
+            if instance.platform == PlatformAccount.Platform.KAGGLE and (handle_changed or platform_changed):
+                old_profile_id = KaggleProfileLink.objects.filter(
+                    platform_account=instance
+                ).values_list("kaggle_profile_id", flat=True).first()
+                profile_ids = {old_profile_id} if old_profile_id else set()
+                if validated_data.get("platform", instance.platform) == PlatformAccount.Platform.KAGGLE:
+                    target = normalize_kaggle_identity(validated_data.get("handle", instance.handle))
+                    target_id = KaggleProfile.objects.filter(
+                        normalized_username=target.lookup_key
+                    ).values_list("pk", flat=True).first()
+                    if target_id:
+                        profile_ids.add(target_id)
+                for profile_id in sorted(profile_ids):
+                    KaggleProfile.objects.select_for_update().get(pk=profile_id)
             instance = super().update(instance, validated_data)
             if handle_changed or platform_changed:
                 instance.profile_url = (

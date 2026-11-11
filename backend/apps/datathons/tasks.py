@@ -8,10 +8,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.datathons.models import KaggleCollectionRun, KaggleProfile
-from apps.datathons.persistence import record_kaggle_collection_failure
 from apps.datathons.services.collection import collect_kaggle_profile
+from apps.datathons.services.lifecycle import cancel_unlinked_collection, finalize_collection_failure
+from apps.datathons.services.links import has_valid_profile_link
 from apps.datathons.services.providers import CollectionError, configured_provider
-from apps.datathons.services.queue import dispatch_kaggle_run
 from apps.datathons.services.scheduling import (
     cleanup_old_runs, dispatch_pending_runs, recover_stale_runs, retry_delay, schedule_due_profiles,
 )
@@ -29,14 +29,14 @@ def process_collection_run(run_id):
             return "terminal"
         if run.status == "running" and run.lease_expires_at and run.lease_expires_at > now:
             return "leased"
+        profile = KaggleProfile.objects.select_for_update().get(pk=run.profile_id)
+        if not has_valid_profile_link(profile):
+            cancel_unlinked_collection(run, when=now)
+            return "cancelled"
         if run.status == "retrying" and run.next_attempt_at and run.next_attempt_at > now:
             return "waiting"
         if run.attempt_count >= run.max_attempts:
-            run.status = KaggleCollectionRun.Status.FAILED
-            run.error_code = "attempts_exhausted"
-            run.finished_at = now
-            run.lease_expires_at = None
-            run.save()
+            finalize_collection_failure(run, "attempts_exhausted", when=now)
             return "failed"
         run.status = KaggleCollectionRun.Status.RUNNING
         run.attempt_count += 1
@@ -47,7 +47,6 @@ def process_collection_run(run_id):
         run.last_dispatch_error_code = ""
         run.save()
         KaggleProfile.objects.filter(pk=run.profile_id).update(last_attempted_at=now)
-        profile = run.profile
     logger.info("kaggle.run_started", extra={"run_id": str(run_id), "profile_id": profile.pk,
                 "provider": run.provider_name, "trigger": run.trigger, "attempt": attempt})
     unexpected = None
@@ -88,23 +87,20 @@ def process_collection_run(run_id):
         elif error.retryable and attempt < current.max_attempts:
             current.status = KaggleCollectionRun.Status.RETRYING
             current.next_attempt_at = finished + timedelta(seconds=retry_delay(attempt))
-            current.next_dispatch_at = finished
+            current.next_dispatch_at = current.next_attempt_at
             current.dispatched_at = None
             current.error_code = error.code
-            transaction.on_commit(lambda pk=current.pk: dispatch_kaggle_run(pk))
             outcome = "retrying"
+        elif error.code == "no_valid_link":
+            cancel_unlinked_collection(current, when=finished)
+            outcome = "cancelled"
         else:
-            current.status = KaggleCollectionRun.Status.FAILED
-            current.finished_at = finished
-            current.next_attempt_at = None
-            current.error_code = error.code
-            if error.code not in ("provider_disabled", "broker_unavailable"):
-                record_kaggle_collection_failure(profile, error.code)
-            KaggleProfile.objects.filter(pk=profile.pk).update(
-                next_refresh_at=finished + timedelta(seconds=max(1, settings.KAGGLE_REFRESH_INTERVAL_SECONDS))
+            finalize_collection_failure(
+                current, error.code, failed_collection=error.code != "provider_disabled", when=finished,
             )
             outcome = "failed"
-        current.save()
+        if outcome in ("succeeded", "retrying"):
+            current.save()
     logger.info("kaggle.run_%s", outcome, extra={"run_id": str(run_id), "profile_id": profile.pk,
                 "provider": run.provider_name, "trigger": run.trigger, "attempt": attempt,
                 "duration_seconds": (timezone.now() - now).total_seconds(),

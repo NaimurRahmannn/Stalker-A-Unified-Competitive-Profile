@@ -37,7 +37,7 @@ def collect_kaggle_profile(profile: KaggleProfile, provider=None, policy=None) -
         data = normalize_profile(parse_profile_document(document, identity.username))
         if normalize_kaggle_identity(data.username).lookup_key != identity.lookup_key:
             raise CollectionError("identity_mismatch")
-        persisted = persist_kaggle_profile_statistics(profile, data)
+        persisted = persist_kaggle_profile_statistics(profile, data, require_link=True)
     except KaggleDocumentError as exc:
         raise CollectionError(exc.code) from exc
     except DatabaseError as exc:

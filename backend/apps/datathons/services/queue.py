@@ -10,6 +10,8 @@ from django.utils import timezone
 
 from apps.datathons.models import ACTIVE_RUN_STATUSES, KaggleCollectionRun, KaggleProfile
 
+from .lifecycle import cancel_unlinked_collection, finalize_collection_failure
+from .links import has_valid_profile_link
 from .providers import CollectionError, configured_provider
 
 
@@ -43,6 +45,8 @@ def request_kaggle_collection(profile: KaggleProfile, requested_by=None, trigger
         locked.clean()
     except ValidationError as exc:
         raise CollectionError("invalid_identity") from exc
+    if not has_valid_profile_link(locked):
+        raise CollectionError("no_valid_link")
     active = KaggleCollectionRun.objects.filter(profile=locked, status__in=ACTIVE_RUN_STATUSES).first()
     if active:
         _log("request_deduplicated", active)
@@ -74,28 +78,28 @@ def dispatch_kaggle_run(run_id) -> bool:
         run = KaggleCollectionRun.objects.select_for_update().filter(pk=run_id).first()
         if not run or run.status not in (KaggleCollectionRun.Status.QUEUED, KaggleCollectionRun.Status.RETRYING):
             return False
+        profile = KaggleProfile.objects.select_for_update().get(pk=run.profile_id)
+        if not has_valid_profile_link(profile):
+            cancel_unlinked_collection(run, when=now)
+            return False
         if run.dispatched_at or (run.next_dispatch_at and run.next_dispatch_at > now):
             return False
+        if run.status == KaggleCollectionRun.Status.RETRYING and (
+            not run.next_attempt_at or run.next_attempt_at > now
+        ):
+            return False
         if run.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS:
-            run.status = KaggleCollectionRun.Status.FAILED
-            run.error_code = "dispatch_exhausted"
-            run.finished_at = now
-            run.next_dispatch_at = None
-            run.save()
-            KaggleProfile.objects.filter(pk=run.profile_id).update(
-                next_refresh_at=now + timedelta(seconds=max(1, settings.KAGGLE_REFRESH_INTERVAL_SECONDS))
-            )
+            finalize_collection_failure(run, "dispatch_exhausted", failed_collection=False, when=now)
             return False
         run.dispatch_attempts += 1
         run.next_dispatch_at = now + timedelta(seconds=max(30, settings.KAGGLE_STALE_RUN_GRACE_SECONDS))
         run.save(update_fields=["dispatch_attempts", "next_dispatch_at", "updated_at"])
         attempt = run.dispatch_attempts
-        eta = run.next_attempt_at if run.status == KaggleCollectionRun.Status.RETRYING else None
     try:
         from apps.datathons.tasks import collect_kaggle_profile_task
 
         collect_kaggle_profile_task.apply_async(
-            args=[str(run_id)], task_id=run.task_id, queue="kaggle", eta=eta,
+            args=[str(run_id)], task_id=run.task_id, queue="kaggle",
             retry=False,
         )
     except Exception:
@@ -107,19 +111,11 @@ def dispatch_kaggle_run(run_id) -> bool:
             if current.status in (KaggleCollectionRun.Status.QUEUED, KaggleCollectionRun.Status.RETRYING):
                 current.last_dispatch_error_code = "broker_unavailable"
                 if attempt >= MAX_DISPATCH_ATTEMPTS:
-                    current.status = KaggleCollectionRun.Status.FAILED
-                    current.error_code = "broker_unavailable"
-                    current.finished_at = timezone.now()
-                    current.next_dispatch_at = None
-                    KaggleProfile.objects.filter(pk=current.profile_id).update(
-                        next_refresh_at=timezone.now() + timedelta(
-                            seconds=max(1, settings.KAGGLE_REFRESH_INTERVAL_SECONDS)
-                        )
-                    )
+                    finalize_collection_failure(current, "broker_unavailable", failed_collection=False)
                 else:
                     delay = min(300, 2 ** attempt * 5)
                     current.next_dispatch_at = timezone.now() + timedelta(seconds=delay)
-                current.save()
+                    current.save()
         return False
     KaggleCollectionRun.objects.filter(
         pk=run_id, status__in=[KaggleCollectionRun.Status.QUEUED, KaggleCollectionRun.Status.RETRYING],

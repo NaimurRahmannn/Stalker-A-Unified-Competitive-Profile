@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -65,6 +66,7 @@ from apps.connectors.serializers import (
     serialize_codeforces_recent_activity,
 )
 from apps.connectors.services import get_connector, get_sync_cooldown_seconds
+from apps.datathons.models import KaggleProfile, KaggleProfileLink
 
 
 class PlatformAccountViewSet(viewsets.ModelViewSet):
@@ -89,6 +91,17 @@ class PlatformAccountViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def perform_destroy(self, instance):
+        if instance.platform != PlatformAccount.Platform.KAGGLE:
+            return super().perform_destroy(instance)
+        with transaction.atomic():
+            profile_id = KaggleProfileLink.objects.filter(
+                platform_account=instance
+            ).values_list("kaggle_profile_id", flat=True).first()
+            if profile_id:
+                KaggleProfile.objects.select_for_update().get(pk=profile_id)
+            super().perform_destroy(instance)
 
     @action(detail=True, methods=["post"], url_path="sync")
     def sync(self, request, pk=None):

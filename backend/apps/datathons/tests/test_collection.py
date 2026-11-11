@@ -59,6 +59,10 @@ class CollectionTests(TestCase):
         self.registration.start()
         self.addCleanup(self.registration.stop)
         self.profile = profile()
+        owner = User.objects.create_user(username="collection_owner", email="collection_owner@example.com")
+        link_kaggle_account(PlatformAccount.objects.create(
+            user=owner, platform="kaggle", handle=self.profile.username,
+        ))
 
     def test_active_run_is_unique_and_fields_are_constrained(self):
         first = run_for(self.profile)
@@ -340,6 +344,8 @@ class CollectionPostgresConcurrencyTests(TransactionTestCase):
         if connection.vendor != "postgresql":
             self.skipTest("PostgreSQL row locking required")
         item = profile()
+        owner = User.objects.create_user(username="concurrent_owner", email="concurrent_owner@example.com")
+        link_kaggle_account(PlatformAccount.objects.create(user=owner, platform="kaggle", handle=item.username))
         barrier = Barrier(2)
         with patch.dict(PROVIDERS, {"mock": ProviderRegistration(SyntheticProvider, POLICY)}), patch(
             "apps.datathons.tasks.collect_kaggle_profile_task.apply_async"

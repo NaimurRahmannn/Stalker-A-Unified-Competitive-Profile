@@ -11,11 +11,18 @@ HISTORY_DAYS = 365
 
 
 @transaction.atomic
-def persist_kaggle_profile_statistics(profile: KaggleProfile, data: NormalizedKaggleProfile) -> KaggleProfile:
+def persist_kaggle_profile_statistics(
+    profile: KaggleProfile, data: NormalizedKaggleProfile, *, require_link: bool = False,
+) -> KaggleProfile:
     identity = normalize_kaggle_identity(data.username)
     if identity.lookup_key != profile.normalized_username:
         raise KaggleDocumentError("identity_mismatch", "Profile identity changed before persistence.")
     locked = KaggleProfile.objects.select_for_update().get(pk=profile.pk)
+    if require_link:
+        from apps.datathons.services.links import has_valid_profile_link
+
+        if not has_valid_profile_link(locked):
+            raise KaggleDocumentError("no_valid_link", "No linked account remains for this profile.")
     if locked.last_successful_at and data.observed_at < locked.last_successful_at:
         raise KaggleDocumentError("stale_observation", "Older ranking observations cannot replace cached data.")
     current = {row.track: row for row in KaggleTrackStats.objects.filter(profile=locked)}

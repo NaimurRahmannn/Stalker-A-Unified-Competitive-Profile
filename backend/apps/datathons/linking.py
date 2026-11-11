@@ -15,6 +15,7 @@ def link_kaggle_account(account: PlatformAccount) -> KaggleProfileLink:
         normalized_username=identity.lookup_key,
         defaults={"username": identity.username, "profile_url": identity.profile_url},
     )
+    profile = KaggleProfile.objects.select_for_update().get(pk=profile.pk)
     link, _ = KaggleProfileLink.objects.update_or_create(
         platform_account=account, defaults={"kaggle_profile": profile}
     )
