@@ -99,7 +99,7 @@ const domainItems: SidebarItem[] = [
   {
     id: "datathon",
     label: "Datathon / Data Science",
-    href: "#",
+    href: "/datathon",
     icon: BarChart3,
     accent: "orange",
     chevron: true,

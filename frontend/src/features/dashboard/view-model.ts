@@ -258,23 +258,20 @@ function buildCompetitiveProgrammingJourney(
   };
 }
 
-function buildComingSoonJourneyItem(
-  title: string,
-  label: string,
-  icon: JourneyItem["icon"],
-  accent: JourneyItem["accent"],
-): JourneyItem {
+function buildDatathonJourneyItem(platforms: DashboardPlatform[]): JourneyItem {
+  const linked = platforms.some((platform) => platform.platform === "kaggle");
   return {
-    title,
-    value: "Coming soon",
-    label,
-    icon,
-    accent,
+    title: "Datathon / Data Science",
+    value: linked ? "Kaggle linked" : "Not connected",
+    label: linked ? "View cached Kaggle rankings" : "Connect your Kaggle profile",
+    icon: BarChart3,
+    accent: "orange",
+    platformMarks: ["kaggle"],
     stats: [],
-    trendLabel: "No trend data until this connector exists.",
-    note: "No backend support yet.",
-    actionLabel: "Coming Soon",
-    isActionDisabled: true,
+    trendLabel: "Competition, Code, and Dataset rankings are shown on the Datathon page when collected.",
+    note: linked ? "Automatic collection may be unavailable." : "Linking does not verify ownership or collect rankings.",
+    actionLabel: linked ? "View Datathon" : "Connect Kaggle",
+    actionHref: "/datathon",
     isPlaceholder: true,
   };
 }
@@ -377,12 +374,7 @@ function buildJourneyItems(platforms: DashboardPlatform[], competitivePlatforms:
     buildCompetitiveProgrammingJourney(competitivePlatforms, summary),
     buildCTFJourneyItem(platforms),
     buildHackathonJourneyItem(hackathons),
-    buildComingSoonJourneyItem(
-      "Datathon / Data Science",
-      "Backend support pending",
-      BarChart3,
-      "orange",
-    ),
+    buildDatathonJourneyItem(platforms),
   ];
 }
 

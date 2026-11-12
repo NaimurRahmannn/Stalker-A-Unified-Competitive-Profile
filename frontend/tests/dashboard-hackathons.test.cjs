@@ -72,7 +72,9 @@ test("empty Hackathon data still gives a working action", () => {
   assert.equal(item.actionLabel, "Add Hackathon");
   assert.equal(item.actionHref, "/hackathon");
   assert.notEqual(item.isActionDisabled, true);
-  assert.equal(model.journeyItems.find((row) => row.title === "Datathon / Data Science").isActionDisabled, true);
+  const datathon = model.journeyItems.find((row) => row.title === "Datathon / Data Science");
+  assert.equal(datathon.actionHref, "/datathon");
+  assert.equal(datathon.value, "Not connected");
 });
 
 test("linked Hackathon accounts appear without being called verified", () => {
