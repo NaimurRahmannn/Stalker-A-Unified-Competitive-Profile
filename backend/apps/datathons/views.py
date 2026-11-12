@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -5,7 +6,7 @@ from rest_framework.views import APIView
 from apps.connectors.models import PlatformAccount
 from apps.connectors.providers.kaggle.identity import normalize_kaggle_identity
 from apps.datathons.models import KaggleCollectionRun, KaggleProfileLink, KaggleTrackStats
-from apps.datathons.services.providers import CollectionError
+from apps.datathons.services.providers import CollectionError, PROVIDERS
 from apps.datathons.services.queue import CooldownActive, request_kaggle_collection
 
 
@@ -77,6 +78,26 @@ class KaggleOverviewView(APIView):
             "last_attempted_at": profile.last_attempted_at if profile else None,
             "last_successful_at": profile.last_successful_at if profile else None,
             "tracks": tracks,
+        })
+
+
+class KaggleCapabilitiesView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        enabled = settings.KAGGLE_COLLECTION_ENABLED
+        registration = PROVIDERS.get(settings.KAGGLE_PROVIDER_NAME) if enabled else None
+        available = registration is not None
+        if available:
+            try:
+                registration.policy.validate()
+            except CollectionError:
+                available = False
+        return Response({
+            "collection_enabled": enabled,
+            "provider_available": available,
+            "can_request_sync": enabled and available,
+            "reason": None if available else "provider_disabled",
         })
 
 
