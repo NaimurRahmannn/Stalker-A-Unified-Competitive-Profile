@@ -282,6 +282,28 @@ class CollectionAPITests(APITestCase):
         self.other = User.objects.create_user(username="bob", email="bob@example.com", password="password123")
         self.sync_url = reverse("kaggle-sync")
         self.status_url = reverse("kaggle-sync-status")
+        self.capabilities_url = reverse("kaggle-capabilities")
+
+    def test_capabilities_are_authenticated_and_do_not_call_provider(self):
+        self.assertEqual(self.client.get(self.capabilities_url).status_code, 401)
+        self.client.force_authenticate(self.user)
+        with patch.object(SyntheticProvider, "load", side_effect=AssertionError("provider called")):
+            response = self.client.get(self.capabilities_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {
+            "collection_enabled": True, "provider_available": True,
+            "can_request_sync": True, "reason": None,
+        })
+        self.assertNotIn("username", response.data)
+        self.assertEqual(self.client.get(self.capabilities_url, {"username": "other"}).data, response.data)
+        with override_settings(KAGGLE_COLLECTION_ENABLED=False):
+            disabled = self.client.get(self.capabilities_url)
+        self.assertEqual(disabled.data["can_request_sync"], False)
+        self.assertEqual(disabled.data["reason"], "provider_disabled")
+        with override_settings(KAGGLE_PROVIDER_NAME="unregistered"):
+            missing = self.client.get(self.capabilities_url)
+        self.assertEqual(missing.data["provider_available"], False)
+        self.assertEqual(KaggleCollectionRun.objects.count(), 0)
 
     def test_auth_missing_link_and_disabled_provider(self):
         self.assertEqual(self.client.post(self.sync_url).status_code, 401)
