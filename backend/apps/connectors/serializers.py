@@ -31,7 +31,7 @@ from apps.connectors.services import (
 )
 from apps.hackathons.services.devpost.identity import profile_reference
 from apps.datathons.linking import link_kaggle_account
-from apps.datathons.models import KaggleProfile, KaggleProfileLink
+from apps.datathons.models import KaggleManualTrackStats, KaggleProfile, KaggleProfileLink
 
 
 class ConnectorHealthSerializer(serializers.Serializer):
@@ -707,6 +707,7 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
                 AtCoderSubmission.objects.filter(platform_account=instance).delete()
                 PlatformRatingEvent.objects.filter(platform_account=instance).delete()
                 PlatformStatsSnapshot.objects.filter(platform_account=instance).delete()
+                KaggleManualTrackStats.objects.filter(platform_account=instance).delete()
                 instance._state.fields_cache.pop("codeforces_stats", None)
                 instance._state.fields_cache.pop("atcoder_stats", None)
                 instance._state.fields_cache.pop("leetcode_stats", None)

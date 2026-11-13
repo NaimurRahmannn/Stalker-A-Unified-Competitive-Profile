@@ -1,11 +1,13 @@
 from django.conf import settings
+from django.db import transaction
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.connectors.models import PlatformAccount
 from apps.connectors.providers.kaggle.identity import normalize_kaggle_identity
-from apps.datathons.models import KaggleCollectionRun, KaggleProfileLink, KaggleTrackStats
+from apps.datathons.manual_serializers import KaggleManualTrackSerializer
+from apps.datathons.models import KaggleCollectionRun, KaggleManualTrackStats, KaggleProfileLink, KaggleTrackStats
 from apps.datathons.services.providers import CollectionError, PROVIDERS
 from apps.datathons.services.queue import CooldownActive, request_kaggle_collection
 
@@ -19,10 +21,13 @@ def _empty_track():
     }
 
 
-def _owned_kaggle_account(user):
-    account = PlatformAccount.objects.filter(
-        user=user, platform=PlatformAccount.Platform.KAGGLE,
-    ).select_related("kaggle_profile_link__kaggle_profile").first()
+def _owned_kaggle_account(user, *, for_update=False):
+    accounts = PlatformAccount.objects.filter(user=user, platform=PlatformAccount.Platform.KAGGLE)
+    if for_update:
+        accounts = accounts.select_for_update()
+    else:
+        accounts = accounts.select_related("kaggle_profile_link__kaggle_profile")
+    account = accounts.first()
     if account is None:
         return None, None
     try:
@@ -40,6 +45,7 @@ class KaggleOverviewView(APIView):
 
     def get(self, request):
         tracks = {track: _empty_track() for track in KaggleTrackStats.Track.values}
+        manual_tracks = {track: None for track in KaggleTrackStats.Track.values}
         account = (PlatformAccount.objects.filter(
             user=request.user, platform=PlatformAccount.Platform.KAGGLE
         ).select_related("kaggle_profile_link__kaggle_profile").prefetch_related(
@@ -50,7 +56,7 @@ class KaggleOverviewView(APIView):
                 "linked": False, "username": None, "profile_url": None,
                 "collection_status": "not_collected", "last_attempted_at": None,
                 "last_successful_at": None,
-                "tracks": tracks,
+                "tracks": tracks, "manual_tracks": manual_tracks,
             })
         try:
             profile = account.kaggle_profile_link.kaggle_profile
@@ -60,7 +66,10 @@ class KaggleOverviewView(APIView):
             identity = normalize_kaggle_identity(account.handle)
         except ValueError:
             identity = None
-        if profile is not None and (identity is None or profile.normalized_username != identity.lookup_key):
+        if profile is not None and (
+            identity is None or profile.normalized_username != identity.lookup_key
+            or profile.profile_url != identity.profile_url
+        ):
             profile = None
         if profile is not None:
             for row in profile.track_stats.all():
@@ -71,14 +80,54 @@ class KaggleOverviewView(APIView):
                     "silver_medals": row.silver_medals, "bronze_medals": row.bronze_medals,
                     "source": row.source, "data_collected_at": row.data_collected_at,
                 }
+            for row in account.kaggle_manual_stats.all():
+                manual_tracks[row.track] = KaggleManualTrackSerializer(row).data
         return Response({
             "linked": True, "username": account.handle,
             "profile_url": account.profile_url,
             "collection_status": profile.collection_status if profile else "not_collected",
             "last_attempted_at": profile.last_attempted_at if profile else None,
             "last_successful_at": profile.last_successful_at if profile else None,
-            "tracks": tracks,
+            "tracks": tracks, "manual_tracks": manual_tracks,
         })
+
+
+class KaggleManualTrackView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _account(self, request):
+        account, profile = _owned_kaggle_account(request.user, for_update=True)
+        if account is None:
+            return None, Response({"code": "not_linked", "detail": "Link a Kaggle account first."},
+                                  status=status.HTTP_404_NOT_FOUND)
+        if profile is None:
+            return None, Response({"code": "invalid_link", "detail": "The Kaggle account link needs correction."},
+                                  status=status.HTTP_409_CONFLICT)
+        return account, None
+
+    @transaction.atomic
+    def put(self, request, track):
+        if track not in KaggleTrackStats.Track.values:
+            return Response({"code": "invalid_track"}, status=status.HTTP_404_NOT_FOUND)
+        account, error = self._account(request)
+        if error is not None:
+            return error
+        existing = KaggleManualTrackStats.objects.filter(platform_account=account, track=track).first()
+        serializer = KaggleManualTrackSerializer(existing, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        row = serializer.save(platform_account=account, track=track)
+        return Response(KaggleManualTrackSerializer(row).data,
+                        status=status.HTTP_200_OK if existing else status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def delete(self, request, track):
+        if track not in KaggleTrackStats.Track.values:
+            return Response({"code": "invalid_track"}, status=status.HTTP_404_NOT_FOUND)
+        account, error = self._account(request)
+        if error is not None:
+            return error
+        KaggleManualTrackStats.objects.filter(platform_account=account, track=track).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class KaggleCapabilitiesView(APIView):

@@ -142,6 +142,51 @@ class KaggleTrackStats(models.Model):
         ]
 
 
+class KaggleManualTrackStats(models.Model):
+    """Self-reported values owned by one linked STALKER account."""
+
+    platform_account = models.ForeignKey(
+        PlatformAccount, on_delete=models.CASCADE, related_name="kaggle_manual_stats",
+    )
+    track = models.CharField(max_length=16, choices=KaggleTrackStats.Track.choices)
+    rank_status = models.CharField(max_length=10, choices=KaggleTrackStats.RankStatus.choices)
+    global_rank = models.PositiveIntegerField(null=True, blank=True)
+    highest_rank = models.PositiveIntegerField(null=True, blank=True)
+    tier = models.CharField(max_length=16, null=True, blank=True)
+    points = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    gold_medals = models.PositiveIntegerField(null=True, blank=True)
+    silver_medals = models.PositiveIntegerField(null=True, blank=True)
+    bronze_medals = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["platform_account", "track"], name="unique_kaggle_manual_account_track",
+            ),
+            models.CheckConstraint(condition=Q(track__in=KAGGLE_TRACKS), name="kaggle_manual_track_valid"),
+            models.CheckConstraint(condition=Q(rank_status__in=RANK_STATUSES), name="kaggle_manual_status_valid"),
+            models.CheckConstraint(
+                condition=Q(highest_rank__isnull=True) | Q(highest_rank__gt=0),
+                name="kaggle_manual_highest_rank_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(points__isnull=True) | (Q(points__gte=0) & Q(points__lt=10000000000)),
+                name="kaggle_manual_points_valid",
+            ),
+            models.CheckConstraint(
+                condition=(Q(rank_status="ranked") & Q(global_rank__isnull=False) & Q(global_rank__gt=0))
+                | (Q(rank_status__in=["unknown", "unranked"]) & Q(global_rank__isnull=True)),
+                name="kaggle_manual_status_rank_consistent",
+            ),
+            models.CheckConstraint(
+                condition=~Q(rank_status="unranked") | (Q(tier__isnull=True) & Q(points__isnull=True)),
+                name="kaggle_manual_unranked_values_empty",
+            ),
+        ]
+
+
 class KaggleRankingSnapshot(models.Model):
     profile = models.ForeignKey(KaggleProfile, on_delete=models.CASCADE, related_name="ranking_snapshots")
     track = models.CharField(max_length=16, choices=KaggleTrackStats.Track.choices)
