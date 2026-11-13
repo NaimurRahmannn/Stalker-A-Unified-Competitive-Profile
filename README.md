@@ -13,8 +13,9 @@ STALKER brings platform accounts, cached activity, manually recorded achievement
 | Cybersecurity | CTFtime team synchronization, including team profile and yearly rankings. |
 | Hackathons | Manual events, participations, projects, submissions, and achievements; owner-scoped search and filtering; privacy controls; public portfolios and project detail pages. |
 | Devpost | Account linking and **user-supplied JSON** import with signed preview, field changes, import history, and possible duplicate review. |
+| Datathons / Kaggle | Public username linking and private, self-reported Competition, Code, and Dataset rankings. Owners can edit or remove each track. Automatic collection is not enabled. |
 
-The platform account model also recognizes other services, including CodeChef, Kaggle, GitHub, TryHackMe, Hack The Box, and DoraHacks. A recognized account type does not imply that synchronization or analytics are implemented for it.
+The platform account model also recognizes other services, including CodeChef, GitHub, TryHackMe, Hack The Box, and DoraHacks. A recognized account type does not imply that synchronization or analytics are implemented for it.
 
 ## Architecture
 

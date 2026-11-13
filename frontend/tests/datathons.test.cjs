@@ -58,22 +58,25 @@ Module._load = function (request, parent, ...rest) {
     updatePlatformAccount: async (id, handle) => { calls.push(["update", id, handle]); const item = account(handle); accounts = [item]; overview = emptyOverview(handle); return item; },
     deletePlatformAccount: async (id) => { calls.push(["delete", id]); accounts = []; overview = emptyOverview(null); },
   };
-  if (request === "../api" && parent?.filename.endsWith("datathon-page-content.tsx")) return {
+  if (request === "../api" && ["datathon-page-content.tsx", "kaggle-manual-editor.tsx"].some((name) => parent?.filename.endsWith(name))) return {
     getKaggleCapabilities: async () => ability,
     getKaggleOverview: () => { calls.push("overview"); return overviewRequest(); },
     getKaggleSyncStatus: () => { calls.push("status"); return statusRequest(); },
     requestKaggleSync: () => { calls.push("sync"); return syncRequest(); },
+    saveKaggleManualTrack: async (selected, values) => { calls.push(["manual-save", selected, values]); const row = { ...values, track: selected, updated_at: "2026-01-03T00:00:00Z" }; overview = { ...overview, manual_tracks: { ...overview.manual_tracks, [selected]: row } }; return row; },
+    deleteKaggleManualTrack: async (selected) => { calls.push(["manual-delete", selected]); overview = { ...overview, manual_tracks: { ...overview.manual_tracks, [selected]: null } }; },
   };
   return originalLoad.call(this, request, parent, ...rest);
 };
 
 const { formatRank, formatNumber, formatPoints, formatTier } = require("../src/features/datathons/formatters.ts");
 const { KaggleTrackCard } = require("../src/features/datathons/components/kaggle-track-card.tsx");
+const { KaggleTierIcon } = require("../src/features/datathons/components/kaggle-tier-icon.tsx");
 const { DatathonPageContent, KaggleRunPanel, syncErrorMessage } = require("../src/features/datathons/components/datathon-page-content.tsx");
 
 function account(handle = "example_user") { return { id: 7, platform: "kaggle", handle, profile_url: `https://www.kaggle.com/${handle}` }; }
 function track(values = {}) { return { rank_status: "unknown", global_rank: null, highest_rank: null, tier: null, points: null, gold_medals: null, silver_medals: null, bronze_medals: null, source: null, data_collected_at: null, ...values }; }
-function emptyOverview(handle) { return { linked: !!handle, username: handle, profile_url: handle ? `https://www.kaggle.com/${handle}` : null, collection_status: "not_collected", last_attempted_at: null, last_successful_at: null, tracks: { competitions: track(), code: track(), datasets: track() } }; }
+function emptyOverview(handle) { return { linked: !!handle, username: handle, profile_url: handle ? `https://www.kaggle.com/${handle}` : null, collection_status: "not_collected", last_attempted_at: null, last_successful_at: null, tracks: { competitions: track(), code: track(), datasets: track() }, manual_tracks: { competitions: null, code: null, datasets: null } }; }
 function reset() {
   document.body.innerHTML = "<div id='root'></div>";
   accounts = []; overview = emptyOverview(null); ability = { collection_enabled: false, provider_available: false, can_request_sync: false, reason: "provider_disabled" };
@@ -101,8 +104,20 @@ test("three track cards show independent ranks, highest rank, points, tiers, and
   const rows = [track({ rank_status: "ranked", global_rank: 1250, highest_rank: 800, tier: "expert", points: "1200.5000", gold_medals: 0, silver_medals: 2, bronze_medals: null }), track({ rank_status: "unranked", gold_medals: 0 }), track()];
   const html = renderToStaticMarkup(React.createElement("div", null, ...["competitions", "code", "datasets"].map((name, index) => React.createElement(KaggleTrackCard, { key: name, track: name, statistics: rows[index], collected: true }))));
   for (const label of ["Competitions", "Code", "Datasets", "#1,250", "#800", "Expert", "1,200.5", "Unranked", "Not available", "Medals in this track"]) assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(html, /color="#954c91"/);
   assert.match(html, />0<\/p>/);
   assert.match(html, />—<\/p>/);
+});
+
+test("Kaggle tier symbols match the five tier names", () => {
+  const colors = { Novice: "#48c98f", Contributor: "#00b3ec", Expert: "#954c91", Master: "#ff642c", Grandmaster: "#e5b600" };
+  for (const [tier, color] of Object.entries(colors)) {
+    const html = renderToStaticMarkup(React.createElement(KaggleTierIcon, { tier: tier.toLowerCase(), className: "size-6" }));
+    assert.match(html, new RegExp(`color="${color}"`));
+    assert.match(html, /<polygon/);
+    assert.match(html, /<circle/);
+  }
+  assert.equal(renderToStaticMarkup(React.createElement(KaggleTierIcon, { tier: null })), "");
 });
 
 test("run panel distinguishes disabled, queued, running, retrying, success, failure, and cancellation", () => {
@@ -207,6 +222,31 @@ test("cached partial rankings survive failed collection and tabs do not refetch"
   assert.match(document.body.textContent, /Code/);
   assert.match(document.body.textContent, /Datasets/);
   assert.equal(calls.filter((item) => item === "overview").length, before, JSON.stringify(calls));
+  await act(async () => root.unmount());
+});
+
+test("manual Kaggle entry updates the overview and can be removed", async () => {
+  reset(); accounts = [account()]; overview = emptyOverview("example_user");
+  const root = await mount();
+  await click("Kaggle");
+  assert.match(document.body.textContent, /Enter your Kaggle statistics/);
+  assert.doesNotMatch(document.body.textContent, /Kaggle synchronization is not available yet/);
+  const rankInput = document.querySelector('input[type="number"]');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(rankInput.constructor.prototype, "value").set.call(rankInput, "1200");
+    rankInput.dispatchEvent(new Event("input", { bubbles: true }));
+    rankInput.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await click("Save Competitions"); await settle();
+  const saved = calls.find((item) => Array.isArray(item) && item[0] === "manual-save");
+  assert.equal(saved[1], "competitions");
+  assert.equal(saved[2].global_rank, 1200);
+  assert.match(document.body.textContent, /#1,200/);
+  assert.match(document.body.textContent, /Self reported/);
+  assert.equal(overview.tracks.competitions.global_rank, null);
+  await click("Remove entry"); await settle();
+  assert.ok(calls.some((item) => Array.isArray(item) && item[0] === "manual-delete"));
+  assert.equal(overview.manual_tracks.competitions, null);
   await act(async () => root.unmount());
 });
 
