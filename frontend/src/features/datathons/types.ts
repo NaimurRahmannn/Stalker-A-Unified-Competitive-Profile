@@ -16,6 +16,13 @@ export type KaggleTrackStatistics = {
   data_collected_at: string | null;
 };
 
+export type KaggleManualTrackStatistics = Omit<KaggleTrackStatistics, "source" | "data_collected_at"> & {
+  track: KaggleTrack;
+  updated_at: string;
+};
+
+export type KaggleManualTrackInput = Omit<KaggleManualTrackStatistics, "track" | "updated_at">;
+
 export type KaggleOverviewResponse = {
   linked: boolean;
   username: string | null;
@@ -24,6 +31,7 @@ export type KaggleOverviewResponse = {
   last_attempted_at: string | null;
   last_successful_at: string | null;
   tracks: Record<KaggleTrack, KaggleTrackStatistics>;
+  manual_tracks: Record<KaggleTrack, KaggleManualTrackStatistics | null>;
 };
 
 export type KaggleCapabilitiesResponse = {
