@@ -21,6 +21,8 @@ from apps.hackathons.models import (
 )
 
 User = get_user_model()
+from apps.datathons.linking import link_kaggle_account
+from apps.datathons.models import KaggleManualTrackStats
 
 
 class DashboardMeEndpointTests(APITestCase):
@@ -370,3 +372,40 @@ class DashboardMeEndpointTests(APITestCase):
         summary = response.data["competitive_programming"]["summary"]
         self.assertEqual(summary["solved_count"], 75)
         self.assertTrue(summary["solved_count_complete"])
+
+    def test_dashboard_includes_kaggle_platform_and_datathons(self):
+        account = PlatformAccount.objects.create(
+            user=self.user,
+            platform=PlatformAccount.Platform.KAGGLE,
+            handle="test_kaggler",
+            profile_url="https://www.kaggle.com/test_kaggler",
+        )
+        link_kaggle_account(account)
+        KaggleManualTrackStats.objects.create(
+            platform_account=account,
+            track="competitions",
+            rank_status="ranked",
+            tier="Master",
+            global_rank=50,
+            gold_medals=1,
+            silver_medals=2,
+            bronze_medals=0,
+        )
+        self.authenticate()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("datathons", response.data)
+        datathons = response.data["datathons"]
+        self.assertTrue(datathons["linked"])
+        self.assertEqual(datathons["summary"]["competitions_tier"], "Master")
+        self.assertEqual(datathons["summary"]["competitions_rank"], 50)
+        self.assertEqual(datathons["summary"]["total_medals"], 3)
+        self.assertTrue(datathons["summary"]["has_data"])
+
+        kaggle_platform = next(p for p in response.data["platforms"] if p["platform"] == "kaggle")
+        self.assertEqual(kaggle_platform["stats"]["competitions_tier"], "Master")
+        self.assertEqual(kaggle_platform["stats"]["competitions_rank"], 50)
+        self.assertEqual(kaggle_platform["stats"]["total_medals"], 3)
+        self.assertTrue(kaggle_platform["stats"]["has_data"])
