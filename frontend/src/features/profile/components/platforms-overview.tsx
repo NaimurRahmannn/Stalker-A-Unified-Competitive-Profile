@@ -3,6 +3,10 @@ import type { PublicPlatformView } from "../view-model";
 import { ProfilePlatformLogo } from "./profile-platform-logo";
 
 function PlatformCard({ platform }: { platform: PublicPlatformView }) {
+  const isKaggle = platform.slug === "kaggle";
+  const ratingColor = platform.hasDetailedStats
+    ? (isKaggle ? "text-[#087EA4]" : "text-emerald-600")
+    : "text-slate-400";
   const content = (
     <>
       <div className="flex items-start gap-3">
@@ -10,11 +14,11 @@ function PlatformCard({ platform }: { platform: PublicPlatformView }) {
         <div className="min-w-0 flex-1"><h3 className="truncate text-xs font-semibold text-slate-950">{platform.name}</h3><p className="mt-1 truncate text-[10px] text-slate-500">{platform.handle}</p></div>
         {platform.profileUrl ? <ExternalLink className="size-3.5 shrink-0 text-slate-400" /> : null}
       </div>
-      <div className="mt-8 flex items-end gap-3"><strong className={`text-xl font-bold ${platform.hasDetailedStats ? "text-emerald-600" : "text-slate-400"}`}>{platform.rating}</strong><div className="pb-0.5"><p className="text-[10px] font-semibold text-slate-800">Rating</p><p className="mt-0.5 max-w-20 truncate text-[9px] capitalize text-slate-500">{platform.rank}</p></div></div>
-      <div className="mt-auto flex items-center justify-between pt-6"><strong className="text-lg font-semibold text-slate-900">{platform.solved}</strong>{platform.handleValid ? <span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700">{platform.slug === "ctftime" ? "Team found" : "Handle valid"}</span> : <span className="rounded bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-500">Not validated</span>}</div>
+      <div className="mt-8 flex items-end gap-3"><strong className={`text-xl font-bold ${ratingColor}`}>{platform.rating}</strong><div className="pb-0.5"><p className="text-[10px] font-semibold text-slate-800">{platform.ratingLabel ?? "Rating"}</p><p className="mt-0.5 max-w-20 truncate text-[9px] capitalize text-slate-500">{platform.rank}</p></div></div>
+      <div className="mt-auto flex items-center justify-between pt-6"><strong className="text-lg font-semibold text-slate-900">{platform.solved}</strong>{platform.handleValid ? <span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700">{platform.slug === "ctftime" ? "Team found" : platform.slug === "kaggle" ? "Linked" : "Handle valid"}</span> : <span className="rounded bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-500">Not validated</span>}</div>
     </>
   );
-  const className = "flex min-h-49 flex-col rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-200 hover:shadow-sm";
+  const className = `flex min-h-49 flex-col rounded-xl border border-slate-200 bg-white p-4 text-left transition ${isKaggle ? "hover:border-sky-300 hover:shadow-sm" : "hover:border-emerald-200 hover:shadow-sm"}`;
   return platform.profileUrl ? <a href={platform.profileUrl} target="_blank" rel="noreferrer" className={className}>{content}</a> : <article className={className}>{content}</article>;
 }
 

@@ -1,5 +1,6 @@
 import type { AtCoderRatingColor, CodeforcesStats, CTFTeamProfile } from "@/features/platforms/types";
 import type { CompetitiveOverviewSummary, CompetitivePlatformSummary } from "@/features/competitive-programming/types";
+import type { KaggleOverviewResponse } from "@/features/datathons/types";
 
 export type PublicCodeforcesStats = Omit<
   CodeforcesStats,
@@ -43,6 +44,21 @@ export interface PublicProfileUser {
   linkedin_url: string | null;
 }
 
+export type PublicKaggleStats = {
+  competitions_rank: number | null;
+  competitions_tier: string | null;
+  code_rank: number | null;
+  code_tier?: string | null;
+  datasets_rank: number | null;
+  datasets_tier?: string | null;
+  total_medals: number;
+  gold_medals?: number;
+  silver_medals?: number;
+  bronze_medals?: number;
+  has_data: boolean;
+  updated_at?: string | null;
+};
+
 export interface PublicProfilePlatform {
   id: number;
   platform: string;
@@ -56,7 +72,7 @@ export interface PublicProfilePlatform {
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
-  stats: PublicCodeforcesStats | PublicAtCoderStats | PublicLeetCodeStats | CTFTeamProfile | null;
+  stats: PublicCodeforcesStats | PublicAtCoderStats | PublicLeetCodeStats | CTFTeamProfile | PublicKaggleStats | null;
 }
 
 export interface PublicProfileResponse {
@@ -67,6 +83,7 @@ export interface PublicProfileResponse {
     platforms: CompetitivePlatformSummary[];
   };
   hackathons: PublicHackathonSummary;
+  datathons?: KaggleOverviewResponse | null;
 }
 
 export type PublicHackathonSummary = {
