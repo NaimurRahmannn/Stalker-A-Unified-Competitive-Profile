@@ -23,6 +23,20 @@ export type KaggleManualTrackStatistics = Omit<KaggleTrackStatistics, "source" |
 
 export type KaggleManualTrackInput = Omit<KaggleManualTrackStatistics, "track" | "updated_at">;
 
+export type KaggleSummary = {
+  competitions_rank: number | null;
+  competitions_tier: string | null;
+  code_rank: number | null;
+  code_tier: string | null;
+  datasets_rank: number | null;
+  datasets_tier: string | null;
+  total_medals: number;
+  gold_medals: number;
+  silver_medals: number;
+  bronze_medals: number;
+  has_data: boolean;
+};
+
 export type KaggleOverviewResponse = {
   linked: boolean;
   username: string | null;
@@ -32,6 +46,7 @@ export type KaggleOverviewResponse = {
   last_successful_at: string | null;
   tracks: Record<KaggleTrack, KaggleTrackStatistics>;
   manual_tracks: Record<KaggleTrack, KaggleManualTrackStatistics | null>;
+  summary?: KaggleSummary;
 };
 
 export type KaggleCapabilitiesResponse = {

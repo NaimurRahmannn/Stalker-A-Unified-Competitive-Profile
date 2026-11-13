@@ -14,6 +14,8 @@ import type {
 } from "./api";
 import type { CompetitiveOverviewSummary, CompetitivePlatformSummary } from "@/features/competitive-programming/types";
 import type { Overview as HackathonOverview } from "@/features/hackathons/types";
+import { formatTier } from "@/features/datathons/formatters";
+import type { KaggleOverviewResponse } from "@/features/datathons/types";
 import { formatDashboardPlatformName, getPlatformMark } from "./data";
 import type {
   ChecklistItem,
@@ -49,8 +51,8 @@ function formatHandle(handle: string): string {
   return handle.startsWith("@") ? handle : `@${handle}`;
 }
 
-function formatNumber(value: number | null, fallback: string): string {
-  return value === null ? fallback : String(value);
+function formatNumber(value: number | null | undefined, fallback: string): string {
+  return value == null ? fallback : new Intl.NumberFormat("en").format(value);
 }
 
 function isSupportedPlatform(platform: DashboardPlatform): boolean {
@@ -58,7 +60,7 @@ function isSupportedPlatform(platform: DashboardPlatform): boolean {
 }
 
 function isManagedPlatform(platform: DashboardPlatform): boolean {
-  return isSupportedPlatform(platform) || ["ctftime", "devpost", "dorahacks"].includes(platform.platform);
+  return isSupportedPlatform(platform) || ["ctftime", "devpost", "dorahacks", "kaggle"].includes(platform.platform);
 }
 
 function pluralize(value: number, singular: string, plural = `${singular}s`) {
@@ -193,7 +195,7 @@ function buildConnectedPlatforms(
     id: platform.id,
     name: formatDashboardPlatformName(platform.platform),
     handle: platform.platform === "ctftime" ? `Team #${platform.handle}` : formatHandle(platform.handle),
-    status: platform.platform === "devpost" || platform.platform === "dorahacks"
+    status: platform.platform === "devpost" || platform.platform === "dorahacks" || platform.platform === "kaggle"
       ? "Linked"
       : platform.platform === "ctftime"
       ? (platform.handle_validated ? "Team found" : "Team not validated")
@@ -258,21 +260,157 @@ function buildCompetitiveProgrammingJourney(
   };
 }
 
-function buildDatathonJourneyItem(platforms: DashboardPlatform[]): JourneyItem {
-  const linked = platforms.some((platform) => platform.platform === "kaggle");
-  return {
+const TIER_ORDER: Record<string, number> = {
+  grandmaster: 5,
+  master: 4,
+  expert: 3,
+  contributor: 2,
+  novice: 1,
+};
+
+function parseTier(value: string | null | undefined): string | null {
+  if (!value || value === "Not available") return null;
+  const formatted = formatTier(value);
+  return formatted === "Not available" ? null : formatted;
+}
+
+function buildDatathonJourneyItem(
+  platforms: DashboardPlatform[],
+  datathons?: KaggleOverviewResponse | null,
+): JourneyItem {
+  const account = platforms.find((platform) => platform.platform === "kaggle");
+  const baseItem = {
     title: "Datathon / Data Science",
-    value: linked ? "Kaggle linked" : "Not connected",
-    label: linked ? "View cached Kaggle rankings" : "Connect your Kaggle profile",
     icon: BarChart3,
     accent: "cyan",
     platformMarks: ["kaggle"],
-    stats: [],
-    trendLabel: "Competition, Code, and Dataset rankings are shown on the Datathon page when collected.",
-    note: linked ? "Automatic collection may be unavailable." : "Linking does not verify ownership or collect rankings.",
-    actionLabel: linked ? "View Datathon" : "Connect Kaggle",
     actionHref: "/datathon",
-    isPlaceholder: true,
+  } satisfies Pick<JourneyItem, "title" | "icon" | "accent" | "platformMarks" | "actionHref">;
+
+  if (!account) {
+    return {
+      ...baseItem,
+      value: "Not connected",
+      label: "Connect your Kaggle profile",
+      note: "No data science platform is connected yet.",
+      trendLabel: "Competition, Code, and Dataset rankings are shown when entered or collected.",
+      actionLabel: "Connect Kaggle",
+      isPlaceholder: true,
+      stats: [],
+    };
+  }
+
+  const summary = datathons?.summary;
+  const anyManual = datathons?.manual_tracks && Object.values(datathons.manual_tracks).some(Boolean);
+  const manual = datathons?.manual_tracks ?? { competitions: null, code: null, datasets: null };
+  const tracks = datathons?.tracks ?? { competitions: null, code: null, datasets: null };
+
+  const comp = manual.competitions ?? tracks.competitions;
+  const code = manual.code ?? tracks.code;
+  const datasets = manual.datasets ?? tracks.datasets;
+
+  const compRank = comp?.global_rank ?? summary?.competitions_rank;
+  const compTier = parseTier(comp?.tier) ?? parseTier(summary?.competitions_tier);
+  const codeRank = code?.global_rank ?? summary?.code_rank;
+  const codeTier = parseTier(code?.tier) ?? parseTier(summary?.code_tier);
+  const datasetsRank = datasets?.global_rank ?? summary?.datasets_rank;
+  const datasetsTier = parseTier(datasets?.tier) ?? parseTier(summary?.datasets_tier);
+
+  const compGold = comp?.gold_medals ?? 0;
+  const compSilver = comp?.silver_medals ?? 0;
+  const compBronze = comp?.bronze_medals ?? 0;
+  const codeGold = code?.gold_medals ?? 0;
+  const codeSilver = code?.silver_medals ?? 0;
+  const codeBronze = code?.bronze_medals ?? 0;
+  const dataGold = datasets?.gold_medals ?? 0;
+  const dataSilver = datasets?.silver_medals ?? 0;
+  const dataBronze = datasets?.bronze_medals ?? 0;
+
+  const totalGold = summary?.gold_medals ?? (compGold + codeGold + dataGold);
+  const totalSilver = summary?.silver_medals ?? (compSilver + codeSilver + dataSilver);
+  const totalBronze = summary?.bronze_medals ?? (compBronze + codeBronze + dataBronze);
+  const totalMedals = summary?.total_medals ?? (totalGold + totalSilver + totalBronze);
+
+  const trackEntries = [
+    { track: "Competitions", short: "Comp", tier: compTier, rank: compRank },
+    { track: "Code", short: "Code", tier: codeTier, rank: codeRank },
+    { track: "Datasets", short: "Data", tier: datasetsTier, rank: datasetsRank },
+  ];
+
+  const bestTierEntry = trackEntries
+    .filter((e) => e.tier)
+    .sort((a, b) => (TIER_ORDER[b.tier!.toLowerCase()] ?? 0) - (TIER_ORDER[a.tier!.toLowerCase()] ?? 0))[0];
+
+  const bestRankEntry = trackEntries
+    .filter((e) => e.rank != null)
+    .sort((a, b) => a.rank! - b.rank!)[0];
+
+  const datathonStats = [
+    {
+      value: compRank ? `#${formatNumber(compRank, "Unranked")}` : (compTier ?? "Unranked"),
+      label: compTier ? `Competitions (${compTier})` : "Competitions",
+    },
+    {
+      value: codeRank ? `#${formatNumber(codeRank, "Unranked")}` : (codeTier ?? "Unranked"),
+      label: codeTier ? `Code (${codeTier})` : "Code",
+    },
+    {
+      value: datasetsRank ? `#${formatNumber(datasetsRank, "Unranked")}` : (datasetsTier ?? "Unranked"),
+      label: datasetsTier ? `Datasets (${datasetsTier})` : "Datasets",
+    },
+    {
+      value: String(totalMedals),
+      label: totalMedals > 0 && (totalGold > 0 || totalSilver > 0 || totalBronze > 0)
+        ? `Medals (${totalGold}G · ${totalSilver}S · ${totalBronze}B)`
+        : "Total medals",
+    },
+  ];
+
+  const hasData = Boolean(
+    summary?.has_data || compRank || compTier || codeRank || codeTier || datasetsRank || datasetsTier || totalMedals > 0
+  );
+
+  if (!hasData) {
+    return {
+      ...baseItem,
+      value: "Unranked",
+      label: "Kaggle Profile Linked",
+      note: "Enter your Competition, Code, and Dataset rankings on the Datathon page.",
+      trendLabel: "Track your Competition, Code, and Dataset progress in STALKER.",
+      actionLabel: "Enter Statistics",
+      isPlaceholder: true,
+      stats: datathonStats,
+    };
+  }
+
+  let heroValue: string;
+  let heroLabel: string;
+
+  if (bestTierEntry) {
+    heroValue = bestTierEntry.tier!;
+    heroLabel = bestTierEntry.rank
+      ? `${bestTierEntry.track} Rank #${formatNumber(bestTierEntry.rank, "Unranked")}`
+      : `Kaggle ${bestTierEntry.track} Track`;
+  } else if (bestRankEntry) {
+    heroValue = `#${formatNumber(bestRankEntry.rank, "Unranked")}`;
+    heroLabel = `${bestRankEntry.track} Global Rank`;
+  } else if (totalMedals > 0) {
+    heroValue = `${totalMedals} Medals`;
+    heroLabel = "Kaggle Medals Earned";
+  } else {
+    heroValue = "Active";
+    heroLabel = "Kaggle Data Science Profile";
+  }
+
+  return {
+    ...baseItem,
+    value: heroValue,
+    label: heroLabel,
+    note: anyManual ? "Self-reported Kaggle statistics" : "Collected Kaggle statistics",
+    trendLabel: "Track your Competition, Code, and Dataset progress in STALKER.",
+    actionLabel: "View Datathon",
+    isPlaceholder: false,
+    stats: datathonStats,
   };
 }
 
@@ -369,12 +507,18 @@ function buildHackathonJourneyItem(overview: HackathonOverview): JourneyItem {
   };
 }
 
-function buildJourneyItems(platforms: DashboardPlatform[], competitivePlatforms: CompetitivePlatformSummary[], summary: CompetitiveOverviewSummary, hackathons: HackathonOverview): JourneyItem[] {
+function buildJourneyItems(
+  platforms: DashboardPlatform[],
+  competitivePlatforms: CompetitivePlatformSummary[],
+  summary: CompetitiveOverviewSummary,
+  hackathons: HackathonOverview,
+  datathons?: KaggleOverviewResponse | null,
+): JourneyItem[] {
   return [
     buildCompetitiveProgrammingJourney(competitivePlatforms, summary),
     buildCTFJourneyItem(platforms),
     buildHackathonJourneyItem(hackathons),
-    buildDatathonJourneyItem(platforms),
+    buildDatathonJourneyItem(platforms, datathons),
   ];
 }
 
@@ -445,7 +589,13 @@ export function buildDashboardViewModel(
     platformSummary: buildPlatformSummary(dashboard.platforms),
     metrics: buildMetrics(profileCompletion.progress, dashboard.competitive_programming.summary),
     connectedPlatforms: buildConnectedPlatforms(dashboard.platforms),
-    journeyItems: buildJourneyItems(dashboard.platforms, dashboard.competitive_programming.platforms, dashboard.competitive_programming.summary, dashboard.hackathons),
+    journeyItems: buildJourneyItems(
+      dashboard.platforms,
+      dashboard.competitive_programming.platforms,
+      dashboard.competitive_programming.summary,
+      dashboard.hackathons,
+      dashboard.datathons,
+    ),
     profileProgress: profileCompletion.progress,
     profileChecklist: profileCompletion.checklist,
     nextSteps: buildNextSteps(profileCompletion.fields, dashboard.platforms),
