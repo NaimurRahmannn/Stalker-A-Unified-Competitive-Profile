@@ -8,6 +8,7 @@ from apps.dashboard.serializers import (
     DashboardPlatformSerializer,
     DashboardUserSerializer,
 )
+from apps.datathons.overview import build_kaggle_overview
 from apps.hackathons.overview import build_hackathon_overview
 
 
@@ -17,8 +18,8 @@ class DashboardMeView(APIView):
     def get(self, request):
         platforms = (
             PlatformAccount.objects.filter(user=request.user)
-            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats", "ctf_team_profile", "ctftime_sync_state")
-            .prefetch_related("ctf_team_profile__yearly_rankings")
+            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats", "ctf_team_profile", "ctftime_sync_state", "kaggle_profile_link__kaggle_profile")
+            .prefetch_related("ctf_team_profile__yearly_rankings", "kaggle_manual_stats", "kaggle_profile_link__kaggle_profile__track_stats")
             .order_by("platform")
         )
 
@@ -31,6 +32,7 @@ class DashboardMeView(APIView):
                     include_activity=False,
                 ),
                 "hackathons": build_hackathon_overview(request.user),
+                "datathons": build_kaggle_overview(request.user),
             }
         )
 

@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import User
 from apps.connectors.competitive import build_competitive_programming_overview
 from apps.connectors.models import PlatformAccount
+from apps.datathons.overview import build_kaggle_overview
 from apps.profiles.serializers import (
     PublicProfilePlatformSerializer,
     PublicProfileUserSerializer,
@@ -25,8 +26,8 @@ class PublicProfileView(APIView):
         user = get_object_or_404(User, username=username)
         platforms = (
             PlatformAccount.objects.filter(user=user)
-            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats", "ctf_team_profile")
-            .prefetch_related("ctf_team_profile__yearly_rankings")
+            .select_related("codeforces_stats", "atcoder_stats", "leetcode_stats", "ctf_team_profile", "kaggle_profile_link__kaggle_profile")
+            .prefetch_related("ctf_team_profile__yearly_rankings", "kaggle_manual_stats", "kaggle_profile_link__kaggle_profile__track_stats")
             .order_by("platform")
         )
 
@@ -42,6 +43,7 @@ class PublicProfileView(APIView):
                     include_activity=False,
                 ),
                 "hackathons": hackathon_summary(user),
+                "datathons": build_kaggle_overview(user),
             }
         )
 

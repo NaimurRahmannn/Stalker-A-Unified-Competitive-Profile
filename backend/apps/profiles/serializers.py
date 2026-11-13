@@ -164,6 +164,10 @@ class PublicProfilePlatformSerializer(serializers.ModelSerializer):
             except CTFTeamProfile.DoesNotExist:
                 return None
             return CTFTeamProfileSerializer(stats).data
+        if obj.platform == PlatformAccount.Platform.KAGGLE:
+            from apps.datathons.overview import build_kaggle_platform_stats
+
+            return build_kaggle_platform_stats(obj)
         return None
 
     def get_handle_validated(self, obj: PlatformAccount) -> bool:
