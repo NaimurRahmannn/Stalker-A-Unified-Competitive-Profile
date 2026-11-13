@@ -50,6 +50,11 @@ export const metricAccentStyles: Record<MetricAccent, MetricAccentStyle> = {
     iconBg: "bg-orange-50",
     barBg: "bg-orange-50",
   },
+  cyan: {
+    icon: "text-[#087EA4]",
+    iconBg: "bg-[#E8F8FE]",
+    barBg: "bg-[#E8F8FE]",
+  },
 };
 
 export const journeyAccentStyles: Record<MetricAccent, JourneyAccentStyle> = {
@@ -93,6 +98,16 @@ export const journeyAccentStyles: Record<MetricAccent, JourneyAccentStyle> = {
     buttonText: "text-orange-700",
     stroke: "#f97316",
   },
+  cyan: {
+    border: "border-sky-100",
+    rail: "bg-[#20BEFF]",
+    icon: "text-[#087EA4]",
+    iconBg: "bg-[#E8F8FE]",
+    value: "text-[#087EA4]",
+    button: "border-sky-200 bg-sky-50/50 hover:bg-sky-50",
+    buttonText: "text-[#087EA4]",
+    stroke: "#20BEFF",
+  },
 };
 
 export const dashboardCardSurface =
@@ -125,6 +140,12 @@ export const achievementAccentStyles: Record<
     iconBg: "bg-orange-50",
     badge: "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
     border: "hover:border-orange-100",
+  },
+  cyan: {
+    icon: "text-[#087EA4]",
+    iconBg: "bg-[#E8F8FE]",
+    badge: "bg-[#E8F8FE] text-[#087EA4] ring-1 ring-sky-200",
+    border: "hover:border-sky-100",
   },
 };
 

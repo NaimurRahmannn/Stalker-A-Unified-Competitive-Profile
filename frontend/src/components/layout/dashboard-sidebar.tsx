@@ -23,7 +23,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
-type Accent = "green" | "blue" | "purple" | "orange" | "slate";
+type Accent = "green" | "blue" | "cyan" | "purple" | "orange" | "slate";
 
 export type DashboardSidebarActiveItem =
   | "overview"
@@ -56,6 +56,10 @@ const accentStyles: Record<Accent, { icon: string; iconBg: string }> = {
   blue: {
     icon: "text-blue-600",
     iconBg: "bg-blue-50",
+  },
+  cyan: {
+    icon: "text-[#087EA4]",
+    iconBg: "bg-[#E8F8FE]",
   },
   purple: {
     icon: "text-violet-600",
@@ -101,7 +105,7 @@ const domainItems: SidebarItem[] = [
     label: "Datathon / Data Science",
     href: "/datathon",
     icon: BarChart3,
-    accent: "orange",
+    accent: "cyan",
     chevron: true,
   },
 ];
@@ -154,13 +158,15 @@ function SidebarLink({ item }: { item: SidebarItem }) {
       href={item.href}
       className={`group flex min-h-12 items-center gap-3 rounded-xl border-l-[3px] px-3 py-2 text-sm font-medium transition ${
         item.active
-          ? "border-emerald-500 bg-emerald-50/70 text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.03)]"
+          ? item.id === "datathon"
+            ? "border-[#20BEFF] bg-[#E8F8FE] text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.03)]"
+            : "border-emerald-500 bg-emerald-50/70 text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.03)]"
           : "border-transparent text-slate-700 hover:bg-slate-50 hover:text-slate-950"
       }`}
     >
       <span
         className={`grid size-8 shrink-0 place-items-center rounded-lg ${
-          item.active ? "bg-white text-emerald-600" : accent.iconBg
+          item.active ? item.id === "datathon" ? "bg-white text-[#087EA4]" : "bg-white text-emerald-600" : accent.iconBg
         } ${item.active ? "" : accent.icon}`}
       >
         <Icon className="size-4" />

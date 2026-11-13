@@ -265,7 +265,7 @@ function buildDatathonJourneyItem(platforms: DashboardPlatform[]): JourneyItem {
     value: linked ? "Kaggle linked" : "Not connected",
     label: linked ? "View cached Kaggle rankings" : "Connect your Kaggle profile",
     icon: BarChart3,
-    accent: "orange",
+    accent: "cyan",
     platformMarks: ["kaggle"],
     stats: [],
     trendLabel: "Competition, Code, and Dataset rankings are shown on the Datathon page when collected.",

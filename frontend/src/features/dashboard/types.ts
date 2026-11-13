@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
-export type MetricAccent = "green" | "blue" | "purple" | "orange";
-export type WidgetAccent = MetricAccent | "cyan" | "slate";
+export type MetricAccent = "green" | "blue" | "purple" | "orange" | "cyan";
+export type WidgetAccent = MetricAccent | "slate";
 
 export type MetricItem = {
   label: string;
