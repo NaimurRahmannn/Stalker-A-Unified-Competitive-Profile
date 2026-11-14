@@ -1,10 +1,11 @@
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
 from rest_framework.views import APIView
 
 from apps.connectors.competitive import build_competitive_programming_overview
 from apps.connectors.models import PlatformAccount
-from apps.dashboard.clist_events import get_clist_events
+from apps.dashboard.clist_events import MAX_PAGE, get_clist_events
 from apps.dashboard.serializers import (
     DashboardPlatformSerializer,
     DashboardUserSerializer,
@@ -45,5 +46,8 @@ class DashboardEventsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        payload = get_clist_events()
+        page = request.query_params.get("page", "1")
+        if len(page) > len(str(MAX_PAGE)) or not page.isascii() or not page.isdecimal() or not 1 <= int(page) <= MAX_PAGE:
+            return Response({"page": [f"Enter a page between 1 and {MAX_PAGE}."]}, status=status.HTTP_400_BAD_REQUEST)
+        payload = get_clist_events(int(page))
         return Response(payload, status=200 if payload["status"] == "ready" else 503)

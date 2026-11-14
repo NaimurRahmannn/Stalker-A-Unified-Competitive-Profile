@@ -15,12 +15,14 @@ class DashboardClistEventsTests(APITestCase):
 
     def setUp(self):
         cache.delete(CACHE_KEY)
+        cache.delete(f"{CACHE_KEY}:2")
         self.user = get_user_model().objects.create_user(
             username="contest_viewer", email="contests@example.com", password="StrongPassword123!"
         )
 
     def tearDown(self):
         cache.delete(CACHE_KEY)
+        cache.delete(f"{CACHE_KEY}:2")
 
     def test_events_require_authentication(self):
         with patch("apps.dashboard.clist_events.requests.get") as provider:
@@ -76,6 +78,46 @@ class DashboardClistEventsTests(APITestCase):
         self.assertEqual(response.data, {
             "status": "unavailable", "events": [], "reason": "provider_unavailable",
         })
+
+    @override_settings(CLIST_API="test-key", CLIST_USERNAME="test-user")
+    def test_contest_pages_use_distinct_offsets_and_cache_entries(self):
+        self.client.force_authenticate(self.user)
+        start = (timezone.now() + timedelta(hours=1)).isoformat()
+        end = (timezone.now() + timedelta(hours=2)).isoformat()
+        rows = [
+            {"id": index, "event": f"Contest {index}", "resource": "example.org", "start": start, "end": end, "href": f"https://example.org/{index}"}
+            for index in range(1, 52)
+        ]
+        first_page = Mock(status_code=200)
+        first_page.json.return_value = {"objects": rows}
+        second_page = Mock(status_code=200)
+        second_page.json.return_value = {"objects": rows[50:]}
+
+        with patch("apps.dashboard.clist_events.requests.get", side_effect=[first_page, second_page]) as provider:
+            first = self.client.get(self.url)
+            second = self.client.get(f"{self.url}?page=2")
+            repeated = self.client.get(f"{self.url}?page=2")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(len(first.data["events"]), 50)
+        self.assertEqual(first.data["next_page"], 2)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual([row["id"] for row in second.data["events"]], [51])
+        self.assertIsNone(second.data["next_page"])
+        self.assertEqual(second.data, repeated.data)
+        self.assertEqual(provider.call_count, 2)
+        self.assertEqual(provider.call_args_list[0].kwargs["params"]["limit"], 51)
+        self.assertEqual(provider.call_args_list[0].kwargs["params"]["offset"], 0)
+        self.assertEqual(provider.call_args_list[1].kwargs["params"]["offset"], 50)
+
+    @override_settings(CLIST_API="test-key", CLIST_USERNAME="test-user")
+    def test_invalid_page_is_rejected_without_fetching_clist(self):
+        self.client.force_authenticate(self.user)
+        with patch("apps.dashboard.clist_events.requests.get") as provider:
+            for page in ("0", "201", "abc", "9" * 5000):
+                response = self.client.get(f"{self.url}?page={page}")
+                self.assertEqual(response.status_code, 400)
+        provider.assert_not_called()
 
     def test_normalizer_discards_ended_and_duplicate_contests(self):
         now = timezone.now()

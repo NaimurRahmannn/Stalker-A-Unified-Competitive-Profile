@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Activity,
   BarChart3,
   CalendarDays,
   ChevronDown,
@@ -17,7 +16,6 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
-  Target,
   Trophy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -32,8 +30,6 @@ export type DashboardSidebarActiveItem =
   | "hackathon"
   | "datathon"
   | "platforms"
-  | "activity"
-  | "goals"
   | "contests"
   | "public-profile"
   | "settings";
@@ -119,17 +115,9 @@ const platformItems: SidebarItem[] = [
     accent: "slate",
   },
   {
-    id: "activity",
-    label: "Activity",
-    href: "#",
-    icon: Activity,
-    accent: "slate",
-  },
-  { id: "goals", label: "Goals", href: "#", icon: Target, accent: "slate" },
-  {
     id: "contests",
     label: "Contests",
-    href: "#",
+    href: "/contests",
     icon: CalendarDays,
     accent: "slate",
   },

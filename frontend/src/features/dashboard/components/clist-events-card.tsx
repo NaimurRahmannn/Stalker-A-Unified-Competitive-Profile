@@ -2,6 +2,7 @@
 
 import { CalendarDays, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getDashboardEvents, type DashboardEvent } from "../api";
 import { WidgetCard } from "./widget-card";
 
@@ -94,19 +95,17 @@ export function ClistEventsCard() {
         </p>
       ) : (
         <div aria-label="Upcoming contests" className="mt-4 grid max-h-[440px] gap-2 overflow-y-auto pr-1">
-          {events.map((event) => <EventRow key={event.id} event={event} />)}
+          {events.slice(0, 30).map((event) => <EventRow key={event.id} event={event} />)}
         </div>
       )}
 
-      <a
-        href="https://clist.by/"
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        href="/contests"
         className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
       >
-        View all contests on CLIST
-        <ExternalLink aria-hidden="true" className="size-3" />
-      </a>
+        View all contests
+        <CalendarDays aria-hidden="true" className="size-3" />
+      </Link>
     </WidgetCard>
   );
 }

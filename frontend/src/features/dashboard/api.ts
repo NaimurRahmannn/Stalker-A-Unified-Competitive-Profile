@@ -81,6 +81,7 @@ export type DashboardEventsResponse = {
   events: DashboardEvent[];
   updated_at: string;
   source: "CLIST";
+  next_page: number | null;
 };
 
 export async function getDashboard(): Promise<DashboardResponse> {
@@ -89,7 +90,9 @@ export async function getDashboard(): Promise<DashboardResponse> {
   return data;
 }
 
-export async function getDashboardEvents(): Promise<DashboardEventsResponse> {
-  const { data } = await api.get<DashboardEventsResponse>("/dashboard/events/");
+export async function getDashboardEvents(page = 1): Promise<DashboardEventsResponse> {
+  const { data } = await api.get<DashboardEventsResponse>("/dashboard/events/", {
+    params: { page },
+  });
   return data;
 }

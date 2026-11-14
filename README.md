@@ -14,7 +14,7 @@ STALKER brings platform accounts, cached activity, manually recorded achievement
 | Hackathons | Manual events, participations, projects, submissions, and achievements; owner-scoped search and filtering; privacy controls; public portfolios and project detail pages. |
 | Devpost | Account linking and **user-supplied JSON** import with signed preview, field changes, import history, and possible duplicate review. |
 | Datathons / Kaggle | Public username linking and private, self-reported Competition, Code, and Dataset rankings. Owners can edit or remove each track. Automatic collection is not enabled. |
-| Contest calendar | The dashboard shows live and upcoming contests across CLIST resources when backend API credentials are configured. |
+| Contest calendar | The dashboard previews live and upcoming CLIST contests; `/contests` provides a paged list across platforms when backend API credentials are configured. |
 
 The platform account model also recognizes other services, including CodeChef, GitHub, TryHackMe, Hack The Box, and DoraHacks. A recognized account type does not imply that synchronization or analytics are implemented for it.
 
@@ -66,7 +66,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000
 
 When all five PostgreSQL variables (`DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and `DB_PORT`) are set, Django uses PostgreSQL. Otherwise it uses `backend/db.sqlite3`. Both `.env` and the SQLite database are ignored by Git.
 
-To show the optional contest calendar, add your CLIST account username and API key to `backend/.env` as `CLIST_USERNAME` and `CLIST_API`. Keep the key on the backend. The event feed caches successful responses for 10 minutes and displays a retry state if CLIST is unavailable.
+To show the optional contest calendar, add your CLIST account username and API key to `backend/.env` as `CLIST_USERNAME` and `CLIST_API`. Keep the key on the backend. The event feed caches each page of successful responses for 10 minutes and displays a retry state if CLIST is unavailable.
 
 ```powershell
 python manage.py migrate
@@ -105,7 +105,7 @@ All routes below are relative to `/api/v1/`. Management routes require a JWT acc
 | Accounts | `POST /accounts/register/`, `POST /accounts/login/`, `POST /accounts/token/refresh/`, `GET /accounts/me/` |
 | Platform accounts | `GET/POST /platform-accounts/`, `POST /platform-accounts/{id}/sync/` |
 | Competitive analytics | `GET /competitive-programming/overview/`, `/codeforces/`, `/atcoder/`, `/leetcode/` |
-| Contest calendar | `GET /dashboard/events/` (authenticated) |
+| Contest calendar | `GET /dashboard/events/?page=1` (authenticated, 50 contests per page) |
 | Hackathon management | `GET /hackathons/overview/`; CRUD under `/hackathons/events/`, `/projects/`, `/participations/`, `/submissions/`, and `/achievements/` |
 | Devpost import | `POST /hackathons/devpost/imports/preview/`; `GET/POST /hackathons/devpost/imports/` |
 | Duplicate review | `GET/POST /hackathons/duplicate-reviews/`; `PATCH /hackathons/duplicate-reviews/{id}/` |

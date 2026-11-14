@@ -1,4 +1,4 @@
-"""Small, owner-independent contest feed from CLIST's authenticated API."""
+"""Owner-independent contest feed from CLIST's authenticated API."""
 
 from datetime import datetime, timezone as datetime_timezone
 from urllib.parse import urlsplit
@@ -11,9 +11,11 @@ from django.utils.dateparse import parse_datetime
 
 
 CLIST_CONTEST_URL = "https://clist.by/api/v4/contest/"
-CACHE_KEY = "dashboard_clist_upcoming_v1"
+CACHE_KEY = "dashboard_clist_upcoming_v2"
 SUCCESS_TTL_SECONDS = 600
 ERROR_TTL_SECONDS = 60
+PAGE_SIZE = 50
+MAX_PAGE = 200
 
 
 def _timestamp(value):
@@ -45,7 +47,7 @@ def normalize_clist_events(payload, *, now: datetime | None = None):
     now = now or timezone.now()
     events = []
     seen = set()
-    for item in payload["objects"][:100]:
+    for item in payload["objects"][:PAGE_SIZE]:
         if not isinstance(item, dict):
             continue
         event_id = item.get("id")
@@ -74,11 +76,14 @@ def normalize_clist_events(payload, *, now: datetime | None = None):
     events.sort(key=lambda event: (
         not event["ongoing"], event["end"] if event["ongoing"] else event["start"], event["id"]
     ))
-    return events[:30]
+    return events
 
 
-def get_clist_events():
-    cached = cache.get(CACHE_KEY)
+def get_clist_events(page=1):
+    if not isinstance(page, int) or not 1 <= page <= MAX_PAGE:
+        raise ValueError("invalid_clist_page")
+    cache_key = CACHE_KEY if page == 1 else f"{CACHE_KEY}:{page}"
+    cached = cache.get(cache_key)
     if cached is not None:
         return cached
     if not settings.CLIST_API or not settings.CLIST_USERNAME:
@@ -91,20 +96,25 @@ def get_clist_events():
                 "Authorization": f"ApiKey {settings.CLIST_USERNAME}:{settings.CLIST_API}",
                 "Accept": "application/json",
             },
-            params={"upcoming": "true", "order_by": "start", "limit": 60, "format": "json"},
+            params={
+                "upcoming": "true", "order_by": "start", "limit": PAGE_SIZE + 1,
+                "offset": (page - 1) * PAGE_SIZE, "format": "json",
+            },
             timeout=8,
         )
         if response.status_code != 200:
             raise ValueError("clist_http_error")
-        events = normalize_clist_events(response.json())
+        payload = response.json()
+        events = normalize_clist_events(payload)
+        next_page = page + 1 if len(payload["objects"]) > PAGE_SIZE and page < MAX_PAGE else None
     except (requests.RequestException, ValueError, TypeError):
         result = {"status": "unavailable", "events": [], "reason": "provider_unavailable"}
-        cache.set(CACHE_KEY, result, ERROR_TTL_SECONDS)
+        cache.set(cache_key, result, ERROR_TTL_SECONDS)
         return result
 
     result = {
         "status": "ready", "events": events,
-        "updated_at": timezone.now().isoformat(), "source": "CLIST",
+        "updated_at": timezone.now().isoformat(), "source": "CLIST", "next_page": next_page,
     }
-    cache.set(CACHE_KEY, result, SUCCESS_TTL_SECONDS)
+    cache.set(cache_key, result, SUCCESS_TTL_SECONDS)
     return result
