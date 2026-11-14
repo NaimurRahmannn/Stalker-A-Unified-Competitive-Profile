@@ -66,8 +66,30 @@ export type DashboardResponse = {
   datathons?: KaggleOverviewResponse;
 };
 
+export type DashboardEvent = {
+  id: number;
+  title: string;
+  platform: string;
+  start: string;
+  end: string;
+  url: string;
+  ongoing: boolean;
+};
+
+export type DashboardEventsResponse = {
+  status: "ready";
+  events: DashboardEvent[];
+  updated_at: string;
+  source: "CLIST";
+};
+
 export async function getDashboard(): Promise<DashboardResponse> {
   const { data } = await api.get<DashboardResponse>("/dashboard/me/");
 
+  return data;
+}
+
+export async function getDashboardEvents(): Promise<DashboardEventsResponse> {
+  const { data } = await api.get<DashboardEventsResponse>("/dashboard/events/");
   return data;
 }

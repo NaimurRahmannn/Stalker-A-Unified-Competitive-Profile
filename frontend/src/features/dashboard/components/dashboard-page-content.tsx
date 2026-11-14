@@ -85,7 +85,7 @@ function DashboardLoadingState() {
           <SectionSkeleton />
           <SectionSkeleton />
         </section>
-        <aside className="hidden min-w-0 border-t border-slate-200 pt-6 xl:block xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+        <aside className="min-w-0 border-t border-slate-200 pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
           <div className="grid gap-4">
             {Array.from({ length: 3 }, (_, index) => (
               <div
@@ -242,12 +242,8 @@ export function DashboardPageContent() {
               <RecentAchievementsSection />
             </section>
 
-            <aside className="hidden min-w-0 border-t border-slate-200 pt-6 xl:block xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-              <RightWidgetsPanel
-                nextSteps={viewModel.nextSteps}
-                profileChecklist={viewModel.profileChecklist}
-                profileProgress={viewModel.profileProgress}
-              />
+            <aside className="min-w-0 border-t border-slate-200 pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+              <RightWidgetsPanel />
             </aside>
           </div>
         </>
