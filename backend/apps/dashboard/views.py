@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 
 from apps.connectors.competitive import build_competitive_programming_overview
 from apps.connectors.models import PlatformAccount
+from apps.dashboard.clist_events import get_clist_events
 from apps.dashboard.serializers import (
     DashboardPlatformSerializer,
     DashboardUserSerializer,
@@ -38,3 +39,11 @@ class DashboardMeView(APIView):
 
 
 DashboardMeAPIView = DashboardMeView
+
+
+class DashboardEventsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        payload = get_clist_events()
+        return Response(payload, status=200 if payload["status"] == "ready" else 503)

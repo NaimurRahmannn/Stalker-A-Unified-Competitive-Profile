@@ -157,6 +157,9 @@ KAGGLE_RUN_LEASE_SECONDS = config("KAGGLE_RUN_LEASE_SECONDS", default=180, cast=
 KAGGLE_STALE_RUN_GRACE_SECONDS = config("KAGGLE_STALE_RUN_GRACE_SECONDS", default=3600, cast=int)
 KAGGLE_COLLECTION_RUN_RETENTION_DAYS = config("KAGGLE_COLLECTION_RUN_RETENTION_DAYS", default=30, cast=int)
 
+CLIST_API = config("CLIST_API", default="")
+CLIST_USERNAME = config("CLIST_USERNAME", default="")
+
 
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
