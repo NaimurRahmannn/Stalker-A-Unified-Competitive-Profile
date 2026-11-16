@@ -1,44 +1,396 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BriefcaseBusiness, Building2, Check, CodeXml, MapPin, Share2 } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  Building2,
+  Camera,
+  CodeXml,
+  LayoutDashboard,
+  Loader2,
+  MapPin,
+  Share2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { metricAccentStyles } from "@/features/dashboard/styles";
+import { updateUserProfile } from "@/features/auth/api";
 import { useAuth } from "@/hooks/use-auth";
+import { getApiErrorMessage } from "@/lib/utils";
 import type { ProfileHeroView, ProfileMetricView } from "../view-model";
+
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 async function shareProfile() {
   try {
-    if (navigator.share) { await navigator.share({ title: document.title, url: window.location.href }); return; }
-    await navigator.clipboard.writeText(window.location.href); toast.success("Profile link copied");
+    if (navigator.share) {
+      await navigator.share({ title: document.title, url: window.location.href });
+      return;
+    }
+    await navigator.clipboard.writeText(window.location.href);
+    toast.success("Profile link copied");
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") return;
-    try { await navigator.clipboard.writeText(window.location.href); toast.success("Profile link copied"); } catch { toast.error("Could not share this profile"); }
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Profile link copied");
+    } catch {
+      toast.error("Could not share this profile");
+    }
   }
 }
 
-export function ProfileHero({ hero, metrics }: { hero: ProfileHeroView; metrics: ProfileMetricView[] }) {
-  const { user } = useAuth();
-  const isOwner = user?.username.toLowerCase() === hero.username.toLowerCase();
+function DefaultLinkedInStalkerCover() {
   return (
-    <section className="relative overflow-hidden border-b border-slate-100 bg-[radial-gradient(circle_at_86%_70%,rgba(167,243,208,0.22),transparent_24%),linear-gradient(135deg,#fff_0%,#fbfdff_62%,#f5fffb_100%)]">
-      <div aria-hidden="true" className="absolute inset-0 opacity-30 [background-image:repeating-radial-gradient(ellipse_at_62%_40%,transparent_0,transparent_12px,rgba(148,163,184,.13)_13px,transparent_14px)]" />
-      <div className="relative mx-auto grid max-w-310 gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1fr)_535px] lg:items-center lg:py-11">
-        <div className="flex min-w-0 flex-col items-center gap-6 text-center sm:flex-row sm:text-left">
-          <div className="grid size-39 shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-50 text-4xl font-bold text-emerald-700 ring-4 ring-white shadow-sm sm:size-48 lg:size-46">{hero.avatarUrl ? <img src={hero.avatarUrl} alt={`${hero.displayName}'s avatar`} className="h-full w-full object-cover" /> : <span aria-label={`${hero.displayName} initials`}>{hero.initials}</span>}</div>
-          <div className="min-w-0">
-            <div className="flex items-center justify-center gap-2 sm:justify-start"><h1 className="truncate text-[26px] font-bold tracking-tight text-slate-950">{hero.displayName}</h1><span title="Public profile" className="grid size-6 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><Check className="size-4 stroke-3" /></span></div>
-            <p className="mt-1 text-sm font-medium text-slate-600">@{hero.username}</p>
-            {hero.bio ? <p className="mt-4 max-w-105 text-[13px] leading-6 text-slate-700">{hero.bio}</p> : null}
-            <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-slate-600 sm:justify-start">{hero.country ? <span className="inline-flex items-center gap-2"><MapPin className="size-4" />{hero.country}</span> : null}{hero.institution ? <span className="inline-flex items-center gap-2"><Building2 className="size-4" />{hero.institution}</span> : null}</div>
-            {hero.socialLinks.length ? <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 sm:justify-start">{hero.socialLinks.map((link) => { const Icon = link.kind === "github" ? CodeXml : BriefcaseBusiness; return <a key={link.kind} href={link.href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs text-slate-600 hover:text-emerald-700"><Icon className="size-4" />{link.label}</a>; })}</div> : null}
+    <div className="relative size-full overflow-hidden bg-[#a0b4b7]">
+      {/* Exact LinkedIn Default Cover Photo Vector Geometry (862x218 ratio) */}
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 size-full select-none"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 862 218"
+        preserveAspectRatio="none"
+      >
+        {/* Left primary shape with rightward convex curve */}
+        <path
+          d="M 0,0 L 520,0 C 546,65 546,153 520,218 L 0,218 Z"
+          fill="#a0b4b7"
+        />
+        {/* Middle accent separator band */}
+        <path
+          d="M 520,0 C 546,65 546,153 520,218 L 591,218 L 591,0 Z"
+          fill="#d9e5e7"
+        />
+        {/* Right rectangular block */}
+        <rect
+          x="591"
+          y="0"
+          width="271"
+          height="218"
+          fill="#bfd3d6"
+        />
+      </svg>
+
+      {/* STALKER Monochrome Variant Logo Watermark */}
+      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center justify-end sm:right-8 md:right-12">
+        <img
+          src="/images/stalker_monochrome_variant_transparent_generated.png"
+          alt="STALKER"
+          className="h-14 w-auto max-w-[44vw] object-contain opacity-35 mix-blend-multiply sm:h-18 md:h-22"
+        />
+      </div>
+    </div>
+  );
+}
+
+export function ProfileHero({
+  hero,
+  metrics,
+  onProfileUpdated,
+}: {
+  hero: ProfileHeroView;
+  metrics: ProfileMetricView[];
+  onProfileUpdated?: () => void;
+}) {
+  const { user, refreshUser } = useAuth();
+  const isOwner = Boolean(user && user.username.toLowerCase() === hero.username.toLowerCase());
+  const isLocalArtwork = hero.avatarUrl === "/images/testuser-profile.jpg";
+
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(hero.avatarUrl);
+  const [coverUrl, setCoverUrl] = useState<string | null>(hero.coverUrl);
+  const [coverImageFailed, setCoverImageFailed] = useState(false);
+
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setAvatarUrl(hero.avatarUrl);
+  }, [hero.avatarUrl]);
+
+  useEffect(() => {
+    setCoverUrl(hero.coverUrl);
+    setCoverImageFailed(false);
+  }, [hero.coverUrl]);
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      toast.error("Please upload a JPG, PNG, or WebP image.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("Avatar image must be smaller than 8 MB.");
+      e.target.value = "";
+      return;
+    }
+
+    const previousUrl = avatarUrl;
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarUrl(previewUrl);
+    setIsUploadingAvatar(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar_image", file);
+      const updatedUser = await updateUserProfile(formData);
+      setAvatarUrl(updatedUser.avatar ?? previewUrl);
+      await refreshUser();
+      onProfileUpdated?.();
+      toast.success("Profile photo updated successfully");
+    } catch (err) {
+      setAvatarUrl(previousUrl);
+      toast.error(getApiErrorMessage(err, "Failed to update profile photo"));
+    } finally {
+      setIsUploadingAvatar(false);
+      if (e.target) e.target.value = "";
+    }
+  }
+
+  async function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      toast.error("Please upload a JPG, PNG, or WebP image.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("Cover image must be smaller than 8 MB.");
+      e.target.value = "";
+      return;
+    }
+
+    const previousUrl = coverUrl;
+    const previewUrl = URL.createObjectURL(file);
+    setCoverUrl(previewUrl);
+    setCoverImageFailed(false);
+    setIsUploadingCover(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("cover_image", file);
+      const updatedUser = await updateUserProfile(formData);
+      setCoverUrl(updatedUser.cover_photo ?? previewUrl);
+      await refreshUser();
+      onProfileUpdated?.();
+      toast.success("Cover photo updated successfully");
+    } catch (err) {
+      setCoverUrl(previousUrl);
+      toast.error(getApiErrorMessage(err, "Failed to update cover photo"));
+    } finally {
+      setIsUploadingCover(false);
+      if (e.target) e.target.value = "";
+    }
+  }
+
+  return (
+    <section className="bg-white">
+      {/* Cover Photo Banner (LinkedIn default cover structure / custom user image) */}
+      <div className="relative h-48 w-full overflow-hidden sm:h-60 md:h-64 lg:h-72">
+        {coverUrl && !coverImageFailed ? (
+          <img
+            src={coverUrl}
+            alt={`${hero.displayName}'s cover photo`}
+            className="size-full object-cover object-center"
+            onError={() => setCoverImageFailed(true)}
+          />
+        ) : (
+          <DefaultLinkedInStalkerCover />
+        )}
+
+        {/* Top Bar: Subtle Branding Tag & Cover Upload Button */}
+        <div className="relative mx-auto flex max-w-310 items-center justify-between px-5 pt-5 sm:px-8 sm:pt-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-700/20 bg-white/70 px-3 py-1 text-[11px] font-semibold tracking-wider text-slate-800 shadow-xs backdrop-blur-md">
+            <span className="size-1.5 rounded-full bg-[#1769b0] animate-pulse" />
+            STALKER // TECH PROFILE
+          </div>
+
+          {isOwner ? (
+            <div>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleCoverChange}
+                className="sr-only"
+                aria-label="Upload cover photo"
+              />
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={isUploadingCover}
+                className="group inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-slate-800 shadow-md backdrop-blur-md transition hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] disabled:opacity-75"
+              >
+                {isUploadingCover ? (
+                  <Loader2 aria-hidden="true" className="size-3.5 animate-spin text-[#1769b0]" />
+                ) : (
+                  <Camera aria-hidden="true" className="size-3.5 text-[#1769b0] transition group-hover:scale-110" />
+                )}
+                <span>{isUploadingCover ? "Uploading..." : coverUrl ? "Change cover" : "Add cover photo"}</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Main Profile Info Section */}
+      <div className="mx-auto max-w-310 px-5 pb-6 sm:px-8 sm:pb-9">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+            {/* Circular Avatar Container matching LinkedIn style */}
+            <div className="relative -mt-16 sm:-mt-20">
+              <div className="group relative grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white bg-slate-100 text-3xl font-bold text-[#16436c] shadow-[0_10px_28px_rgba(7,18,34,.18)] sm:size-36">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={`${hero.displayName}'s avatar`}
+                    className={`size-full object-cover ${isLocalArtwork ? "object-right" : "object-center"}`}
+                  />
+                ) : (
+                  <div className="relative grid size-full place-items-center bg-[#e4eaec] text-slate-700">
+                    <span aria-label={`${hero.displayName} initials`} className="font-bold text-[#102c46]">
+                      {hero.initials}
+                    </span>
+                  </div>
+                )}
+
+                {/* Uploading Spinner Overlay */}
+                {isUploadingAvatar ? (
+                  <div className="absolute inset-0 grid place-items-center bg-black/50 backdrop-blur-xs">
+                    <Loader2 aria-hidden="true" className="size-8 animate-spin text-white" />
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Owner Avatar Upload Button */}
+              {isOwner ? (
+                <>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleAvatarChange}
+                    className="sr-only"
+                    aria-label="Upload profile picture"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    aria-label="Upload profile picture"
+                    title="Upload profile picture"
+                    className="absolute bottom-0 right-0 grid size-9.5 place-items-center rounded-full border-2 border-white bg-[#102c46] text-white shadow-md transition hover:bg-[#1769b0] hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] disabled:opacity-75 sm:size-10.5"
+                  >
+                    {isUploadingAvatar ? (
+                      <Loader2 aria-hidden="true" className="size-4.5 animate-spin" />
+                    ) : (
+                      <Camera aria-hidden="true" className="size-4.5" />
+                    )}
+                  </button>
+                </>
+              ) : null}
+            </div>
+
+            {/* Display Name and Username */}
+            <div className="min-w-0 sm:pb-2">
+              <h1 className="wrap-break-word text-[30px] font-bold leading-tight tracking-tight text-[#102c46] sm:text-[40px]">
+                {hero.displayName}
+              </h1>
+              <p className="mt-1 text-sm font-medium text-slate-500">@{hero.username}</p>
+            </div>
+          </div>
+
+          {/* Action Buttons: Share & Dashboard */}
+          <div className="flex flex-wrap gap-2 lg:pt-6">
+            <button
+              type="button"
+              onClick={() => void shareProfile()}
+              className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] ${
+                isOwner
+                  ? "border border-slate-300 bg-white text-[#24435e] hover:bg-slate-50"
+                  : "bg-[#1769b0] text-white hover:bg-[#125994]"
+              }`}
+            >
+              <Share2 aria-hidden="true" className="size-4" />
+              Share profile
+            </button>
+            {isOwner ? (
+              <Link
+                href="/dashboard"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1769b0] px-4 text-sm font-semibold text-white transition hover:bg-[#125994] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0]"
+              >
+                <LayoutDashboard aria-hidden="true" className="size-4" />
+                View dashboard
+              </Link>
+            ) : null}
           </div>
         </div>
-        <div className="min-w-0">
-          <div className="mb-9 flex flex-wrap justify-center gap-3 lg:justify-end"><button type="button" onClick={() => void shareProfile()} className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"><Share2 className="size-4" />Share Profile</button>{isOwner ? <Link href="/dashboard" className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-5 text-xs font-semibold text-white shadow-[0_8px_20px_rgba(5,150,105,.2)] transition hover:bg-emerald-700"><Share2 className="size-4" />View Dashboard</Link> : null}</div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{metrics.map((metric) => { const Icon = metric.icon; const style = metricAccentStyles[metric.accent]; return <div key={metric.label} className="flex min-h-39 flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white/90 px-3 py-4 text-center shadow-[0_8px_28px_rgba(15,23,42,.04)]"><span className={`grid size-9 place-items-center rounded-xl ${style.iconBg} ${style.icon}`}><Icon className="size-5" /></span><strong className="mt-3 text-xl font-bold text-slate-950">{metric.value}</strong><span className="mt-2 text-[11px] font-medium leading-5 text-slate-600">{metric.label}</span></div>; })}</div>
-        </div>
+
+        {hero.bio ? <p className="mt-6 max-w-2xl text-sm leading-6 text-slate-600">{hero.bio}</p> : null}
+        {hero.country || hero.institution || hero.socialLinks.length > 0 ? (
+          <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-[13px] text-slate-600">
+            {hero.country ? (
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin aria-hidden="true" className="size-4 text-[#357db5]" />
+                {hero.country}
+              </span>
+            ) : null}
+            {hero.institution ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Building2 aria-hidden="true" className="size-4 text-[#357db5]" />
+                {hero.institution}
+              </span>
+            ) : null}
+            {hero.socialLinks.map((link) => {
+              const Icon = link.kind === "github" ? CodeXml : BriefcaseBusiness;
+              return (
+                <a
+                  key={link.kind}
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 font-medium text-[#1769b0] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0]"
+                >
+                  <Icon aria-hidden="true" className="size-4" />
+                  {link.label}
+                </a>
+              );
+            })}
+          </div>
+        ) : null}
+
+        <dl className="mt-9 grid grid-cols-2 gap-x-7 gap-y-7 border-y border-slate-200 py-6 lg:grid-cols-4 lg:gap-x-10">
+          {metrics.map((metric) => {
+            const Icon = metric.icon;
+            const style = metricAccentStyles[metric.accent];
+            return (
+              <div key={metric.label} className="min-w-0">
+                <dt className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                  <Icon aria-hidden="true" className={`size-4 shrink-0 ${style.icon}`} />
+                  {metric.label}
+                </dt>
+                <dd
+                  className={`mt-2 wrap-break-word font-bold leading-tight tracking-tight text-[#102c46] ${
+                    metric.label === "Last Synced" ? "text-xl sm:text-2xl" : "text-[29px] sm:text-[34px]"
+                  }`}
+                >
+                  {metric.value}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
       </div>
     </section>
   );

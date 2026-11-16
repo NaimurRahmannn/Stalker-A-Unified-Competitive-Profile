@@ -51,3 +51,9 @@ export async function getCurrentUser(): Promise<User> {
 
   return data;
 }
+
+export async function updateUserProfile(formData: FormData): Promise<User> {
+  const { data } = await api.patch<User>("/accounts/me/update/", formData);
+
+  return data;
+}

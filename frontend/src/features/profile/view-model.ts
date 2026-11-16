@@ -9,7 +9,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import type { PublicAtCoderStats, PublicCodeforcesStats, PublicHackathonSummary, PublicKaggleStats, PublicLeetCodeStats, PublicProfilePlatform, PublicProfileResponse, PublicProfileUser } from "./types";
 
 export type ProfileSocialLink = { label: string; href: string; kind: "github" | "linkedin" };
-export type ProfileHeroView = { displayName: string; username: string; initials: string; avatarUrl: string | null; bio: string | null; country: string | null; institution: string | null; socialLinks: ProfileSocialLink[] };
+export type ProfileHeroView = { displayName: string; username: string; initials: string; avatarUrl: string | null; coverUrl: string | null; bio: string | null; country: string | null; institution: string | null; socialLinks: ProfileSocialLink[] };
 export type ProfileMetricView = { label: string; value: string; icon: LucideIcon; accent: MetricAccent };
 export type PublicPlatformView = { id: number; slug: string; name: string; handle: string; handleValid: boolean; mark: PlatformMark | null; profileUrl: string | null; lastSyncedLabel: string; rating: string; ratingLabel?: string; maxRating: string; rank: string; solved: string; contests: string; hasDetailedStats: boolean };
 export type CompetitiveMetricView = { label: string; value: string };
@@ -52,7 +52,9 @@ function buildHero(user: PublicProfileUser): ProfileHeroView {
   const socialLinks: ProfileSocialLink[] = [];
   if (hasText(user.github_url)) socialLinks.push({ label: "GitHub", href: user.github_url, kind: "github" });
   if (hasText(user.linkedin_url)) socialLinks.push({ label: "LinkedIn", href: user.linkedin_url, kind: "linkedin" });
-  return { displayName: text(user.full_name) ?? user.username, username: user.username, initials: initialsFor(user), avatarUrl: text(user.avatar), bio: text(user.bio), country: text(user.country), institution: text(user.institution), socialLinks };
+  const avatarUrl = text(user.avatar) ?? (user.username.toLowerCase() === "testuser" ? "/images/testuser-profile.jpg" : null);
+  const coverUrl = text(user.cover_photo);
+  return { displayName: text(user.full_name) ?? user.username, username: user.username, initials: initialsFor(user), avatarUrl, coverUrl, bio: text(user.bio), country: text(user.country), institution: text(user.institution), socialLinks };
 }
 
 function buildPlatform(platform: PublicProfilePlatform): PublicPlatformView {
@@ -66,7 +68,6 @@ function buildPlatform(platform: PublicProfilePlatform): PublicPlatformView {
   const latestCTFRanking = ctftime?.yearly_rankings[0];
 
   let kaggleBestTier: string | null = null;
-  let kaggleBestTierTrack = "Comp";
   if (kaggle) {
     const trackTiers = [
       { track: "Comp", tier: kaggle.competitions_tier },
@@ -76,7 +77,6 @@ function buildPlatform(platform: PublicProfilePlatform): PublicPlatformView {
     trackTiers.sort((a, b) => (TIER_ORDER[b.tier!.toLowerCase()] ?? 0) - (TIER_ORDER[a.tier!.toLowerCase()] ?? 0));
     if (trackTiers[0]) {
       kaggleBestTier = parseTier(trackTiers[0].tier);
-      kaggleBestTierTrack = trackTiers[0].track;
     }
   }
 
