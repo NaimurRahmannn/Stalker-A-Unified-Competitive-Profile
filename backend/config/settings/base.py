@@ -162,6 +162,8 @@ CLIST_USERNAME = config("CLIST_USERNAME", default="")
 
 
 STATIC_URL = "static/"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = Path(config("DJANGO_MEDIA_ROOT", default=str(BASE_DIR / "media")))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"
