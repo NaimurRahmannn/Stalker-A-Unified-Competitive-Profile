@@ -20,14 +20,14 @@ function PublicProfileLoading() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <PublicProfileNavbar />
-      <div className="relative h-48 overflow-hidden bg-[#a0b4b7] px-5 pt-6 sm:h-60 md:h-64 lg:h-72">
+      <div className="relative h-36 overflow-hidden bg-[#a0b4b7] px-5 pt-3.5 sm:h-44 sm:pt-4 md:h-48">
         <div className="mx-auto max-w-310 sm:px-3">
           <Block className="h-4 w-40 bg-white/30" />
         </div>
       </div>
       <div className="mx-auto max-w-310 px-5 pb-9 sm:px-8">
         <div className="flex flex-wrap items-end gap-5">
-          <Block className="-mt-16 size-28 rounded-full border-4 border-white bg-slate-300 sm:-mt-20 sm:size-36" />
+          <Block className="-mt-14 size-28 rounded-full border-4 border-white bg-slate-300 sm:-mt-17 sm:size-34" />
           <div className="pb-2">
             <Block className="h-8 w-54" />
             <Block className="mt-3 h-4 w-28" />

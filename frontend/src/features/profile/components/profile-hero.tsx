@@ -78,7 +78,7 @@ function DefaultLinkedInStalkerCover() {
         <img
           src="/images/stalker_monochrome_variant_transparent_generated.png"
           alt="STALKER"
-          className="h-14 w-auto max-w-[44vw] object-contain opacity-35 mix-blend-multiply sm:h-18 md:h-22"
+          className="h-9 w-auto max-w-[40vw] object-contain opacity-35 mix-blend-multiply sm:h-12 md:h-14"
         />
       </div>
     </div>
@@ -197,7 +197,7 @@ export function ProfileHero({
   return (
     <section className="bg-white">
       {/* Cover Photo Banner (LinkedIn default cover structure / custom user image) */}
-      <div className="relative h-48 w-full overflow-hidden sm:h-60 md:h-64 lg:h-72">
+      <div className="relative h-36 w-full overflow-hidden sm:h-44 md:h-48">
         {coverUrl && !coverImageFailed ? (
           <img
             src={coverUrl}
@@ -210,7 +210,7 @@ export function ProfileHero({
         )}
 
         {/* Top Bar: Subtle Branding Tag & Cover Upload Button */}
-        <div className="relative mx-auto flex max-w-310 items-center justify-between px-5 pt-5 sm:px-8 sm:pt-6">
+        <div className="relative mx-auto flex max-w-310 items-center justify-between px-5 pt-3.5 sm:px-8 sm:pt-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-700/20 bg-white/70 px-3 py-1 text-[11px] font-semibold tracking-wider text-slate-800 shadow-xs backdrop-blur-md">
             <span className="size-1.5 rounded-full bg-[#1769b0] animate-pulse" />
             STALKER // TECH PROFILE
@@ -249,8 +249,8 @@ export function ProfileHero({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
             {/* Circular Avatar Container matching LinkedIn style */}
-            <div className="relative -mt-16 sm:-mt-20">
-              <div className="group relative grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white bg-slate-100 text-3xl font-bold text-[#16436c] shadow-[0_10px_28px_rgba(7,18,34,.18)] sm:size-36">
+            <div className="relative -mt-14 sm:-mt-17">
+              <div className="group relative grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white bg-slate-100 text-3xl font-bold text-[#16436c] shadow-[0_10px_28px_rgba(7,18,34,.18)] sm:size-34">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
