@@ -198,19 +198,22 @@ export function ProfileHero({
     <section className="bg-white">
       {/* Cover Photo Banner (LinkedIn default cover structure / custom user image) */}
       <div className="relative h-36 w-full overflow-hidden sm:h-44 md:h-48">
-        {coverUrl && !coverImageFailed ? (
-          <img
-            src={coverUrl}
-            alt={`${hero.displayName}'s cover photo`}
-            className="size-full object-cover object-center"
-            onError={() => setCoverImageFailed(true)}
-          />
-        ) : (
-          <DefaultLinkedInStalkerCover />
-        )}
+        {/* Background Layer */}
+        <div className="absolute inset-0">
+          {coverUrl && !coverImageFailed ? (
+            <img
+              src={coverUrl}
+              alt={`${hero.displayName}'s cover photo`}
+              className="size-full object-cover object-center"
+              onError={() => setCoverImageFailed(true)}
+            />
+          ) : (
+            <DefaultLinkedInStalkerCover />
+          )}
+        </div>
 
-        {/* Top Bar: Subtle Branding Tag & Cover Upload Button */}
-        <div className="relative mx-auto flex max-w-310 items-center justify-between px-5 pt-3.5 sm:px-8 sm:pt-4">
+        {/* Top Bar: Branding Tag & Cover Upload Button */}
+        <div className="relative z-10 mx-auto flex h-full max-w-310 items-start justify-between px-5 pt-3.5 sm:px-8 sm:pt-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-700/20 bg-white/70 px-3 py-1 text-[11px] font-semibold tracking-wider text-slate-800 shadow-xs backdrop-blur-md">
             <span className="size-1.5 rounded-full bg-[#1769b0] animate-pulse" />
             STALKER // TECH PROFILE
@@ -230,14 +233,14 @@ export function ProfileHero({
                 type="button"
                 onClick={() => coverInputRef.current?.click()}
                 disabled={isUploadingCover}
-                className="group inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-slate-800 shadow-md backdrop-blur-md transition hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] disabled:opacity-75"
+                className="group inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-800 shadow-md backdrop-blur-md transition hover:bg-white hover:text-slate-950 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] disabled:opacity-75"
               >
                 {isUploadingCover ? (
                   <Loader2 aria-hidden="true" className="size-3.5 animate-spin text-[#1769b0]" />
                 ) : (
                   <Camera aria-hidden="true" className="size-3.5 text-[#1769b0] transition group-hover:scale-110" />
                 )}
-                <span>{isUploadingCover ? "Uploading..." : coverUrl ? "Change cover" : "Add cover photo"}</span>
+                <span>{isUploadingCover ? "Uploading..." : coverUrl ? "Change cover" : "Upload cover photo"}</span>
               </button>
             </div>
           ) : null}
@@ -250,7 +253,15 @@ export function ProfileHero({
           <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
             {/* Circular Avatar Container matching LinkedIn style */}
             <div className="relative -mt-14 sm:-mt-17">
-              <div className="group relative grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white bg-slate-100 text-3xl font-bold text-[#16436c] shadow-[0_10px_28px_rgba(7,18,34,.18)] sm:size-34">
+              <div
+                onClick={() => {
+                  if (isOwner && !isUploadingAvatar) avatarInputRef.current?.click();
+                }}
+                title={isOwner ? "Click to change profile picture" : undefined}
+                className={`group relative grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white bg-slate-100 text-3xl font-bold text-[#16436c] shadow-[0_10px_28px_rgba(7,18,34,.18)] sm:size-34 ${
+                  isOwner ? "cursor-pointer" : ""
+                }`}
+              >
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
@@ -264,6 +275,13 @@ export function ProfileHero({
                     </span>
                   </div>
                 )}
+
+                {/* Hover camera overlay for owner */}
+                {isOwner && !isUploadingAvatar ? (
+                  <div className="absolute inset-0 grid place-items-center bg-black/35 opacity-0 transition group-hover:opacity-100">
+                    <Camera aria-hidden="true" className="size-7 text-white drop-shadow-md" />
+                  </div>
+                ) : null}
 
                 {/* Uploading Spinner Overlay */}
                 {isUploadingAvatar ? (
@@ -290,7 +308,7 @@ export function ProfileHero({
                     disabled={isUploadingAvatar}
                     aria-label="Upload profile picture"
                     title="Upload profile picture"
-                    className="absolute bottom-0 right-0 grid size-9.5 place-items-center rounded-full border-2 border-white bg-[#102c46] text-white shadow-md transition hover:bg-[#1769b0] hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] disabled:opacity-75 sm:size-10.5"
+                    className="absolute bottom-0 right-0 z-20 grid size-9.5 place-items-center rounded-full border-2 border-white bg-[#102c46] text-white shadow-md transition hover:bg-[#1769b0] hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] disabled:opacity-75 sm:size-10.5"
                   >
                     {isUploadingAvatar ? (
                       <Loader2 aria-hidden="true" className="size-4.5 animate-spin" />
