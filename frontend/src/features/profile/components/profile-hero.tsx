@@ -212,13 +212,8 @@ export function ProfileHero({
           )}
         </div>
 
-        {/* Top Bar: Branding Tag & Cover Upload Button */}
-        <div className="relative z-10 mx-auto flex h-full max-w-310 items-start justify-between px-5 pt-3.5 sm:px-8 sm:pt-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-700/20 bg-white/70 px-3 py-1 text-[11px] font-semibold tracking-wider text-slate-800 shadow-xs backdrop-blur-md">
-            <span className="size-1.5 rounded-full bg-[#1769b0] animate-pulse" />
-            STALKER // TECH PROFILE
-          </div>
-
+        {/* Top Action Bar: Cover Upload Button */}
+        <div className="relative z-10 mx-auto flex h-full max-w-310 items-start justify-end px-5 pt-3.5 sm:px-8 sm:pt-4">
           {isOwner ? (
             <div>
               <input
