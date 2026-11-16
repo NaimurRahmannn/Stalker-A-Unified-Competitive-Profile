@@ -4,7 +4,30 @@ from rest_framework import serializers
 from apps.accounts.models import User
 
 
+def uploaded_image_url(image, request) -> str | None:
+    if not image:
+        return None
+    return request.build_absolute_uri(image.url) if request else image.url
+
+
+def validate_profile_image(image):
+    if image.size > 8 * 1024 * 1024:
+        raise serializers.ValidationError("Image must be smaller than 8 MB.")
+    if image.content_type not in ("image/jpeg", "image/png", "image/webp"):
+        raise serializers.ValidationError("Upload a JPG, PNG, or WebP image.")
+    return image
+
+
 class UserSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+    cover_photo = serializers.SerializerMethodField()
+
+    def get_avatar(self, user: User) -> str | None:
+        return uploaded_image_url(user.avatar_image, self.context.get("request")) or user.avatar or None
+
+    def get_cover_photo(self, user: User) -> str | None:
+        return uploaded_image_url(user.cover_image, self.context.get("request"))
+
     class Meta:
         model = User
         fields = (
@@ -13,6 +36,7 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "full_name",
             "avatar",
+            "cover_photo",
             "bio",
             "country",
             "institution",
@@ -64,11 +88,19 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    def validate_avatar_image(self, image):
+        return validate_profile_image(image)
+
+    def validate_cover_image(self, image):
+        return validate_profile_image(image)
+
     class Meta:
         model = User
         fields = (
             "full_name",
             "avatar",
+            "avatar_image",
+            "cover_image",
             "bio",
             "country",
             "institution",

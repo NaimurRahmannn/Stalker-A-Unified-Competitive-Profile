@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -127,3 +128,31 @@ class AuthEndpointsTests(APITestCase):
         self.assertEqual(response.data["country"], "Bangladesh")
         self.assertEqual(response.data["institution"], "My University")
         self.assertEqual(response.data["github_url"], "https://github.com/example")
+
+    def test_authenticated_avatar_and_cover_upload(self):
+        user = User.objects.create_user(
+            username="upload_user",
+            email="upload@example.com",
+            password="StrongPassword123!",
+        )
+        self.client.force_authenticate(user=user)
+
+        avatar = SimpleUploadedFile("avatar.png", b"fake-png-content", content_type="image/png")
+        cover = SimpleUploadedFile("cover.jpg", b"fake-jpg-content", content_type="image/jpeg")
+
+        response = self.client.patch(
+            reverse("accounts-me-update"),
+            {"avatar_image": avatar, "cover_image": cover},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertTrue(user.avatar_image.name)
+        self.assertTrue(user.cover_image.name)
+        self.assertIsNotNone(response.data.get("avatar"))
+        self.assertIsNotNone(response.data.get("cover_photo"))
+        if user.avatar_image:
+            user.avatar_image.delete(save=False)
+        if user.cover_image:
+            user.cover_image.delete(save=False)

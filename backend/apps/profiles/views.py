@@ -33,7 +33,7 @@ class PublicProfileView(APIView):
 
         return Response(
             {
-                "user": PublicProfileUserSerializer(user).data,
+                "user": PublicProfileUserSerializer(user, context={"request": request}).data,
                 "platforms": PublicProfilePlatformSerializer(
                     platforms,
                     many=True,

@@ -27,7 +27,7 @@ class DashboardMeView(APIView):
 
         return Response(
             {
-                "user": DashboardUserSerializer(request.user).data,
+                "user": DashboardUserSerializer(request.user, context={"request": request}).data,
                 "platforms": DashboardPlatformSerializer(platforms, many=True).data,
                 "competitive_programming": build_competitive_programming_overview(
                     request.user,

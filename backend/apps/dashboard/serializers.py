@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.accounts.serializers import uploaded_image_url
 from apps.connectors.models import (
     AtCoderStats,
     CodeforcesStats,
@@ -17,6 +18,15 @@ from apps.connectors.services import (
 
 
 class DashboardUserSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+    cover_photo = serializers.SerializerMethodField()
+
+    def get_avatar(self, user: User) -> str | None:
+        return uploaded_image_url(user.avatar_image, self.context.get("request")) or user.avatar or None
+
+    def get_cover_photo(self, user: User) -> str | None:
+        return uploaded_image_url(user.cover_image, self.context.get("request"))
+
     class Meta:
         model = User
         fields = (
@@ -25,6 +35,7 @@ class DashboardUserSerializer(serializers.ModelSerializer):
             "email",
             "full_name",
             "avatar",
+            "cover_photo",
             "bio",
             "country",
             "institution",

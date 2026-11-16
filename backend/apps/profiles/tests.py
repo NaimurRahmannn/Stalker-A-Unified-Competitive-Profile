@@ -89,6 +89,7 @@ class PublicProfileEndpointTests(APITestCase):
                 "username": "niamur",
                 "full_name": "Niamur Rahman",
                 "avatar": None,
+                "cover_photo": None,
                 "bio": "Competitive programmer",
                 "country": "Bangladesh",
                 "institution": "My University",
