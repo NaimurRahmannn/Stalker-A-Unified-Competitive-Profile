@@ -243,7 +243,7 @@ export function ProfileHero({
       </div>
 
       {/* Main Profile Info Section */}
-      <div className="mx-auto max-w-310 px-5 pb-6 sm:px-8 sm:pb-9">
+      <div className="mx-auto max-w-310 px-5 pb-2 sm:px-8 sm:pb-4">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
             {/* Circular Avatar Container matching LinkedIn style */}

@@ -32,16 +32,16 @@ function PlatformRow({ platform }: { platform: PublicPlatformView }) {
 
 export function PlatformsOverview({ platforms }: { platforms: PublicPlatformView[] }) {
   return (
-    <section aria-labelledby="platforms-heading" className="py-12 sm:py-14">
+    <section aria-labelledby="platforms-heading" className="pt-3 pb-10 sm:pt-5 sm:pb-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-[#1769b0]">01 / Connections</p>
-          <h2 id="platforms-heading" className="mt-2 text-2xl font-bold tracking-tight text-[#102c46] sm:text-[28px]">Connected platforms</h2>
-          <p className="mt-2 text-sm text-slate-500">Accounts and activity linked to this profile.</p>
+          <h2 id="platforms-heading" className="mt-1 text-2xl font-bold tracking-tight text-[#102c46] sm:text-[28px]">Connected platforms</h2>
+          <p className="mt-1 text-sm text-slate-500">Accounts and activity linked to this profile.</p>
         </div>
         <span className="text-sm font-medium text-slate-500">{platforms.length} {platforms.length === 1 ? "platform" : "platforms"}</span>
       </div>
-      <div className="mt-7 border-t border-slate-300">
+      <div className="mt-5 border-t border-slate-300">
         {platforms.length ? platforms.map((platform) => <PlatformRow key={platform.id} platform={platform} />) : <p className="py-8 text-sm text-slate-500">No platforms connected yet.</p>}
       </div>
     </section>
