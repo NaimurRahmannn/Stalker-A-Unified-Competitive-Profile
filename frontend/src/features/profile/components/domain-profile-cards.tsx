@@ -1,20 +1,41 @@
-import { BarChart3, ExternalLink, ShieldCheck, Trophy } from "lucide-react";
+import { ArrowUpRight, BarChart3, ShieldCheck, Trophy } from "lucide-react";
 import type { DomainCardView } from "../view-model";
 import { ProfilePlatformLogo } from "./profile-platform-logo";
 
 const domainStyle = {
-  ctf: { Icon: ShieldCheck, icon: "bg-blue-50 text-blue-600", border: "border-blue-200 text-blue-600" },
-  hackathon: { Icon: Trophy, icon: "bg-violet-50 text-violet-600", border: "border-violet-200 text-violet-600" },
-  datathon: { Icon: BarChart3, icon: "bg-[#E8F8FE] text-[#087EA4]", border: "border-sky-200 text-[#087EA4] hover:bg-sky-50" },
+  ctf: { Icon: ShieldCheck, color: "text-blue-600" },
+  hackathon: { Icon: Trophy, color: "text-violet-600" },
+  datathon: { Icon: BarChart3, color: "text-cyan-700" },
 };
 
 export function DomainProfileCards({ cards }: { cards: DomainCardView[] }) {
-  return <section aria-label="Specialized profiles" className="grid gap-4 lg:grid-cols-3">{cards.map((card) => { const style = domainStyle[card.key]; const Icon = style.Icon; const metrics = card.metrics ?? (card.key === "ctf" && card.accounts[0] ? [{ label: "Rating", value: card.accounts[0].rating }, { label: "Global rank", value: card.accounts[0].rank }, { label: "Years", value: card.accounts[0].contests }] : [{ label: "Rating", value: "—" }, { label: "Events", value: "—" }, { label: "Awards", value: "—" }]); return (
-    <article key={card.key} className="flex min-h-57 flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-[0_10px_32px_rgba(15,23,42,.03)]">
-      <div className="flex items-center gap-3"><span className={`grid size-8 place-items-center rounded-lg ${style.icon}`}><Icon className="size-4" /></span><div><h2 className="text-xs font-semibold text-slate-950">{card.title}</h2><p className="sr-only">{card.subtitle}</p></div></div>
-      <div className="mt-4 space-y-3">{card.accounts.length ? card.accounts.map((account) => <div key={account.id} className="flex items-center gap-3 border-b border-slate-100 pb-3 last:border-0"><ProfilePlatformLogo mark={account.mark} name={account.name} size="sm" /><div className="min-w-0 flex-1"><p className="truncate text-[11px] font-semibold text-slate-900">{account.name}</p><p className="mt-0.5 truncate text-[9px] text-slate-500">{account.handle}</p></div>{account.handleValid ? <span className="rounded bg-emerald-50 px-2 py-1 text-[8px] font-semibold text-emerald-700">{account.mark === "ctftime" ? "Team found" : account.mark === "kaggle" ? "Linked" : "Handle valid"}</span> : <span className="text-[8px] text-slate-400">Not validated</span>}</div>) : <div className="rounded-lg bg-slate-50 px-4 py-5 text-center"><p className="text-[11px] font-medium text-slate-600">No connected accounts yet</p><p className="mt-1 text-[9px] text-slate-400">Public statistics are unavailable</p></div>}</div>
-      <div className="mt-auto grid grid-cols-3 gap-2 pt-4 text-center">{metrics.map(({ label, value }) => <div key={label}><strong className="block text-sm text-slate-700">{value}</strong><span className="text-[8px] text-slate-400">{label}</span></div>)}</div>
-      {card.accounts[0]?.profileUrl ? <a href={card.accounts[0].profileUrl} target="_blank" rel="noreferrer" className={`mt-4 inline-flex h-8 items-center justify-center gap-2 rounded-lg border text-[9px] font-semibold ${style.border}`}>View {card.accounts[0].name} Profile <ExternalLink className="size-3" /></a> : <button type="button" disabled className={`mt-4 h-8 cursor-not-allowed rounded-lg border text-[9px] font-semibold opacity-60 ${style.border}`}>Profile unavailable</button>}
-    </article>
-  ); })}</section>;
+  return (
+    <section aria-labelledby="domains-heading" className="border-t border-slate-200 py-12 sm:py-14">
+      <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-[#1769b0]">03 / Specializations</p>
+      <h2 id="domains-heading" className="mt-2 text-2xl font-bold tracking-tight text-[#102c46] sm:text-[28px]">Beyond the leaderboard</h2>
+      <p className="mt-2 text-sm text-slate-500">A wider view of this person&apos;s technical work.</p>
+      <div className="mt-9 grid gap-8 lg:grid-cols-3 lg:gap-0">
+        {cards.map((card) => {
+          const style = domainStyle[card.key];
+          const Icon = style.Icon;
+          const metrics = card.metrics ?? (card.key === "ctf" && card.accounts[0]
+            ? [{ label: "Rating", value: card.accounts[0].rating }, { label: "Global rank", value: card.accounts[0].rank }, { label: "Years", value: card.accounts[0].contests }]
+            : [{ label: "Rating", value: "—" }, { label: "Events", value: "—" }, { label: "Awards", value: "—" }]);
+          return (
+            <article key={card.key} className="border-t border-slate-200 pt-6 lg:border-l lg:border-t-0 lg:px-8 lg:pt-0 lg:first:border-l-0 lg:first:pl-0 lg:last:pr-0">
+              <div className="flex items-center gap-3"><Icon aria-hidden="true" className={`size-5 ${style.color}`} /><h3 className="text-lg font-semibold text-[#102c46]">{card.title}</h3></div>
+              <p className="mt-2 min-h-10 text-xs leading-5 text-slate-500">{card.subtitle}</p>
+              <div className="mt-4 min-h-20 space-y-3">
+                {card.accounts.length ? card.accounts.map((account) => <div key={account.id} className="flex items-center gap-3"><ProfilePlatformLogo mark={account.mark} name={account.name} size="sm" /><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{account.name}</p><p className="truncate text-xs text-slate-500">{account.handle}</p></div></div>) : <p className="text-sm text-slate-400">No public account connected</p>}
+              </div>
+              <dl className="mt-5 grid grid-cols-3 gap-3 border-t border-slate-200 pt-4">
+                {metrics.map(({ label, value }) => <div key={label} className="min-w-0"><dt className="text-[11px] text-slate-500">{label}</dt><dd className="mt-1 truncate text-sm font-semibold text-[#102c46]">{value}</dd></div>)}
+              </dl>
+              {card.accounts[0]?.profileUrl ? <a href={card.accounts[0].profileUrl} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-[#1769b0] hover:underline">View {card.accounts[0].name} Profile<ArrowUpRight aria-hidden="true" className="size-4" /></a> : null}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
 }

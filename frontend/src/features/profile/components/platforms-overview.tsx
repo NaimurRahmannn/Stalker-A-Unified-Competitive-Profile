@@ -1,34 +1,48 @@
-import { ExternalLink, Plus } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import type { PublicPlatformView } from "../view-model";
 import { ProfilePlatformLogo } from "./profile-platform-logo";
 
-function PlatformCard({ platform }: { platform: PublicPlatformView }) {
-  const isKaggle = platform.slug === "kaggle";
-  const ratingColor = platform.hasDetailedStats
-    ? (isKaggle ? "text-[#087EA4]" : "text-emerald-600")
-    : "text-slate-400";
+function PlatformRow({ platform }: { platform: PublicPlatformView }) {
   const content = (
     <>
-      <div className="flex items-start gap-3">
+      <div className="flex min-w-0 items-center gap-4">
         <ProfilePlatformLogo mark={platform.mark} slug={platform.slug} name={platform.name} size="lg" />
-        <div className="min-w-0 flex-1"><h3 className="truncate text-xs font-semibold text-slate-950">{platform.name}</h3><p className="mt-1 truncate text-[10px] text-slate-500">{platform.handle}</p></div>
-        {platform.profileUrl ? <ExternalLink className="size-3.5 shrink-0 text-slate-400" /> : null}
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 truncate text-sm font-semibold text-[#102c46] sm:text-base">
+            {platform.name}
+            {platform.profileUrl ? <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" /> : null}
+          </h3>
+          <p className="mt-0.5 truncate text-xs text-slate-500">{platform.handle}</p>
+        </div>
       </div>
-      <div className="mt-8 flex items-end gap-3"><strong className={`text-xl font-bold ${ratingColor}`}>{platform.rating}</strong><div className="pb-0.5"><p className="text-[10px] font-semibold text-slate-800">{platform.ratingLabel ?? "Rating"}</p><p className="mt-0.5 max-w-20 truncate text-[9px] capitalize text-slate-500">{platform.rank}</p></div></div>
-      <div className="mt-auto flex items-center justify-between pt-6"><strong className="text-lg font-semibold text-slate-900">{platform.solved}</strong>{platform.handleValid ? <span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700">{platform.slug === "ctftime" ? "Team found" : platform.slug === "kaggle" ? "Linked" : "Handle valid"}</span> : <span className="rounded bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-500">Not validated</span>}</div>
+      <dl className="grid grid-cols-3 gap-3 lg:col-span-3 lg:gap-7">
+        <div className="min-w-0"><dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{platform.ratingLabel ?? "Rating"}</dt><dd className="mt-1 truncate text-sm font-semibold text-[#102c46]">{platform.rating}</dd></div>
+        <div className="min-w-0"><dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Activity</dt><dd className="mt-1 truncate text-sm font-semibold text-[#102c46]">{platform.solved}</dd></div>
+        <div className="min-w-0"><dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Connection</dt><dd className={`mt-1 flex items-center gap-1.5 text-xs font-medium ${platform.handleValid ? "text-emerald-700" : "text-slate-500"}`}><span className={`size-1.5 shrink-0 rounded-full ${platform.handleValid ? "bg-emerald-500" : "bg-slate-400"}`} />{platform.handleValid ? "Validated" : "Not validated"}</dd></div>
+      </dl>
     </>
   );
-  const className = `flex min-h-49 flex-col rounded-xl border border-slate-200 bg-white p-4 text-left transition ${isKaggle ? "hover:border-sky-300 hover:shadow-sm" : "hover:border-emerald-200 hover:shadow-sm"}`;
-  return platform.profileUrl ? <a href={platform.profileUrl} target="_blank" rel="noreferrer" className={className}>{content}</a> : <article className={className}>{content}</article>;
+  const className = "grid gap-4 border-b border-slate-200 py-5 transition-colors last:border-b-0 lg:grid-cols-4 lg:items-center lg:gap-8";
+  return platform.profileUrl ? (
+    <a href={platform.profileUrl} target="_blank" rel="noreferrer" className={`${className} hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0]`}>{content}</a>
+  ) : (
+    <article className={className}>{content}</article>
+  );
 }
 
 export function PlatformsOverview({ platforms }: { platforms: PublicPlatformView[] }) {
   return (
-    <section aria-labelledby="platforms-heading" className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_10px_32px_rgba(15,23,42,.03)]">
-      <h2 id="platforms-heading" className="text-[15px] font-semibold text-slate-950">Platforms Overview</h2>
-      <div className="mt-5 grid grid-cols-1 gap-3 min-[460px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-        {platforms.map((platform) => <PlatformCard key={platform.id} platform={platform} />)}
-        <div className="flex min-h-49 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/40 p-4 text-center"><Plus className="size-6 text-slate-500" /><p className="mt-4 text-xs font-medium text-slate-700">More Platforms</p><p className="mt-1 text-[10px] text-slate-500">Coming Soon</p></div>
+    <section aria-labelledby="platforms-heading" className="py-12 sm:py-14">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-[#1769b0]">01 / Connections</p>
+          <h2 id="platforms-heading" className="mt-2 text-2xl font-bold tracking-tight text-[#102c46] sm:text-[28px]">Connected platforms</h2>
+          <p className="mt-2 text-sm text-slate-500">Accounts and activity linked to this profile.</p>
+        </div>
+        <span className="text-sm font-medium text-slate-500">{platforms.length} {platforms.length === 1 ? "platform" : "platforms"}</span>
+      </div>
+      <div className="mt-7 border-t border-slate-300">
+        {platforms.length ? platforms.map((platform) => <PlatformRow key={platform.id} platform={platform} />) : <p className="py-8 text-sm text-slate-500">No platforms connected yet.</p>}
       </div>
     </section>
   );
