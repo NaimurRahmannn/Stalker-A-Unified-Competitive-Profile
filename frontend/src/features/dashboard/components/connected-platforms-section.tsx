@@ -40,7 +40,7 @@ function PlatformMiniCard({ platform }: { platform: ConnectedPlatform }) {
       : "bg-orange-50 text-orange-700 ring-1 ring-orange-200";
 
   return (
-    <article className={`${dashboardCardSurface} flex min-h-38 flex-col items-center justify-between p-3 text-center transition duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_22px_46px_rgba(15,23,42,0.1)]`}>
+    <article className={`${dashboardCardSurface} flex min-h-38 flex-col items-center justify-between p-3 text-center`}>
       <PlatformMark mark={platform.mark} />
       <div className="min-w-0">
         <p className="truncate text-xs font-semibold text-slate-950">
@@ -74,9 +74,9 @@ function AddPlatformCard() {
   return (
     <Link
       href="/platforms"
-      className="flex min-h-38 flex-col items-center justify-center gap-3 rounded-[22px] border border-dashed border-blue-200 bg-[linear-gradient(155deg,#ffffff_0%,#eff6ff_100%)] p-3 text-center text-blue-700 shadow-[0_16px_42px_rgba(15,23,42,0.045)] transition duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-[0_22px_46px_rgba(15,23,42,0.09)]"
+      className="ui-card ui-card-interactive flex min-h-38 flex-col items-center justify-center gap-3 border-dashed p-3 text-center text-primary"
     >
-      <span className="grid size-10 place-items-center rounded-xl border border-blue-200 bg-white">
+      <span className="grid size-10 place-items-center rounded-xl border border-primary/20 bg-primary-soft">
         <span className="text-2xl font-light leading-none">+</span>
       </span>
       <span className="text-xs font-semibold">Add Platform</span>

@@ -41,7 +41,7 @@ export function PublicProfileActions({ username }: PublicProfileActionsProps) {
     <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-max sm:flex-row sm:items-center">
       <Link
         href={profilePath}
-        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-[13px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+        className="ui-button ui-button-primary shrink-0 text-[13px]"
       >
         <ExternalLink className="size-4" />
         View Public Profile
@@ -50,9 +50,9 @@ export function PublicProfileActions({ username }: PublicProfileActionsProps) {
       <button
         type="button"
         onClick={copyProfileLink}
-        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
+        className="ui-button ui-button-secondary shrink-0 text-[13px]"
       >
-        <Copy className="size-4 text-blue-600" />
+        <Copy className="size-4" />
         Copy Profile Link
       </button>
     </div>

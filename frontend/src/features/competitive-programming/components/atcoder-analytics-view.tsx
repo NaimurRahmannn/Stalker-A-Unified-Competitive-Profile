@@ -16,7 +16,7 @@ const metrics = [
 
 export function AtCoderAnalyticsView({ analytics, onSync, isSyncing, cooldownSeconds }: { analytics: AtCoderAnalyticsResponse; onSync: () => void; isSyncing: boolean; cooldownSeconds: number }) {
   if (!analytics.account) {
-    return <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm"><h2 className="text-lg font-semibold text-slate-950">Connect AtCoder to start tracking your progress</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">Add your AtCoder handle, then sync to load Algorithm ratings and indexed submissions.</p><Link href="/platforms" className="mt-6 inline-flex h-10 items-center rounded-xl bg-emerald-600 px-5 text-xs font-semibold text-white hover:bg-emerald-700">Connect AtCoder</Link></div>;
+    return <div className="ui-card border-dashed px-6 py-16 text-center"><h2 className="text-lg font-semibold text-slate-950">Connect AtCoder to start tracking your progress</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">Add your AtCoder handle, then sync to load Algorithm ratings and indexed submissions.</p><Link href="/platforms" className="ui-button ui-button-primary mt-6">Connect AtCoder</Link></div>;
   }
   const stats = analytics.stats;
   const values = { solved: stats ? `${stats.solved_count}${stats.submission_stats_complete ? "" : "+"}` : "—", contests: stats ? String(stats.rated_contest_count) : "—", rating: stats ? (stats.current_rating === null ? "Unrated" : String(stats.current_rating)) : "—", max: stats ? (stats.max_rating === null ? "Unrated" : String(stats.max_rating)) : "—" };

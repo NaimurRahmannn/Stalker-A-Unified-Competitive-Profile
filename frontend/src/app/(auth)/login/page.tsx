@@ -67,7 +67,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="ui-button ui-button-primary ui-button-lg mt-1"
         >
           {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
           {isSubmitting ? "Signing in..." : "Sign in"}

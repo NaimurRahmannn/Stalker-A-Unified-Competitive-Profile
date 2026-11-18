@@ -33,11 +33,12 @@ export function TextField({
         placeholder={placeholder}
         autoComplete={autoComplete}
         aria-invalid={error ? "true" : "false"}
-        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 aria-[invalid=true]:border-red-300 aria-[invalid=true]:focus:ring-red-100"
+        aria-describedby={error ? `${id}-error` : undefined}
+        className="ui-input h-11"
         {...registration}
       />
       {error ? (
-        <p className="mt-1 text-xs font-medium text-red-600">{error}</p>
+        <p id={`${id}-error`} role="alert" className="mt-1 text-xs font-medium text-destructive">{error}</p>
       ) : null}
     </div>
   );

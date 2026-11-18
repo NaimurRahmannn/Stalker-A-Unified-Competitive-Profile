@@ -146,15 +146,13 @@ function SidebarLink({ item }: { item: SidebarItem }) {
       href={item.href}
       className={`group flex min-h-12 items-center gap-3 rounded-xl border-l-[3px] px-3 py-2 text-sm font-medium transition ${
         item.active
-          ? item.id === "datathon"
-            ? "border-[#20BEFF] bg-[#E8F8FE] text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.03)]"
-            : "border-emerald-500 bg-emerald-50/70 text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.03)]"
+          ? "border-primary bg-primary-soft text-indigo-900"
           : "border-transparent text-slate-700 hover:bg-slate-50 hover:text-slate-950"
       }`}
     >
       <span
         className={`grid size-8 shrink-0 place-items-center rounded-lg ${
-          item.active ? item.id === "datathon" ? "bg-white text-[#087EA4]" : "bg-white text-emerald-600" : accent.iconBg
+          item.active ? "bg-white text-primary" : accent.iconBg
         } ${item.active ? "" : accent.icon}`}
       >
         <Icon className="size-4" />
@@ -303,7 +301,7 @@ export function DashboardSidebar({
           type="button"
           id="sidebar-user-menu-toggle"
           onClick={() => setMenuOpen((prev) => !prev)}
-          className="w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)]"
+          className="w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300"
         >
           <div className="flex items-center gap-3">
             <div

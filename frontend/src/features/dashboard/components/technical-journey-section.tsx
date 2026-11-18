@@ -28,14 +28,14 @@ function JourneyCard({ item }: { item: JourneyItem }) {
   const accent = journeyAccentStyles[item.accent];
   const hasSparkline = item.sparkline && item.sparkline.length > 1;
   const actionLabel = item.actionLabel ?? "View Details";
-  const actionClass = `inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border text-xs font-semibold shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${accent.button} ${accent.buttonText}`;
+  const actionClass = "ui-button ui-button-secondary w-full text-xs";
 
   return (
-    <article className="group relative flex h-full min-h-96 flex-col overflow-hidden rounded-[22px] border border-slate-200/80 bg-[linear-gradient(155deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_16px_42px_rgba(15,23,42,0.055)] transition duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_24px_55px_rgba(15,23,42,0.11)]">
+    <article className="ui-card group relative flex h-full min-h-96 flex-col overflow-hidden p-5">
       <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${accent.rail}`} />
 
       <div className="flex min-h-13 items-center gap-3">
-        <span className={`grid size-11 shrink-0 place-items-center rounded-2xl border border-white shadow-[0_5px_12px_rgba(15,23,42,0.08)] ${accent.iconBg} ${accent.icon}`}>
+        <span className={`grid size-11 shrink-0 place-items-center rounded-xl ${accent.iconBg} ${accent.icon}`}>
           <Icon className="size-5" />
         </span>
         <div className="min-w-0">

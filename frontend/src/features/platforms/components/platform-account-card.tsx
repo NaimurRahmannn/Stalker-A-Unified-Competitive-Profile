@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
 import {
   ExternalLink,
-  Loader2,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
@@ -12,6 +11,8 @@ import {
 } from "lucide-react";
 import type { PlatformAccount } from "@/features/platforms/types";
 import { formatPlatformName, formatRelativeTime } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type PlatformAccountCardProps = {
   account: PlatformAccount;
@@ -119,12 +120,12 @@ function ProviderStats({ account }: { account: PlatformAccount }) {
   );
 }
 
-function StatusBadge({ valid, children }: { valid: boolean; children: ReactNode }) {
+function AccountStatusBadge({ valid, children }: { valid: boolean; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${valid ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-orange-50 text-orange-700 ring-1 ring-orange-200"}`}>
+    <StatusBadge tone={valid ? "success" : "warning"}>
       {valid ? <ShieldCheck className="size-3.5" /> : <ShieldAlert className="size-3.5" />}
       {children}
-    </span>
+    </StatusBadge>
   );
 }
 
@@ -168,7 +169,7 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
   };
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.035)] transition hover:shadow-[0_14px_32px_rgba(15,23,42,0.06)] sm:p-5">
+    <article className="ui-card p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-slate-50 ring-1 ring-slate-100">
@@ -184,8 +185,8 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          <StatusBadge valid={account.handle_validated}>{account.platform === "ctftime" ? (account.handle_validated ? "Team found" : "Team not validated") : (account.handle_validated ? "Handle valid" : "Handle not validated")}</StatusBadge>
-          {account.platform !== "ctftime" ? <StatusBadge valid={account.ownership_verified}>{account.ownership_verified ? "Ownership verified" : "Ownership not verified"}</StatusBadge> : null}
+          <AccountStatusBadge valid={account.handle_validated}>{account.platform === "ctftime" ? (account.handle_validated ? "Team found" : "Team not validated") : (account.handle_validated ? "Handle valid" : "Handle not validated")}</AccountStatusBadge>
+          {account.platform !== "ctftime" ? <AccountStatusBadge valid={account.ownership_verified}>{account.ownership_verified ? "Ownership verified" : "Ownership not verified"}</AccountStatusBadge> : null}
         </div>
       </div>
 
@@ -200,14 +201,14 @@ export function PlatformAccountCard({ account, onSync, onDelete }: PlatformAccou
       ) : null}
 
       <div className="mt-4 flex items-center gap-2">
-        <button type="button" onClick={handleSync} disabled={isSyncDisabled} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-          {isSyncing ? <Loader2 className="size-4 animate-spin text-blue-600" /> : <RefreshCw className="size-4 text-blue-600" />}
+        <Button type="button" variant="secondary" size="sm" onClick={handleSync} disabled={isSyncDisabled} loading={isSyncing}>
+          {!isSyncing && <RefreshCw className="size-4 text-primary" />}
           {syncLabel}
-        </button>
-        <button type="button" onClick={handleDelete} disabled={isBusy} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-red-100 bg-white px-3 text-[13px] font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
-          {isDeleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={handleDelete} disabled={isBusy} loading={isDeleting} className="text-destructive">
+          {!isDeleting && <Trash2 className="size-4" />}
           {isDeleting ? "Removing..." : "Delete"}
-        </button>
+        </Button>
       </div>
     </article>
   );

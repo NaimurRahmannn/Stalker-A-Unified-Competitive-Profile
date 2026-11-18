@@ -59,7 +59,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
           <select
             id="platform"
             aria-label="Platform"
-            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+            className="ui-input h-11 font-medium"
             {...register("platform")}
           >
             <option value="codeforces">Codeforces</option>
@@ -85,7 +85,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
             spellCheck={false}
             placeholder={isCTFtime ? "e.g. 1005" : selectedPlatform === "kaggle" ? "e.g. alexisbcook" : "e.g. tourist"}
             aria-invalid={errors.handle ? "true" : "false"}
-            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+            className="ui-input h-11"
             {...register("handle")}
           />
           {errors.handle ? (
@@ -98,7 +98,7 @@ export function ConnectPlatformForm({ onConnect }: ConnectPlatformFormProps) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:mt-6"
+          className="ui-button ui-button-primary ui-button-lg shrink-0 sm:mt-6"
         >
           {isSubmitting ? (
             <Loader2 className="size-4 animate-spin" />

@@ -218,7 +218,7 @@ export function ContestsPageContent() {
     <div className="min-w-0 bg-slate-50">
       <DashboardMobileNav activeItem="contests" />
       <div className="mx-auto max-w-7xl space-y-6 p-5 sm:p-6 lg:p-8">
-        <header className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white p-5 sm:p-7">
+        <header className="ui-card border-l-4 border-l-domain-cp p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700">Contest schedule</p>
@@ -253,18 +253,18 @@ export function ContestsPageContent() {
               <label className="relative block min-w-0">
                 <span className="sr-only">Search loaded contests</span>
                 <Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search loaded contests" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search loaded contests" className="ui-input pl-9" />
               </label>
               <div aria-label="Contest status" className="flex rounded-xl bg-slate-100 p-1">
                 {(["all", "live", "upcoming"] as const).map((value) => (
-                  <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition lg:flex-none ${filter === value ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+                  <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className="ui-tab flex-1 capitalize lg:flex-none">
                     {value}
                   </button>
                 ))}
               </div>
               <label className="block min-w-0">
                 <span className="sr-only">Filter loaded contests by platform</span>
-                <select value={platform} onChange={(event) => setPlatform(event.target.value)} className="h-10 w-full max-w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 lg:w-44">
+                <select value={platform} onChange={(event) => setPlatform(event.target.value)} className="ui-input max-w-full lg:w-44">
                   <option value="">All platforms</option>
                   {platforms.map((name) => <option key={name} value={name}>{name}</option>)}
                 </select>
@@ -279,7 +279,7 @@ export function ContestsPageContent() {
           ) : error ? (
             <div role="alert" className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center">
               <p className="text-sm font-semibold text-slate-900">Contests are unavailable right now.</p>
-              <button type="button" onClick={() => { setLoading(true); setRetryVersion((version) => version + 1); }} className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Try again</button>
+              <button type="button" onClick={() => { setLoading(true); setRetryVersion((version) => version + 1); }} className="ui-button ui-button-primary mt-4">Try again</button>
             </div>
           ) : visibleEvents.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-600">

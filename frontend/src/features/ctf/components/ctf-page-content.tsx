@@ -35,6 +35,14 @@ function PageHeader({ tab, onTabChange }: { tab: Tab; onTabChange: (tab: Tab) =>
     { id: "overview", label: "Overview" },
     { id: "ctftime", label: "CTFtime" },
   ];
+  function moveTab(event: React.KeyboardEvent<HTMLButtonElement>, current: Tab) {
+    const index = tabs.findIndex((item) => item.id === current);
+    const next = event.key === "ArrowRight" ? tabs[(index + 1) % tabs.length] : event.key === "ArrowLeft" ? tabs[(index + tabs.length - 1) % tabs.length] : event.key === "Home" ? tabs[0] : event.key === "End" ? tabs[tabs.length - 1] : null;
+    if (!next) return;
+    event.preventDefault();
+    onTabChange(next.id);
+    document.getElementById(`ctf-tab-${next.id}`)?.focus();
+  }
   return (
     <header>
       <div className="flex items-center gap-3">
@@ -44,9 +52,9 @@ function PageHeader({ tab, onTabChange }: { tab: Tab; onTabChange: (tab: Tab) =>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
         Track your CTFtime team profile and yearly rankings from data cached by STALKER.
       </p>
-      <div role="tablist" aria-label="CTF platform" className="mt-5 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+      <div role="tablist" aria-label="CTF platform" className="mt-5 inline-flex rounded-xl border border-slate-200 bg-white p-1">
         {tabs.map((item) => (
-          <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => onTabChange(item.id)} className={`h-9 rounded-lg px-4 text-xs font-semibold transition ${tab === item.id ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
+          <button key={item.id} id={`ctf-tab-${item.id}`} type="button" role="tab" aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} onClick={() => onTabChange(item.id)} onKeyDown={(event) => moveTab(event, item.id)} className="ui-tab">
             {item.label}
           </button>
         ))}

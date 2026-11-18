@@ -77,7 +77,7 @@ export function HackathonPageContent() {
     <div className="min-w-0"><DashboardMobileNav activeItem="hackathon" /><div className="mx-auto max-w-7xl space-y-6 p-5 sm:p-6 lg:p-8">
       <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-[28px] font-semibold text-slate-950">Hackathons</h1>
         <p className="mt-1 text-sm text-slate-600 sm:text-base">Track your hackathon participation, projects, and achievements.</p></div>
-        <button type="button" onClick={() => setAdding(true)} disabled={!user} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50">Add Hackathon</button></header>
+        <button type="button" onClick={() => setAdding(true)} disabled={!user} className="ui-button ui-button-primary">Add Hackathon</button></header>
       {authLoading || !user || loading ? <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading hackathons…</div> : <>
         {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error} <button type="button" onClick={() => void refresh()} className="ml-2 font-semibold underline">Retry</button></div>}
         {fetching && <p role="status" className="text-xs text-violet-700">Updating results…</p>}

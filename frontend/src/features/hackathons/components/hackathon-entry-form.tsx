@@ -10,7 +10,7 @@ import type { Event, Project } from "../types";
 import { getApiErrorMessage } from "@/lib/utils";
 import { useState } from "react";
 
-const input = "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100";
+const input = "ui-input mt-1";
 const label = "block text-xs font-semibold text-slate-600";
 
 export function HackathonEntryForm({ onSaved, onCancel }: { onSaved: () => Promise<void>; onCancel: () => void }) {
@@ -60,7 +60,7 @@ export function HackathonEntryForm({ onSaved, onCancel }: { onSaved: () => Promi
     </section>
     <section className="border-t border-slate-100 pt-5"><h3 className="font-semibold text-violet-700">5. Review & save</h3><p className="mt-1 text-sm text-slate-600">{eventMode === "new" ? values.name || "New hackathon" : "Existing hackathon"} · {values.status} · {projectMode === "none" ? "No project" : "Project and submission"} · {fields.length} achievement{fields.length === 1 ? "" : "s"}</p></section>
     {serverError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{serverError}</p>}
-    <div className="flex gap-3"><button disabled={isSubmitting} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{isSubmitting ? "Saving…" : "Save hackathon"}</button><button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm">Cancel</button></div>
+    <div className="flex gap-3"><button disabled={isSubmitting} className="ui-button ui-button-primary">{isSubmitting ? "Saving…" : "Save hackathon"}</button><button type="button" onClick={onCancel} className="ui-button ui-button-secondary">Cancel</button></div>
   </form>;
 }
 

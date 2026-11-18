@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import {
   BriefcaseBusiness,
@@ -98,24 +98,18 @@ export function ProfileHero({
   const isOwner = Boolean(user && user.username.toLowerCase() === hero.username.toLowerCase());
   const isLocalArtwork = hero.avatarUrl === "/images/testuser-profile.jpg";
 
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(hero.avatarUrl);
-  const [coverUrl, setCoverUrl] = useState<string | null>(hero.coverUrl);
-  const [coverImageFailed, setCoverImageFailed] = useState(false);
+  const [avatarOverride, setAvatarOverride] = useState<{ source: string | null; url: string | null } | null>(null);
+  const [coverOverride, setCoverOverride] = useState<{ source: string | null; url: string | null } | null>(null);
+  const [failedCoverUrl, setFailedCoverUrl] = useState<string | null>(null);
+  const avatarUrl = avatarOverride?.source === hero.avatarUrl ? avatarOverride.url : hero.avatarUrl;
+  const coverUrl = coverOverride?.source === hero.coverUrl ? coverOverride.url : hero.coverUrl;
+  const coverImageFailed = failedCoverUrl === coverUrl;
 
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setAvatarUrl(hero.avatarUrl);
-  }, [hero.avatarUrl]);
-
-  useEffect(() => {
-    setCoverUrl(hero.coverUrl);
-    setCoverImageFailed(false);
-  }, [hero.coverUrl]);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -135,19 +129,19 @@ export function ProfileHero({
 
     const previousUrl = avatarUrl;
     const previewUrl = URL.createObjectURL(file);
-    setAvatarUrl(previewUrl);
+    setAvatarOverride({ source: hero.avatarUrl, url: previewUrl });
     setIsUploadingAvatar(true);
 
     try {
       const formData = new FormData();
       formData.append("avatar_image", file);
       const updatedUser = await updateUserProfile(formData);
-      setAvatarUrl(updatedUser.avatar ?? previewUrl);
+      setAvatarOverride({ source: hero.avatarUrl, url: updatedUser.avatar ?? previewUrl });
       await refreshUser();
       onProfileUpdated?.();
       toast.success("Profile photo updated successfully");
     } catch (err) {
-      setAvatarUrl(previousUrl);
+      setAvatarOverride({ source: hero.avatarUrl, url: previousUrl });
       toast.error(getApiErrorMessage(err, "Failed to update profile photo"));
     } finally {
       setIsUploadingAvatar(false);
@@ -173,20 +167,20 @@ export function ProfileHero({
 
     const previousUrl = coverUrl;
     const previewUrl = URL.createObjectURL(file);
-    setCoverUrl(previewUrl);
-    setCoverImageFailed(false);
+    setCoverOverride({ source: hero.coverUrl, url: previewUrl });
+    setFailedCoverUrl(null);
     setIsUploadingCover(true);
 
     try {
       const formData = new FormData();
       formData.append("cover_image", file);
       const updatedUser = await updateUserProfile(formData);
-      setCoverUrl(updatedUser.cover_photo ?? previewUrl);
+      setCoverOverride({ source: hero.coverUrl, url: updatedUser.cover_photo ?? previewUrl });
       await refreshUser();
       onProfileUpdated?.();
       toast.success("Cover photo updated successfully");
     } catch (err) {
-      setCoverUrl(previousUrl);
+      setCoverOverride({ source: hero.coverUrl, url: previousUrl });
       toast.error(getApiErrorMessage(err, "Failed to update cover photo"));
     } finally {
       setIsUploadingCover(false);
@@ -205,7 +199,7 @@ export function ProfileHero({
               src={coverUrl}
               alt={`${hero.displayName}'s cover photo`}
               className="size-full object-cover object-center"
-              onError={() => setCoverImageFailed(true)}
+              onError={() => setFailedCoverUrl(coverUrl)}
             />
           ) : (
             <DefaultLinkedInStalkerCover />
@@ -228,12 +222,12 @@ export function ProfileHero({
                 type="button"
                 onClick={() => coverInputRef.current?.click()}
                 disabled={isUploadingCover}
-                className="group inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-800 shadow-md backdrop-blur-md transition hover:bg-white hover:text-slate-950 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] disabled:opacity-75"
+                className="ui-button ui-button-secondary ui-button-sm bg-white/95"
               >
                 {isUploadingCover ? (
-                  <Loader2 aria-hidden="true" className="size-3.5 animate-spin text-[#1769b0]" />
+                  <Loader2 aria-hidden="true" className="size-3.5 animate-spin text-primary" />
                 ) : (
-                  <Camera aria-hidden="true" className="size-3.5 text-[#1769b0] transition group-hover:scale-110" />
+                  <Camera aria-hidden="true" className="size-3.5 text-primary" />
                 )}
                 <span>{isUploadingCover ? "Uploading..." : coverUrl ? "Change cover" : "Upload cover photo"}</span>
               </button>
@@ -252,6 +246,12 @@ export function ProfileHero({
                 onClick={() => {
                   if (isOwner && !isUploadingAvatar) avatarInputRef.current?.click();
                 }}
+                onKeyDown={(event) => {
+                  if (isOwner && !isUploadingAvatar && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); avatarInputRef.current?.click(); }
+                }}
+                role={isOwner ? "button" : undefined}
+                tabIndex={isOwner ? 0 : undefined}
+                aria-label={isOwner ? "Change profile picture" : undefined}
                 title={isOwner ? "Click to change profile picture" : undefined}
                 className={`group relative grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white bg-slate-100 text-3xl font-bold text-[#16436c] shadow-[0_10px_28px_rgba(7,18,34,.18)] sm:size-34 ${
                   isOwner ? "cursor-pointer" : ""
@@ -303,7 +303,7 @@ export function ProfileHero({
                     disabled={isUploadingAvatar}
                     aria-label="Upload profile picture"
                     title="Upload profile picture"
-                    className="absolute bottom-0 right-0 z-20 grid size-9.5 place-items-center rounded-full border-2 border-white bg-[#102c46] text-white shadow-md transition hover:bg-[#1769b0] hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] disabled:opacity-75 sm:size-10.5"
+                    className="absolute bottom-0 right-0 z-20 grid size-10 place-items-center rounded-full border-2 border-white bg-primary text-white shadow-sm transition-colors hover:bg-primary-hover sm:size-11"
                   >
                     {isUploadingAvatar ? (
                       <Loader2 aria-hidden="true" className="size-4.5 animate-spin" />
@@ -317,7 +317,7 @@ export function ProfileHero({
 
             {/* Display Name and Username */}
             <div className="min-w-0 sm:pb-2">
-              <h1 className="wrap-break-word text-[30px] font-bold leading-tight tracking-tight text-[#102c46] sm:text-[40px]">
+              <h1 className="wrap-break-word text-[30px] font-semibold leading-tight tracking-tight text-foreground sm:text-[40px]">
                 {hero.displayName}
               </h1>
               <p className="mt-1 text-sm font-medium text-slate-500">@{hero.username}</p>
@@ -329,11 +329,7 @@ export function ProfileHero({
             <button
               type="button"
               onClick={() => void shareProfile()}
-              className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0] ${
-                isOwner
-                  ? "border border-slate-300 bg-white text-[#24435e] hover:bg-slate-50"
-                  : "bg-[#1769b0] text-white hover:bg-[#125994]"
-              }`}
+              className={`ui-button ui-button-lg ${isOwner ? "ui-button-secondary" : "ui-button-primary"}`}
             >
               <Share2 aria-hidden="true" className="size-4" />
               Share profile
@@ -341,7 +337,7 @@ export function ProfileHero({
             {isOwner ? (
               <Link
                 href="/dashboard"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1769b0] px-4 text-sm font-semibold text-white transition hover:bg-[#125994] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0]"
+                className="ui-button ui-button-primary ui-button-lg"
               >
                 <LayoutDashboard aria-hidden="true" className="size-4" />
                 View dashboard
@@ -373,7 +369,7 @@ export function ProfileHero({
                   href={link.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 font-medium text-[#1769b0] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769b0]"
+                  className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
                 >
                   <Icon aria-hidden="true" className="size-4" />
                   {link.label}
@@ -394,7 +390,7 @@ export function ProfileHero({
                   {metric.label}
                 </dt>
                 <dd
-                  className={`mt-2 wrap-break-word font-bold leading-tight tracking-tight text-[#102c46] ${
+                  className={`mt-2 wrap-break-word font-mono font-semibold leading-tight tracking-tight tabular-nums text-foreground ${
                     metric.label === "Last Synced" ? "text-xl sm:text-2xl" : "text-[29px] sm:text-[34px]"
                   }`}
                 >

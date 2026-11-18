@@ -9,7 +9,6 @@ import { getApiErrorMessage } from "@/lib/utils";
 import { ConnectedPlatformsSection } from "./connected-platforms-section";
 import { DashboardTopHeader } from "./dashboard-top-header";
 import { MetricCardsSection } from "./metric-cards-section";
-import { RecentAchievementsSection } from "./recent-achievements-section";
 import { RightWidgetsPanel } from "./right-widgets-panel";
 import { TechnicalJourneySection } from "./technical-journey-section";
 
@@ -82,7 +81,6 @@ function DashboardLoadingState() {
             <div className="h-5 w-44 animate-pulse rounded bg-slate-200" />
             <CardsSkeleton count={4} />
           </section>
-          <SectionSkeleton />
           <SectionSkeleton />
         </section>
         <aside className="min-w-0 border-t border-slate-200 bg-white p-5 sm:p-6 lg:p-8 xl:border-l xl:border-t-0 xl:px-5 xl:py-8">
@@ -243,7 +241,6 @@ export function DashboardPageContent() {
                 />
               </div>
 
-              <RecentAchievementsSection />
             </section>
 
             <aside className="min-w-0 border-t border-slate-200 bg-white p-5 sm:p-6 lg:p-8 xl:border-l xl:border-t-0 xl:px-5 xl:py-8">

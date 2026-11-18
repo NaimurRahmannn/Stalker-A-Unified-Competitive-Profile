@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AxiosError } from "axios";
 import { Trophy } from "lucide-react";
 import { getApiErrorMessage } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { verificationLabel } from "@/features/hackathons/verification";
 import { getPublicHackathonProject } from "../../api";
 import type { PublicHackathonProjectDetail } from "../../types";
@@ -12,7 +13,7 @@ import { safeExternalUrl } from "./safe-external-url";
 
 function External({ href, children }: { href: string | null; children: React.ReactNode }) {
   const safe = safeExternalUrl(href);
-  return safe ? <a href={safe} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-violet-700 underline underline-offset-2">{children}</a> : null;
+  return safe ? <a href={safe} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary underline underline-offset-2">{children}</a> : null;
 }
 
 export function PublicProjectDetailContent({ detail, username }: { detail: PublicHackathonProjectDetail; username: string }) {
@@ -21,9 +22,9 @@ export function PublicProjectDetailContent({ detail, username }: { detail: Publi
   const image = safeExternalUrl(project.image_url);
   return <main className="min-h-screen bg-slate-50 px-5 py-8 text-slate-900 sm:px-8">
     <div className="mx-auto max-w-5xl space-y-6">
-      <Link href={`/profile/${encodeURIComponent(username)}`} className="text-sm font-semibold text-violet-700 underline">Back to {username}&apos;s profile</Link>
-      <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex h-64 items-center justify-center bg-gradient-to-br from-violet-100 via-indigo-50 to-slate-100">
+      <Link href={`/profile/${encodeURIComponent(username)}`} className="text-sm font-semibold text-primary underline">Back to {username}&apos;s profile</Link>
+      <article className="ui-card overflow-hidden">
+        <div className="flex h-64 items-center justify-center bg-domain-hackathon/10">
           {image && !imageFailed ? <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={image} alt="" className="h-full w-full object-cover" onError={() => setImageFailed(true)} />
@@ -41,7 +42,7 @@ export function PublicProjectDetailContent({ detail, username }: { detail: Publi
             <External href={project.video_url}>Video</External></div>
         </div>
       </article>
-      <section aria-labelledby="project-submissions" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section aria-labelledby="project-submissions" className="ui-card p-6">
         <h2 id="project-submissions" className="text-lg font-semibold">Public hackathon submissions</h2>
         {detail.submission_count > 20 && <p className="mt-1 text-xs text-slate-500">Showing the latest 20 of {detail.submission_count} submissions.</p>}
         {submissions.length ? <ul className="mt-4 space-y-3">{submissions.map((row) => <li key={row.id} className="rounded-xl border border-slate-100 p-4">
@@ -49,12 +50,12 @@ export function PublicProjectDetailContent({ detail, username }: { detail: Publi
             <External href={row.submission_url}>Submission</External></div></li>)}</ul> :
           <p className="mt-3 text-sm text-slate-500">No submitted work has been shared for this project.</p>}
       </section>
-      <section aria-labelledby="project-achievements" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section aria-labelledby="project-achievements" className="ui-card p-6">
         <h2 id="project-achievements" className="text-lg font-semibold">Public achievements</h2>
         {detail.achievement_count > 20 && <p className="mt-1 text-xs text-slate-500">Showing the latest 20 of {detail.achievement_count} achievements.</p>}
         {achievements.length ? <ul className="mt-4 space-y-3">{achievements.map((row) => <li key={row.id} className="rounded-xl border border-slate-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="font-medium">{row.title}</h3>
-            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${row.verification_status === "verified" ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>{verificationLabel[row.verification_status]}</span></div>
+            <StatusBadge tone={row.verification_status === "verified" ? "success" : "neutral"}>{verificationLabel[row.verification_status]}</StatusBadge></div>
           <p className="mt-1 text-xs capitalize text-slate-500">{row.achievement_type.replaceAll("_", " ")}{row.rank != null ? ` · Rank ${row.rank}` : ""}</p>
           {row.description && <p className="mt-2 text-sm text-slate-600">{row.description}</p>}</li>)}</ul> :
           <p className="mt-3 text-sm text-slate-500">No achievements have been shared for this project.</p>}
@@ -77,11 +78,11 @@ export function PublicProjectDetail({ username, projectId }: { username: string;
     return () => { active = false; };
   }, [username, projectId, version]);
   if (loading && !detail) return <main role="status" className="min-h-screen bg-slate-50 p-8 text-sm text-slate-600">Loading project…</main>;
-  if (!detail) return <main className="min-h-screen bg-slate-50 p-8"><div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8">
+  if (!detail) return <main className="min-h-screen bg-slate-50 p-8"><div className="ui-card mx-auto max-w-xl p-8">
     <h1 className="text-xl font-semibold">{notFound ? "Project not found" : "Could not load project"}</h1>
     <p role="alert" className="mt-2 text-sm text-slate-600">{notFound ? "This project is unavailable or private." : error}</p>
-    {!notFound && <button type="button" onClick={() => { setLoading(true); setVersion((value) => value + 1); }} className="mt-4 text-sm font-semibold text-violet-700 underline">Retry</button>}
-    <Link href={`/profile/${encodeURIComponent(username)}`} className="ml-4 text-sm font-semibold text-violet-700 underline">Back to profile</Link>
+    {!notFound && <button type="button" onClick={() => { setLoading(true); setVersion((value) => value + 1); }} className="ui-button ui-button-primary mt-4">Retry</button>}
+    <Link href={`/profile/${encodeURIComponent(username)}`} className="ml-4 text-sm font-semibold text-primary underline">Back to profile</Link>
   </div></main>;
   return <PublicProjectDetailContent detail={detail} username={username} />;
 }

@@ -72,7 +72,7 @@ export function Editor({ resource, record, onSaved, onCancel, submissionOptions 
   return <form onSubmit={save} className="mt-3 grid gap-3 rounded-xl border border-violet-200 bg-violet-50/50 p-4 sm:grid-cols-2">
     {keys[resource].map((key) => <Field key={key} title={format(key)}>{key === "submission" ? <select className={fieldClass} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })}><option value="">No linked submission</option>{submissionOptions.map((item) => <option key={item.id} value={item.id}>{item.project_title}</option>)}</select> : ["format", "status", "achievement_type", "is_public"].includes(key) ? <select className={fieldClass} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })}>{(key === "format" ? ["unknown", "online", "in_person", "hybrid"] : key === "is_public" ? ["false", "true"] : key === "achievement_type" ? ["placement", "award", "finalist", "participation", "other"] : resource === "participations" ? ["registered", "attended", "submitted"] : ["draft", "submitted", "withdrawn"]).map((option) => <option key={option} value={option}>{format(option)}</option>)}</select> : <input className={fieldClass} type={key.endsWith("_date") ? "date" : key === "submitted_at" ? "datetime-local" : ["rank", "total_participants"].includes(key) ? "number" : "text"} step={key === "submitted_at" ? 1 : undefined} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })} />}</Field>)}
     {error && <p role="alert" className="sm:col-span-2 text-sm text-rose-700">{error}</p>}
-    <div className="flex gap-2 sm:col-span-2"><button disabled={busy} className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Saving…" : "Save changes"}</button><button type="button" onClick={onCancel} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button></div>
+    <div className="flex gap-2 sm:col-span-2"><button disabled={busy} className="ui-button ui-button-primary">{busy ? "Saving…" : "Save changes"}</button><button type="button" onClick={onCancel} className="ui-button ui-button-secondary">Cancel</button></div>
   </form>;
 }
 
@@ -89,7 +89,7 @@ function AchievementAdd({ participationId, submissions, onSaved }: { participati
     <Field title="Description"><textarea className={fieldClass} {...register("description")} /></Field>
     <Field title="Evidence URL" error={errors.evidence_url?.message}><input type="url" className={fieldClass} {...register("evidence_url")} /></Field>
     <Field title="Linked submission (optional)"><select className={fieldClass} value={submissionId} onChange={(e) => setSubmissionId(e.target.value)}><option value="">No linked submission</option>{submissions.map((item) => <option key={item.id} value={item.id}>{item.project_title}</option>)}</select></Field>
-    {error && <p role="alert" className="sm:col-span-2 text-sm text-rose-700">{error}</p>}<button disabled={isSubmitting} className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSubmitting ? "Saving…" : "Add achievement"}</button>
+    {error && <p role="alert" className="sm:col-span-2 text-sm text-rose-700">{error}</p>}<button disabled={isSubmitting} className="ui-button ui-button-primary">{isSubmitting ? "Saving…" : "Add achievement"}</button>
   </form>;
 }
 

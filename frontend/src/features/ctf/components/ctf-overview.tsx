@@ -15,7 +15,7 @@ export function CTFOverview({ account, onView }: { account: PlatformAccount | nu
           <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
             Connect a CTFtime team to bring its public rankings into your profile.
           </p>
-          <Link href="/platforms" className="mt-5 inline-flex h-10 items-center rounded-xl bg-emerald-600 px-5 text-xs font-semibold text-white hover:bg-emerald-700">
+          <Link href="/platforms" className="ui-button ui-button-primary mt-5">
             Connect a team
           </Link>
         </div>

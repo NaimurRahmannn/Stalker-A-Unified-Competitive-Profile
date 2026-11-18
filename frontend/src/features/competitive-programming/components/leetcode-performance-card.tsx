@@ -24,7 +24,7 @@ export function LeetCodePerformanceCard({ account, stats, onSync, isSyncing, coo
             <p className="mt-1 text-[10px] text-slate-500">{account.ownership_verified ? "Ownership verified" : "Ownership not verified"}</p>
           </div>
         </div>
-        <button type="button" onClick={onSync} disabled={disabled} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"><RefreshCw className={`size-4 ${isSyncing ? "animate-spin" : ""}`} />{syncLabel}</button>
+        <button type="button" onClick={onSync} disabled={disabled} className="ui-button ui-button-primary shrink-0"><RefreshCw className={`size-4 ${isSyncing ? "animate-spin" : ""}`} />{syncLabel}</button>
       </div>
       {stats ? <>
         <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">

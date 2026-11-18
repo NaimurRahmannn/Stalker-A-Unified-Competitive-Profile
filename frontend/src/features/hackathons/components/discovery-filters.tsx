@@ -5,7 +5,7 @@ import type { EventFilters, ProjectFilters } from "../types";
 export const initialProjectFilters: ProjectFilters = { search: "", source: "", visibility: "", technology: "", ordering: "newest" };
 export const initialEventFilters: EventFilters = { name: "", status: "", year: "", event_format: "", source: "", ordering: "newest" };
 
-const inputClass = "min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200";
+const inputClass = "ui-input min-w-0";
 
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: Array<[string, string]>; onChange: (value: string) => void }) {
   return <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-slate-600">{label}

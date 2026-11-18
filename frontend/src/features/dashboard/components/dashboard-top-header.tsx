@@ -1,7 +1,5 @@
 import {
   Bell,
-  Search,
-  Sun,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { PublicProfileActions } from "./public-profile-actions";
@@ -35,7 +33,7 @@ export function DashboardTopHeader({
   username?: string;
 }) {
   return (
-    <header className="flex flex-col gap-5 min-[1750px]:flex-row min-[1750px]:items-start min-[1750px]:justify-between">
+    <header className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
       <div className="min-w-0">
         <h1 className="text-[25px] font-semibold leading-tight tracking-normal text-slate-950 sm:text-[28px]">
           Good morning, {displayName}{" "}
@@ -46,28 +44,12 @@ export function DashboardTopHeader({
         </p>
       </div>
 
-      <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center min-[1750px]:w-auto min-[1750px]:justify-end">
-        <label className="relative block w-full sm:min-w-0 sm:flex-1 sm:basis-80 min-[1750px]:w-101.25 min-[1750px]:flex-none">
-          <span className="sr-only">Search anything</span>
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            placeholder="Search anything..."
-            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-16 text-[13px] text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-          />
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium leading-none text-slate-500">
-            {"\u2318"} K
-          </span>
-        </label>
-
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-3 xl:w-auto xl:justify-end">
         {username ? <PublicProfileActions username={username} /> : null}
 
         <div className="hidden items-center gap-2 lg:flex">
           <HeaderIconButton label="Notifications">
             <Bell className="size-5" />
-          </HeaderIconButton>
-          <HeaderIconButton label="Theme">
-            <Sun className="size-5" />
           </HeaderIconButton>
         </div>
       </div>

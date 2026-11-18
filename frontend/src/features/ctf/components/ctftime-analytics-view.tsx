@@ -40,7 +40,7 @@ function TeamPerformanceCard({ account, onSync, isSyncing, cooldownSeconds }: {
             {profile ? <p className="mt-1 truncate text-[10px] text-slate-500">{profile.name}{profile.country ? ` · ${profile.country}` : ""}</p> : null}
           </div>
         </div>
-        <button type="button" onClick={onSync} disabled={disabled} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300">
+        <button type="button" onClick={onSync} disabled={disabled} className="ui-button ui-button-primary shrink-0">
           <RefreshCw className={`size-4 ${isSyncing ? "animate-spin" : ""}`} />{syncLabel}
         </button>
       </div>
@@ -157,7 +157,7 @@ export function CTFtimeAnalyticsView({ account, onSync, isSyncing, cooldownSecon
   cooldownSeconds: number;
 }) {
   if (!account) {
-    return <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm"><h2 className="text-lg font-semibold text-slate-950">Connect CTFtime to start tracking your team</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">Add your numeric team ID, then sync to load the team profile and yearly rankings.</p><Link href="/platforms" className="mt-6 inline-flex h-10 items-center rounded-xl bg-emerald-600 px-5 text-xs font-semibold text-white hover:bg-emerald-700">Connect CTFtime</Link></div>;
+    return <div className="ui-card border-dashed px-6 py-16 text-center"><h2 className="text-lg font-semibold text-slate-950">Connect CTFtime to start tracking your team</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">Add your numeric team ID, then sync to load the team profile and yearly rankings.</p><Link href="/platforms" className="ui-button ui-button-primary mt-6">Connect CTFtime</Link></div>;
   }
 
   return (

@@ -111,7 +111,7 @@ export const journeyAccentStyles: Record<MetricAccent, JourneyAccentStyle> = {
 };
 
 export const dashboardCardSurface =
-  "rounded-[22px] border border-slate-200/80 bg-[linear-gradient(155deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_16px_42px_rgba(15,23,42,0.055)]";
+  "ui-card";
 
 export const achievementAccentStyles: Record<
   MetricAccent,

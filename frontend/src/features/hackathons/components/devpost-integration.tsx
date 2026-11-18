@@ -133,7 +133,7 @@ export function DevpostIntegration({ onImported }: { onImported: () => Promise<v
           <div className="min-w-0 flex-1"><label htmlFor="devpost-reference" className="text-xs font-semibold text-slate-600">Devpost username or profile URL</label>
             <input id="devpost-reference" {...register("reference")} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="example_user or https://devpost.com/example_user" />
             {errors.reference && <p className="mt-1 text-xs text-rose-700">{errors.reference.message}</p>}</div>
-          <button disabled={busy || isSubmitting} className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:mt-5">{account ? "Change profile" : "Link profile"}</button>
+          <button disabled={busy || isSubmitting} className="ui-button ui-button-primary sm:mt-5">{account ? "Change profile" : "Link profile"}</button>
           {account && <button type="button" disabled={busy} onClick={() => void unlink()} className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-50 sm:mt-5">Unlink</button>}
         </form>
         {account && <p className="mt-2 text-xs text-amber-800">Changing this handle invalidates pending previews. Historical records and manual achievements remain unchanged.</p>}
@@ -146,13 +146,13 @@ export function DevpostIntegration({ onImported }: { onImported: () => Promise<v
           <button type="button" onClick={() => { clearPreview(); setDocumentText(JSON.stringify(exampleDocument(account.handle), null, 2)); }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Load schema example</button></div>
         <label htmlFor="devpost-json" className="mt-3 block text-xs font-semibold text-slate-600">JSON document</label>
         <textarea id="devpost-json" value={documentText} maxLength={DEVPOST_REQUEST_LIMIT} onChange={(event) => { clearPreview(); setDocumentText(event.target.value); }} rows={10} spellCheck={false} className="mt-1 w-full rounded-lg border border-slate-300 p-3 font-mono text-xs" placeholder="Paste STALKER JSON v1 here or choose a file" />
-        <button type="button" disabled={busy || !documentText.trim()} onClick={() => void previewImport()} className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Working…" : "Preview import"}</button>
+        <button type="button" disabled={busy || !documentText.trim()} onClick={() => void previewImport()} className="ui-button ui-button-primary mt-3">{busy ? "Working…" : "Preview import"}</button>
       </div>}
       {preview && <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
         <h3 className="font-semibold">Import preview</h3>
         <ImportPreviewDetails preview={preview} />
         <label className="mt-3 flex items-start gap-2 text-xs text-slate-700"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-0.5" />I reviewed these changes and want to import this user-provided data.</label>
-        <button type="button" disabled={busy || !confirmed || preview.conflicts.length > 0} onClick={() => void applyImport()} className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Confirm import</button>
+        <button type="button" disabled={busy || !confirmed || preview.conflicts.length > 0} onClick={() => void applyImport()} className="ui-button ui-button-primary mt-3">Confirm import</button>
       </div>}
       {result && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><h3 className="font-semibold">Import completed</h3><p>{result.created_count} created · {result.updated_count} updated · {result.skipped_count} skipped</p><p>{result.result.events_created ?? 0} hackathons, {result.result.participations_created ?? 0} participations, and {result.result.submissions_created ?? 0} submissions created.</p>{result.result.warnings?.map((warning, index) => <p key={`${index}-${warning}`} className="mt-1 text-xs">{warning}</p>)}</div>}
       <DuplicateReviewPanel refreshKey={result?.id ?? 0} />

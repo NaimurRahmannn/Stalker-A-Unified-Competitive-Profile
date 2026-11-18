@@ -1,28 +1,131 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #111827;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --surface-hover: #f1f5f9;
+  --secondary-foreground: #475569;
+  --muted-foreground: #64748b;
+  --disabled-foreground: #94a3b8;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-active: #3730a3;
+  --primary-soft: #eef2ff;
+  --primary-foreground: #ffffff;
+  --success: #15803d;
+  --success-soft: #f0fdf4;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
+  --destructive: #dc2626;
+  --destructive-soft: #fef2f2;
+  --information: #1d4ed8;
+  --information-soft: #eff6ff;
+  --domain-cp: #059669;
+  --domain-cp-soft: #ecfdf5;
+  --domain-ctf: #2563eb;
+  --domain-ctf-soft: #eff6ff;
+  --domain-hackathon: #7c3aed;
+  --domain-hackathon-soft: #f5f3ff;
+  --domain-datathon: #087ea4;
+  --domain-datathon-soft: #e8f8fe;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-disabled-foreground: var(--disabled-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-information: var(--information);
+  --color-information-soft: var(--information-soft);
+  --color-domain-cp: var(--domain-cp);
+  --color-domain-cp-soft: var(--domain-cp-soft);
+  --color-domain-ctf: var(--domain-ctf);
+  --color-domain-ctf-soft: var(--domain-ctf-soft);
+  --color-domain-hackathon: var(--domain-hackathon);
+  --color-domain-hackathon-soft: var(--domain-hackathon-soft);
+  --color-domain-datathon: var(--domain-datathon);
+  --color-domain-datathon-soft: var(--domain-datathon-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  button, input, select, textarea, a { -webkit-tap-highlight-color: transparent; }
+  button:not(:disabled), a { cursor: pointer; }
+  :is(button, a, input, select, textarea):focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  :is(button, input, select, textarea):disabled { cursor: not-allowed; opacity: .55; }
+  input, select, textarea { accent-color: var(--primary); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+}
+
+@layer components {
+  .ui-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.5rem; padding: .5rem 1rem; border: 1px solid transparent; border-radius: .625rem; font-size: .875rem; font-weight: 600; line-height: 1.25rem; transition: background-color .15s, border-color .15s, color .15s; }
+  .ui-button-sm { min-height: 2.25rem; padding: .375rem .75rem; font-size: .8125rem; }
+  .ui-button-lg { min-height: 2.75rem; padding: .625rem 1.25rem; }
+  .ui-button-icon { width: 2.5rem; padding: .5rem; }
+  .ui-button-primary { background: var(--primary); color: var(--primary-foreground); }
+  .ui-button-primary:hover:not(:disabled) { background: var(--primary-hover); }
+  .ui-button-primary:active:not(:disabled) { background: var(--primary-active); }
+  .ui-button-secondary, .ui-button-outline { border-color: var(--border); background: var(--surface); color: var(--foreground); }
+  .ui-button-secondary:hover:not(:disabled), .ui-button-outline:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
+  .ui-button-ghost { color: var(--muted-foreground); }
+  .ui-button-ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--foreground); }
+  .ui-button-destructive { background: var(--destructive); color: white; }
+  .ui-button-destructive:hover:not(:disabled) { background: #b91c1c; }
+  .ui-button-link { min-height: auto; padding: 0; color: var(--primary); }
+  .ui-button-link:hover:not(:disabled) { text-decoration: underline; }
+  .ui-card { border: 1px solid var(--border); border-radius: 1rem; background: var(--surface); box-shadow: 0 1px 3px rgb(15 23 42 / .04); }
+  .ui-card-subtle { background: var(--background); box-shadow: none; }
+  .ui-card-elevated { box-shadow: 0 8px 24px rgb(15 23 42 / .07); }
+  .ui-card-interactive { transition: border-color .15s, box-shadow .15s; }
+  .ui-card-interactive:hover { border-color: var(--border-strong); box-shadow: 0 4px 16px rgb(15 23 42 / .07); }
+  .ui-input { min-height: 2.5rem; width: 100%; border: 1px solid var(--border-strong); border-radius: .625rem; background: var(--surface); padding: .5rem .75rem; color: var(--foreground); font-size: .875rem; outline: none; }
+  .ui-input::placeholder { color: var(--disabled-foreground); }
+  .ui-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .ui-input[aria-invalid="true"] { border-color: #f87171; }
+  .ui-input[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px var(--destructive-soft); }
+  .ui-tab { min-height: 2.25rem; border-radius: .5rem; padding: .375rem 1rem; color: var(--muted-foreground); font-size: .8125rem; font-weight: 600; }
+  .ui-tab:hover { background: var(--surface-hover); color: var(--foreground); }
+  .ui-tab[aria-selected="true"], .ui-tab[aria-pressed="true"] { background: var(--primary-soft); color: var(--primary-active); }
+  .ui-badge { display: inline-flex; align-items: center; gap: .375rem; border-radius: .5rem; padding: .2rem .5rem; font-size: .6875rem; font-weight: 600; }
+  .ui-badge-success { background: var(--success-soft); color: var(--success); }
+  .ui-badge-warning { background: var(--warning-soft); color: var(--warning); }
+  .ui-badge-error { background: var(--destructive-soft); color: var(--destructive); }
+  .ui-badge-info { background: var(--information-soft); color: var(--information); }
+  .ui-badge-neutral { background: var(--surface-muted); color: var(--secondary-foreground); }
 }
 
 @keyframes slideUp {
