@@ -1,10 +1,9 @@
 "use client";
 
-import { CalendarDays, ExternalLink } from "lucide-react";
+import { ArrowRight, CalendarDays, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getDashboardEvents, type DashboardEvent } from "../api";
-import { WidgetCard } from "./widget-card";
 
 function formatEventTime(value: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -21,7 +20,7 @@ function EventRow({ event }: { event: DashboardEvent }) {
       href={event.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group block rounded-xl border border-slate-100 bg-slate-50/70 p-3 transition hover:border-emerald-200 hover:bg-emerald-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+      className="group block border-b border-slate-100 py-3.5 last:border-b-0 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
     >
       <div className="flex items-start justify-between gap-3">
         <span className="min-w-0 text-xs font-semibold leading-5 text-slate-900 group-hover:text-emerald-800">
@@ -63,10 +62,13 @@ export function ClistEventsCard() {
   }, [requestVersion]);
 
   return (
-    <WidgetCard title="Live & upcoming contests">
+    <section aria-labelledby="sidebar-contests-heading" className="min-w-0">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-3">
+        <h2 id="sidebar-contests-heading" className="text-sm font-semibold text-slate-950">Live & upcoming contests</h2>
+        <CalendarDays aria-hidden="true" className="size-4 shrink-0 text-emerald-600" />
+      </div>
       <div className="mt-3 flex items-center justify-between gap-2 text-[11px] font-medium text-slate-500">
         <span className="inline-flex items-center gap-1.5">
-          <CalendarDays aria-hidden="true" className="size-3.5 text-emerald-600" />
           Events across platforms
         </span>
         <span>via CLIST</span>
@@ -94,18 +96,18 @@ export function ClistEventsCard() {
           No upcoming contests found.
         </p>
       ) : (
-        <div aria-label="Upcoming contests" className="mt-4 grid max-h-[440px] gap-2 overflow-y-auto pr-1">
+        <div aria-label="Upcoming contests" className="mt-3 max-h-[560px] overflow-y-auto pr-1">
           {events.slice(0, 30).map((event) => <EventRow key={event.id} event={event} />)}
         </div>
       )}
 
       <Link
         href="/contests"
-        className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
+        className="mt-4 inline-flex w-full items-center justify-between gap-2 border-t border-slate-200 pt-4 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
       >
         View all contests
-        <CalendarDays aria-hidden="true" className="size-3" />
+        <ArrowRight aria-hidden="true" className="size-3.5" />
       </Link>
-    </WidgetCard>
+    </section>
   );
 }

@@ -75,8 +75,8 @@ function DashboardLoadingState() {
   return (
     <>
       <DashboardHeaderSkeleton />
-      <div className="grid min-w-0 grid-cols-1 gap-6 p-5 sm:p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <section className="min-w-0">
+      <div className="grid min-w-0 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <section className="min-w-0 p-5 sm:p-6 lg:p-8">
           <MetricCardsSkeleton />
           <section className="mt-7">
             <div className="h-5 w-44 animate-pulse rounded bg-slate-200" />
@@ -85,14 +85,18 @@ function DashboardLoadingState() {
           <SectionSkeleton />
           <SectionSkeleton />
         </section>
-        <aside className="min-w-0 border-t border-slate-200 pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-          <div className="grid gap-4">
-            {Array.from({ length: 3 }, (_, index) => (
-              <div
-                key={index}
-                className="h-52 animate-pulse rounded-2xl border border-slate-200 bg-white"
-              />
-            ))}
+        <aside className="min-w-0 border-t border-slate-200 bg-white p-5 sm:p-6 lg:p-8 xl:border-l xl:border-t-0 xl:px-5 xl:py-8">
+          <div className="animate-pulse">
+            <div className="h-4 w-40 rounded bg-slate-200" />
+            <div className="mt-6 divide-y divide-slate-100">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div key={index} className="py-4">
+                  <div className="h-4 w-4/5 rounded bg-slate-200" />
+                  <div className="mt-2 h-3 w-2/3 rounded bg-slate-100" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 h-4 w-28 rounded bg-slate-200" />
           </div>
         </aside>
       </div>
@@ -225,8 +229,8 @@ export function DashboardPageContent() {
             />
           </section>
 
-          <div className="grid min-w-0 grid-cols-1 gap-6 p-5 sm:p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <section className="min-w-0">
+          <div className="grid min-w-0 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px]">
+            <section className="min-w-0 p-5 sm:p-6 lg:p-8">
               {error ? <RefreshErrorBanner message={error} onRetry={retry} /> : null}
 
               <MetricCardsSection metrics={viewModel.metrics} />
@@ -242,7 +246,7 @@ export function DashboardPageContent() {
               <RecentAchievementsSection />
             </section>
 
-            <aside className="min-w-0 border-t border-slate-200 pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+            <aside className="min-w-0 border-t border-slate-200 bg-white p-5 sm:p-6 lg:p-8 xl:border-l xl:border-t-0 xl:px-5 xl:py-8">
               <RightWidgetsPanel />
             </aside>
           </div>

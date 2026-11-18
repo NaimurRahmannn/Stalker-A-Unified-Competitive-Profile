@@ -55,7 +55,7 @@ async function mount() {
   return root;
 }
 
-test("right sidebar shows CLIST contests and preserves streak and image cards", async () => {
+test("right sidebar shows a full-width contest list and streak without the bottom image", async () => {
   fetchEvents = () => Promise.resolve({ status: "ready", source: "CLIST", updated_at: "2026-11-14T00:00:00Z", next_page: null, events: [
     { id: 4, title: "Weekend Challenge", platform: "example.org", start: "2026-11-15T10:00:00Z", end: "2026-11-15T12:00:00Z", url: "https://example.org/contest", ongoing: false },
   ] });
@@ -67,11 +67,12 @@ test("right sidebar shows CLIST contests and preserves streak and image cards", 
   assert.equal(document.querySelector("a[href='https://example.org/contest']").getAttribute("rel"), "noopener noreferrer");
   assert.ok(document.querySelector("a[href='/contests']"));
   assert.equal(document.querySelector("a[href='https://clist.by/']"), null);
-  assert.ok(document.querySelector("img[src='/images/stalker_right_bg.png']"));
+  assert.ok(document.querySelector("section[aria-labelledby='sidebar-contests-heading']"));
+  assert.equal(document.querySelector("img[src='/images/stalker_right_bg.png']"), null);
   await act(async () => root.unmount());
 });
 
-test("CLIST failure offers retry without hiding the other cards", async () => {
+test("CLIST failure offers retry without hiding the streak section", async () => {
   fetchEvents = () => Promise.reject(new Error("provider offline"));
   const root = await mount();
   assert.match(document.body.textContent, /Contests are unavailable right now/);
